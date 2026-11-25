@@ -109,12 +109,21 @@ describe('Renderer3D.warmUp', () => {
     const progress = [];
     // The story is untold here: its freighter is made too.
     renderer.story = { warm: vi.fn() };
+    // The ending's last image: built and compiled before the frame of
+    // everything uploads it.
+    renderer.ending = {
+      warm: vi.fn((compile) => {
+        expect(composer.render).not.toHaveBeenCalled();
+        compile();
+      }),
+    };
 
     const done = renderer.warmUp((value) => progress.push(value));
     await vi.runAllTimersAsync();
     await done;
     vi.useRealTimers();
     expect(renderer.story.warm).toHaveBeenCalledTimes(1);
+    expect(renderer.ending.warm).toHaveBeenCalledTimes(1);
 
     const kinds = create.mock.calls.map(([kind]) => kind);
     for (const kind of [...KNOWN_KINDS, 'boss-choir', 'boss-null']) {

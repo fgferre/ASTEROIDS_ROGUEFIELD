@@ -266,10 +266,13 @@ describe('RunCinematics', () => {
     expect(ui.cinematics.deferUntilEpilogueEnds(show)).toBe(false);
   });
 
-  it("plays act 2's beats for the ending picked, its two lines as theirs start, then the credits", () => {
-    const { ui, renderer, spoken } = setup();
+  it("plays act 2's beats under the bars for the ending picked, its two lines as theirs start, then the credits", () => {
+    const { ui, hud, renderer, spoken } = setup();
+    const bars = hud.els.letterbox.classList;
     const onEnd = vi.fn();
-    ui.cinematics.playEnding('severance', onEnd);
+    // it says the renderer draws it (the page's own dim stays off)
+    expect(ui.cinematics.playEnding('severance', onEnd)).toBe(true);
+    expect(bars.contains('is-showing')).toBe(true);
     const beats = endingBeats('severance');
     const lines = endingTransmissions('severance');
     const total = beats.reduce(
@@ -289,9 +292,18 @@ describe('RunCinematics', () => {
       ])
     );
     expect(onEnd).not.toHaveBeenCalled();
+    expect(bars.contains('is-showing')).toBe(true);
     vi.advanceTimersByTime(1);
     expect(onEnd).toHaveBeenCalledTimes(1);
+    // the bars come off where the credits take over
+    expect(bars.contains('is-showing')).toBe(false);
     expect(endingBeats('stewardship').map(({ id }) => id)).toContain('watch');
+  });
+
+  it('a renderer that draws none of act 2 says so', () => {
+    const { ui, hud } = setup({ plays: false });
+    expect(ui.cinematics.playEnding('severance', vi.fn())).toBe(false);
+    expect(hud.els.letterbox.classList.contains('is-showing')).toBe(false);
   });
 
   it("in act 2 a hold goes to the credits once, a tap to the next beat; the last beat's tap ends it", () => {

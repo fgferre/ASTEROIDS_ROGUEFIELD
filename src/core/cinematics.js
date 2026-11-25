@@ -60,8 +60,9 @@ const WAKE_START = 0.2;
  * any run start fly the journey, frozen at t, to `&sector=<id>` (the opening
  * to the first sector without it); without `t` that journey plays on
  * (to film it). `?cinematic=story&t=` does the same with the story before it.
- * `?cinematic=ending&beat=<id>&t=` holds act 1's beat `id` (REVELATION_BEATS)
- * at t once the ending starts. Null without the flag.
+ * `?cinematic=ending&beat=<id>&t=` holds the ending's beat `id` (either act)
+ * at t once the ending starts, as `&ending=severance|stewardship` picks
+ * (Severance without it). Null without the flag.
  */
 export function cinematicFreezeFromUrl() {
   try {
@@ -77,6 +78,8 @@ export function cinematicFreezeFromUrl() {
       t: plays ? null : Number.isFinite(t) ? t : 0.5,
       sector: params.get('sector'),
       beat: params.get('beat'),
+      ending:
+        params.get('ending') === 'stewardship' ? 'stewardship' : 'severance',
     };
   } catch {
     return null;
@@ -124,22 +127,12 @@ export function wakeAt(t) {
   return easeInOut((clamp01(t) - WAKE_START) / (1 - WAKE_START));
 }
 
-// The ending (ui/runCinematics.js playEnding): the epilogue's last shot
-// held while the Ring answers the choice, its wake going from 1 to this.
-const ENDING_WAKE = Object.freeze({
+// The wake the Ring's answer goes to over act 2's `answer`, from 1, by the
+// ending picked (render3d/endingScene.js).
+export const ENDING_WAKE = Object.freeze({
   severance: 0, // the Ring's light goes out along its arc
   stewardship: 1.25, // proposta 12/11: it stays lit, a little brighter
 });
-
-/** The ending's path: the held epilogue shot, the wake easing to its own. */
-export function endingPath(ending) {
-  const to = ENDING_WAKE[ending];
-  const endingPose = epiloguePath(1);
-  return (t) => {
-    endingPose.wake = lerp(1, to, easeInOut(t));
-    return endingPose;
-  };
-}
 
 // The campaign's ending in beats (PLAN.md; ui/runCinematics.js plays them,
 // Renderer3D.playEndingBeat draws each). `line`: the index of the beat's
@@ -201,6 +194,46 @@ export const REVELATION_SHOTS = Object.freeze({
     exposure: 1,
   },
   known: { pull: [1.12, 1] },
+});
+
+// Act 2's pictures at the Crucible (render3d/endingScene.js), proposta
+// 24/11. `answer` rises from act 1's last picture as its pull-back does, to
+// `range` out at `tilt`° from straight down over a point `ahead` down the
+// field of Sovereign, in a lens `fov`, while the Ring's wake goes from 1 to
+// ENDING_WAKE. `twin`, the last image, goes on from what its `answer` left
+// (the Ring's wake at the ending's own, never relit): eye and aim in the
+// slip's own frame (render3d/places/crucibleSlip.js: x along the arc, y
+// up, z out from the star) held for `hold` of the beat, then pushing in
+// toward the lit window, the eye ending at `push` from it; lens `fov`.
+// The star below is the key light (`light`: its direction toward the
+// light in the slip's frame, colour, and level and exposure × by ending;
+// the other lights are off). Severance: the slip's lamps go out from the
+// farthest over `lamps` (shares of the beat), the window over `window`,
+// then the picture fades to black over the last `fadeMs`. Stewardship:
+// the lamps light from the farthest along the arc to the slip over
+// `arrive`, the window stays, and the picture is black for the last
+// `cutMs`.
+export const ENDING_SHOTS = Object.freeze({
+  answer: { range: 3400, tilt: 34, ahead: 40, fov: 34 },
+  twin: {
+    eye: [-470, 190, 760],
+    aim: [-30, 30, 0],
+    hold: 0.3,
+    push: [-60, 40, 260],
+    fov: 32,
+    light: {
+      from: [0, -1, 0.3],
+      color: '#ff9a4a',
+      severance: { level: 0.65, exposure: 1 },
+      stewardship: { level: 0.85, exposure: 1 },
+    },
+    severance: {
+      lamps: [0.2, 0.7],
+      window: [0.84, 0.9],
+      fadeMs: 1500,
+    },
+    stewardship: { arrive: [0.3, 0.8], cutMs: 300 },
+  },
 });
 
 // Act 2, after the choice: the answer, home, then each ending's own shots

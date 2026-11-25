@@ -397,8 +397,9 @@ export class RunEndScreens {
   /**
    * An ending picked on the choice: recorded once, the choice leaves, its
    * beats play (the ending's act 2), the HUD down to its transmission, as
-   * the Ring answers (Severance also dims the field), then the end credits
-   * and the final card.
+   * the Ring answers, then the end credits and the final card. Severance
+   * dims the field only where the scene draws no pictures (it darkens its
+   * own otherwise).
    * False when no choice is open.
    */
   chooseEnding(ending) {
@@ -410,10 +411,10 @@ export class RunEndScreens {
     updateRecords({ ending });
     const field = this.refs.victory.field;
     field?.classList.add('is-ending');
-    field?.classList.toggle('is-severed', ending === 'severance');
-    this.cinematics.playEnding(ending, () =>
+    const drawn = this.cinematics.playEnding(ending, () =>
       this.endCredits.play(() => this.showVictoryScreen(payload, ending))
     );
+    field?.classList.toggle('is-severed', ending === 'severance' && !drawn);
     return true;
   }
 

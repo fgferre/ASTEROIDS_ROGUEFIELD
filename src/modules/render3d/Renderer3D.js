@@ -15,7 +15,7 @@ import {
   createCamera,
   resolveCameraMode,
 } from '../../core/camera.js';
-import { endingPath, epiloguePath, introPath } from '../../core/cinematics.js';
+import { epiloguePath, introPath } from '../../core/cinematics.js';
 import { CAMERA_DIRECTOR } from '../../data/constants/camera.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { IS_DEV } from '../../core/env.js';
@@ -532,24 +532,13 @@ class Renderer3D extends BaseSystem {
 
   /**
    * Beat `id` of the campaign's ending (ui/runCinematics.js), `durationMs`
-   * long, `ending` the one picked in act 2: act 1's drawn by endingScene.js
-   * (to act 2), act 2's still the ending's path, started on `answer`, held.
-   * False when nothing would move, as playIntro.
+   * long, `ending` the one picked in act 2: every beat of both acts drawn
+   * by endingScene.js. False when nothing would move, as playIntro.
    */
   playEndingBeat(id, durationMs, ending) {
-    if (isRevelationBeat(id)) {
-      const drawn = this.startCinematic(holdIntroStart, 1, true, 'revelation');
-      return drawn && this.ending.start(id, durationMs);
-    }
-    if (id === 'answer') {
-      return this.startCinematic(
-        endingPath(ending),
-        durationMs,
-        true,
-        'ending'
-      );
-    }
-    return !this.failed && this.camera.isEnabled() && !this.reducedMotion;
+    const kind = isRevelationBeat(id) ? 'revelation' : 'ending';
+    const drawn = this.startCinematic(holdIntroStart, 1, true, kind);
+    return drawn && this.ending.start(id, durationMs, ending);
   }
 
   startCinematic(path, durationMs, hold, kind) {
@@ -798,6 +787,9 @@ class Renderer3D extends BaseSystem {
       () => this.three.player.warm(this.cachedPlayer, compile),
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
       () => this.three.enemies.kit.warmLooks(compile),
+      // The ending's last image: its slip and twin Wake (seeded: three
+      // names programs with Math.random).
+      () => this.seeded(() => this.ending.warm(compile)),
       () => this.drawEverything(),
       // The story's freighter (seconds): every campaign launch tells it.
       () => this.warmStory(),
@@ -1049,8 +1041,9 @@ class Renderer3D extends BaseSystem {
     );
 
     t.renderer.info.reset();
-    // The story draws its own scene in the field's place.
-    const drawn = story ? story.scene : t.scene;
+    // The story draws its own scene in the field's place (the ending's
+    // black, an empty one).
+    const drawn = story ? story.scene : this.ending?.scene ?? t.scene;
     t.composer.passes[0].scene = drawn;
     this.ending?.pose(time);
     if (this.graphics.postProcessing) t.composer.render(dt);

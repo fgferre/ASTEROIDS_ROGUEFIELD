@@ -91,7 +91,7 @@ describe("the campaign ending's beats", () => {
     ).toEqual([0, 1]);
   });
 
-  it('holds one beat of act 1 for captures: ?cinematic=ending&beat=&t=', () => {
+  it('holds one beat of either act for captures: ?cinematic=ending&beat=&t=&ending=', () => {
     vi.stubGlobal('window', {
       location: { search: '?cinematic=ending&beat=fences&t=0.25' },
     });
@@ -99,6 +99,17 @@ describe("the campaign ending's beats", () => {
       kind: 'ending',
       beat: 'fences',
       t: 0.25,
+      ending: 'severance',
+    });
+    vi.stubGlobal('window', {
+      location: {
+        search: '?cinematic=ending&beat=twin&t=1&ending=stewardship',
+      },
+    });
+    expect(cinematicFreezeFromUrl()).toMatchObject({
+      beat: 'twin',
+      t: 1,
+      ending: 'stewardship',
     });
     vi.unstubAllGlobals();
   });

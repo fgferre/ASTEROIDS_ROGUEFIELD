@@ -261,6 +261,31 @@ describe('Run end screens', () => {
     expect(victory.nextBtn.classList.contains('hidden')).toBe(true);
   });
 
+  it('dims the field for Severance only where the scene draws no pictures of it', () => {
+    const field = () => {
+      const names = new Set();
+      return {
+        classList: {
+          add: (name) => names.add(name),
+          toggle: (name, on) => (on ? names.add(name) : names.delete(name)),
+          contains: (name) => names.has(name),
+        },
+      };
+    };
+    const pick = (ending, drawn) => {
+      const { victory, win, screens, cinematics } = victoryScreen();
+      victory.field = field();
+      cinematics.playEnding.mockReturnValue(drawn);
+      win(CRUCIBLE);
+      screens.chooseEnding(ending);
+      return victory.field.classList;
+    };
+    expect(pick('severance', true).contains('is-severed')).toBe(false);
+    expect(pick('severance', false).contains('is-severed')).toBe(true);
+    expect(pick('stewardship', false).contains('is-severed')).toBe(false);
+    expect(pick('severance', true).contains('is-ending')).toBe(true);
+  });
+
   it('a sector won: the chapter cleared, its badge, Next Chapter and the way back to the map', () => {
     const { victory, win, cinematics } = victoryScreen();
     win({

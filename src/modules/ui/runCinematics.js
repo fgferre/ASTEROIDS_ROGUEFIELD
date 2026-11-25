@@ -447,11 +447,12 @@ export class RunCinematics {
    * Act 2: the ending picked (data/story.js STORY.ending), its beats
    * (endingBeats) with its two lines; `onEnd` runs once, when they are done
    * or skipped. The press that picked it has gone by when the skip binds.
+   * Whether the renderer draws its pictures (its first beat's).
    */
   playEnding(ending, onEnd) {
     this.stop();
     this.afterEnding = onEnd;
-    this.startAct(
+    return this.startAct(
       'ending',
       endingBeats(ending),
       endingTransmissions(ending),
@@ -460,26 +461,29 @@ export class RunCinematics {
     );
   }
 
-  // An act of the ending (kind 'revelation' or 'ending') from its first beat.
+  // An act of the ending (kind 'revelation' or 'ending') from its first
+  // beat; whether that beat is drawn.
   startAct(kind, beats, lines, ending, onEnd) {
     this.begin(kind);
     this.act = { beats, lines, ending, onEnd, at: 0 };
-    this.playBeat(0);
+    const drawn = this.playBeat(0);
     this.unbindSkip = this.bindSkip(
       () => this.skip(),
       () => this.next()
     );
+    return drawn;
   }
 
   /**
    * The act's beat `i`, now: its picture asked of the renderer, its line
    * spoken; the next beat when it is over, the act's end after the last.
+   * Whether its picture is drawn.
    */
   playBeat(i) {
     const { beats, lines, ending, onEnd } = this.act;
     if (i >= beats.length) {
       onEnd();
-      return;
+      return false;
     }
     const { entry, durationMs } = beatTiming(beats[i], lines);
     this.act.at = i;
@@ -488,13 +492,12 @@ export class RunCinematics {
       durationMs,
       ending
     );
-    // act 1's pictures play under the bars, the instruments away
-    if (drawn && this.kind === 'revelation') {
-      this.hud()?.showLetterbox(true, true);
-    }
+    // both acts' pictures play under the bars, the instruments away
+    if (drawn) this.hud()?.showLetterbox(true, true);
     if (entry) this.speak(entry);
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.playBeat(i + 1), durationMs);
+    return Boolean(drawn);
   }
 
   endEnding() {
@@ -577,7 +580,7 @@ export class RunCinematics {
 
   finish() {
     const { kind } = this;
-    if (['arrival', 'travel', 'story', 'revelation'].includes(kind)) {
+    if (['arrival', 'travel', 'story', 'revelation', 'ending'].includes(kind)) {
       this.hud()?.showLetterbox(false);
     }
     clearTimeout(this.timer);

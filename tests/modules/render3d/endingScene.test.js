@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { REVELATION_SHOTS } from '../../../src/core/cinematics.js';
+import {
+  ENDING_SHOTS,
+  REVELATION_SHOTS,
+} from '../../../src/core/cinematics.js';
 import { EnemyMirror } from '../../../src/modules/render3d/enemyMirror.js';
 import {
   EndingScene,
@@ -8,6 +11,7 @@ import {
   isRevelationBeat,
   shellsAt,
 } from '../../../src/modules/render3d/endingScene.js';
+import { twinAt } from '../../../src/modules/render3d/endingTwin.js';
 import { RING } from '../../../src/modules/render3d/ring/ringShape.js';
 
 const THREE = {};
@@ -21,7 +25,9 @@ new Function(
 )(THREE, {});
 
 // Just enough of Renderer3D's kit: a real scene and enemy mirror, the
-// backdrop's Ring and place sets as plain parts, a bus.
+// backdrop's Ring and place sets as plain parts (the Crucible's slip a
+// plain cradle frame, its lamps, pane and glow), the key and a fill light,
+// a bus.
 function kit() {
   const scene = new THREE.Scene();
   const enemies = new EnemyMirror(THREE, scene, (fn) => fn(), {
@@ -29,19 +35,47 @@ function kit() {
     flash: () => {},
   });
   const ring = { object: new THREE.Group(), follow: RING.follow };
+  const holder = new THREE.Group();
+  const slip = {
+    object: new THREE.Group(),
+    frame: new THREE.Group(),
+    lamps: [new THREE.Mesh(), new THREE.Mesh(), new THREE.Mesh()],
+    pane: new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial()
+    ),
+    paneColor: new THREE.Color(1, 0.8, 0.5),
+    glow: new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial()
+    ),
+    glowColor: new THREE.Color(0.5, 0.4, 0.2),
+    paneAt: new THREE.Vector3(-100, 80, 60),
+  };
+  slip.object.visible = false;
+  slip.object.add(slip.frame);
+  slip.frame.position.set(0, 1100, 2400);
+  holder.add(slip.object);
+  const crucible = {
+    object: new THREE.Group(),
+    layers: [{ anchor: [250, -3600, -900], follow: 0.9, holder }],
+    ending: vi.fn(),
+    slip: vi.fn(() => slip),
+  };
   const places = {
     object: new THREE.Group(),
-    built: new Map([
-      [
-        'the-crucible',
-        { layers: [{ anchor: [250, -3600, -900], follow: 0.9 }] },
-      ],
-    ]),
+    built: new Map([['the-crucible', crucible]]),
     setFlight: vi.fn(),
   };
+  places.object.add(holder);
   const rock = new THREE.Mesh();
+  const structures = { group: new THREE.Group() };
   const player = { group: new THREE.Group() };
-  scene.add(ring.object, places.object, rock, player.group);
+  const key = new THREE.DirectionalLight(0xffffff, 1.6);
+  key.position.set(-300, 800, 200);
+  const fill = new THREE.HemisphereLight(0xffffff, 0x000000, 0.3);
+  scene.add(ring.object, structures.group, places.object, rock, player.group);
+  scene.add(key, key.target, fill);
   const handlers = {};
   const bus = {
     on: (name, fn) => (handlers[name] = fn),
@@ -52,15 +86,17 @@ function kit() {
     scene,
     enemies,
     camera: new THREE.PerspectiveCamera(20, 16 / 9, 10, 20000),
-    renderer: { toneMappingExposure: 1 },
-    backdrop: { ring, places, setWake: vi.fn() },
+    renderer: { toneMappingExposure: 1, compile: vi.fn() },
+    backdrop: { ring, places, structures, setWake: vi.fn() },
     space: {},
-    key: { target: new THREE.Object3D() },
+    key,
     debris: { meshes: [], plates: [] },
     wardenLight: new THREE.PointLight(),
     player,
   };
-  return { t, bus, rock, ending: new EndingScene(t, bus) };
+  const ending = new EndingScene(t, bus);
+  ending.warm(() => {});
+  return { t, bus, rock, crucible, slip, fill, ending };
 }
 
 const sovereign = {
@@ -190,8 +226,8 @@ describe("the ending's act 1", () => {
     expect(view.object.visible).toBe(false);
     expect(t.player.group.visible).toBe(false);
 
-    // act 2 starts: the act's state goes back, Sovereign's view to its pool
-    bus.emit('cinematic-started', { kind: 'ending' });
+    // a reset gives everything back, Sovereign's view to its pool
+    ending.stop();
     expect(ending.active).toBe(false);
     expect(rock.visible).toBe(true);
     expect(t.backdrop.places.setFlight).toHaveBeenLastCalledWith(null);
@@ -211,5 +247,130 @@ describe("the ending's act 1", () => {
     expect(ending.progress).toBe(1);
     ending.frame(t.camera);
     expect(t.backdrop.ring.follow).toBe(RING.follow);
+  });
+
+  it("answers from act 1's last picture, Sovereign still open, the Ring's wake going to the ending's", () => {
+    const { t, bus, crucible, slip, ending } = kit();
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000);
+    ending.start('known', 5000);
+    ending.frame(t.camera);
+    // act 1 over: known held under the choice, nothing built there
+    bus.emit('cinematic-ended', { kind: 'revelation' });
+    expect(crucible.slip).toHaveBeenCalledTimes(1);
+    expect(slip.object.visible).toBe(false);
+    ending.frame(t.camera);
+    const known = t.camera.position.clone();
+    const knownTurn = t.camera.quaternion.clone();
+    const knownFov = t.camera.fov;
+
+    bus.emit('cinematic-started', { kind: 'ending' });
+    expect(ending.active).toBe(true);
+    ending.start('answer', 6000, 'stewardship');
+    ending.frame(t.camera);
+    ending.pose(1);
+    expect(t.camera.position.distanceTo(known)).toBeLessThan(1e-6);
+    expect(t.camera.quaternion.angleTo(knownTurn)).toBeLessThan(1e-6);
+    expect(t.camera.fov).toBe(knownFov);
+    expect(t.backdrop.setWake).toHaveBeenLastCalledWith(1);
+    expect(crucible.ending).toHaveBeenLastCalledWith(true);
+    expect(t.enemies.husk.object.visible).toBe(true);
+    expect(ending.boss.plateOpen).toBe(REVELATION_SHOTS.open);
+
+    now.mockReturnValue(7000);
+    ending.frame(t.camera);
+    expect(t.backdrop.setWake).toHaveBeenLastCalledWith(1.25);
+    expect(t.camera.fov).toBe(ENDING_SHOTS.answer.fov);
+    expect(t.camera.position.y).toBeGreaterThan(known.y);
+    // a beat at home not drawn yet holds the answer's last picture
+    const answered = t.camera.position.clone();
+    ending.start('steady', 5000, 'stewardship');
+    ending.frame(t.camera);
+    expect(t.camera.position.distanceTo(answered)).toBeLessThan(1e-6);
+    now.mockRestore();
+  });
+
+  it('builds the last image on the loading screen, shown only while its programs compile', () => {
+    const { t, crucible, slip } = kit();
+    const ending = new EndingScene(t, { on: () => {} });
+    const shown = [];
+    ending.warm(() => shown.push(slip.object.visible));
+    expect(shown).toEqual([true]);
+    expect(slip.object.visible).toBe(false);
+    expect(crucible.slip).toHaveBeenCalled();
+  });
+
+  it('goes on from what the answer left: Severance dark, its lamps out from the farthest and the window last; Stewardship lit to the cut', () => {
+    const ms = 7000;
+    const at = (u, ending) => ({ ...twinAt(u, ending, ms) });
+    // Severance: the Crucible severed throughout, the lamps all lit first
+    const out = [0, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95, 1].map((u) =>
+      at(u, 'severance')
+    );
+    out.forEach((f) => expect(f.wake).toBe(0));
+    expect(out[0]).toMatchObject({ on: 0, off: 1, window: 1 });
+    // the farthest go first (the lit run starts later along the arc)
+    expect(out[2].on).toBeGreaterThan(0);
+    expect(out[2].on).toBeLessThan(1);
+    const lampsOut = out.findIndex((f) => f.on === 1);
+    const windowOut = out.findIndex((f) => f.window === 0);
+    expect(lampsOut).toBeLessThan(windowOut);
+    expect(out[windowOut].black).toBe(false);
+    expect(out[windowOut].exposure).toBeGreaterThan(0);
+    expect(out.at(-1)).toMatchObject({ exposure: 0, black: true });
+    // Stewardship: plated throughout, the lamps lit from the farthest
+    const lit = [0, 0.5, 0.95, 1].map((u) => at(u, 'stewardship'));
+    lit.forEach((f) => expect(f.wake).toBe(1.25));
+    expect(lit[0]).toMatchObject({ on: 0, off: 0, window: 1 });
+    expect(lit[1].off).toBeGreaterThan(0);
+    expect(lit[2]).toMatchObject({ off: 1, window: 1, black: false });
+    expect(lit[3].black).toBe(true);
+    // the camera holds, then pushes in
+    expect(at(0.2, 'severance').push).toBe(0);
+    expect(at(0.6, 'severance').push).toBeGreaterThan(0);
+    expect(at(1, 'severance').push).toBe(1);
+  });
+
+  it('shows the slip only in the last image, black after the act until a reset gives everything back', () => {
+    const { t, bus, rock, crucible, slip, fill, ending } = kit();
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000);
+    ending.start('twin', 7000, 'severance');
+    ending.frame(t.camera);
+    ending.pose(1);
+    expect(slip.object.visible).toBe(true);
+    expect(slip.lamps.every((lamp) => lamp.visible)).toBe(true);
+    expect(slip.pane.visible).toBe(true);
+    // the star below is the key light, every other light off; back after
+    expect(t.key.position.y).toBeLessThan(t.key.target.position.y);
+    expect(fill.intensity).toBe(0);
+    expect(t.enemies.husk.object.visible).toBe(false);
+    expect(t.player.group.visible).toBe(false);
+    // the Crucible's arcs and star, no Ring
+    expect(t.backdrop.places.object.visible).toBe(true);
+    expect(t.backdrop.ring.object.visible).toBe(false);
+    expect(t.backdrop.structures.group.visible).toBe(false);
+    ending.showField();
+    expect(t.key.position.toArray()).toEqual([-300, 800, 200]);
+    expect(t.key.intensity).toBe(1.6);
+    expect(fill.intensity).toBe(0.3);
+
+    // its end (or a skip): the black holds, nothing of the scene drawn
+    bus.emit('cinematic-ended', { kind: 'ending' });
+    ending.frame(t.camera);
+    ending.pose(2);
+    expect(ending.black).toBe(true);
+    expect(slip.pane.visible).toBe(false);
+    expect(ending.scene).not.toBe(t.scene);
+    expect(ending.scene.children).toHaveLength(0);
+    ending.showField();
+
+    ending.stop();
+    expect(slip.object.visible).toBe(false);
+    expect(crucible.ending).toHaveBeenLastCalledWith(false);
+    expect(t.backdrop.ring.object.visible).toBe(true);
+    expect(t.renderer.toneMappingExposure).toBe(1);
+    expect(ending.black).toBe(false);
+    expect(ending.scene).toBe(null);
+    expect(rock.visible).toBe(true);
+    now.mockRestore();
   });
 });

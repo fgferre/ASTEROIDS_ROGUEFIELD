@@ -1,5 +1,6 @@
-// Act 1 of the campaign's ending (ui/runCinematics.js plays its beats,
-// core/cinematics.js REVELATION_BEATS; their shots REVELATION_SHOTS), drawn
+// The campaign's ending (ui/runCinematics.js plays its beats,
+// core/cinematics.js REVELATION_BEATS and endingBeats). Act 1 (its shots
+// REVELATION_SHOTS) is drawn
 // in the game's own scene after the camera rig, on the rough cut the owner
 // approved (24/11): close on Sovereign where it fell, sealed and still, its
 // shells opening wide; a slow quarter turn round it; the pull-back over the
@@ -10,23 +11,41 @@
 // Sovereign is the very view the fight drew (enemyMirror keepFallen),
 // driven by a stand-in boss from the pose it fell in. Nothing of the fight
 // shows meanwhile (hideField), and the ship only in the Crucible's shots.
-// Everything is a function of the beat's progress: `?cinematic=ending&beat=
-// <id>&t=` holds one (core/cinematics.js). Nothing is allocated per frame.
+// Act 2 at the Crucible (ENDING_SHOTS): `answer` rises from that last
+// picture, Sovereign still standing open, to a wide view over the Crucible
+// as the Ring's wake goes to the ending's own (the set answers:
+// theCrucible.js); `twin`, the last image (endingTwin.js), goes on from
+// it at the slip of an arc no other shot shows (places/crucibleSlip.js),
+// a Wake identical to ours, empty, one window lit. The black holds after the act (its end, or a skip) until the
+// scene resets (stop). The beats between, in the opening's scene, are not
+// drawn yet: they hold `answer`'s last picture.
+// Each beat sets its whole state from scratch, a function of its progress:
+// `?cinematic=ending&beat=<id>&t=&ending=` holds one (core/cinematics.js).
+// Nothing is allocated per frame.
 
 import {
+  ENDING_SHOTS,
+  ENDING_WAKE,
   REVELATION_BEATS,
   REVELATION_SHOTS as SHOTS,
   cinematicFreezeFromUrl,
   easeInOut,
+  endingBeats,
   wakeAt,
 } from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
 import { biomeForLayer } from '../../data/biomes.js';
 import { sectorById } from '../../data/sectors.js';
 import { HALF_H, HALF_W } from './batches.js';
+import { LastImage } from './endingTwin.js';
 import { RING } from './ring/ringShape.js';
 
 const BEATS = new Set(REVELATION_BEATS.map((beat) => beat.id));
+const ALL_BEATS = new Set([
+  ...BEATS,
+  ...endingBeats('severance').map((beat) => beat.id),
+  ...endingBeats('stewardship').map((beat) => beat.id),
+]);
 const CRUCIBLE = 'the-crucible';
 // The hero view's lens up (+y), and the pull-back's (up the field).
 const UP = [0, 1, 0];
@@ -82,11 +101,11 @@ export class EndingScene {
     eventBus?.on('boss-defeated', ({ enemy } = {}) => {
       if (enemy?.bossKind === 'sovereign') this.fallen(enemy);
     });
+    // act 1 over: its last picture holds under the choice; act 2 over:
+    // the black holds
     eventBus?.on('cinematic-ended', ({ kind } = {}) => {
-      if (kind === 'revelation') this.settle();
-    });
-    eventBus?.on('cinematic-started', ({ kind } = {}) => {
-      if (kind === 'ending') this.stop();
+      if (kind === 'revelation') this.settle('known');
+      if (kind === 'ending') this.settle('twin');
     });
     // A cut away from the Crucible's field (no Sovereign, no ship).
     this.cut = false;
@@ -100,6 +119,12 @@ export class EndingScene {
     });
     this.baseFov = null;
     this.exposure = t.renderer.toneMappingExposure;
+    // The ending picked (act 2), the last image (endingTwin.js), and
+    // whether the picture is black.
+    this.ending = null;
+    this.last = new LastImage(t);
+    this.black = false;
+    this.blank = new THREE.Scene();
     // Where Sovereign fell (world) and how, and the stand-in boss that
     // poses it.
     this.centre = new THREE.Vector3();
@@ -163,12 +188,15 @@ export class EndingScene {
   }
 
   /**
-   * Beat `id` of act 1 over `durationMs` (a dev freeze holds its own beat
-   * at its t); the first takes Sovereign from where it fell. True.
+   * Beat `id` of either act over `durationMs`, `ending` the one picked (act
+   * 2; a dev freeze holds its own beat at its t, for its own ending); the
+   * first takes Sovereign from where it fell. True.
    */
-  start(id, durationMs) {
+  start(id, durationMs, ending = null) {
     const { freeze } = this;
-    const held = freeze?.kind === 'ending' && isRevelationBeat(freeze.beat);
+    const held = freeze?.kind === 'ending' && ALL_BEATS.has(freeze.beat);
+    if (held) this.ending = freeze.ending;
+    else this.ending = ending;
     this.hold(held ? freeze.beat : id, durationMs, held ? freeze.t : null);
     return true;
   }
@@ -219,11 +247,18 @@ export class EndingScene {
     this.posed = true;
   }
 
-  /** The act ended before its last beat (a skip): its last picture holds. */
-  settle() {
+  /**
+   * An act ended (or was skipped): its last picture (`last`, act 1's or the
+   * black after the last image) holds until the next act or a reset.
+   */
+  settle(last) {
     if (!this.active || this.frozenAt !== null) return;
-    if (this.beat === 'known') return;
-    this.hold('known', 1, 1);
+    this.hold(last, 1, 1);
+  }
+
+  /** Loading screen: the last image's slip built and compiled (LastImage). */
+  warm(compile) {
+    this.last.warm(compile);
   }
 
   stop() {
@@ -237,10 +272,19 @@ export class EndingScene {
     this.showField();
     this.mirror.keepFallen = false;
     this.mirror.releaseHusk();
+    this.ending = null;
+    this.black = false;
+    this.last.show(false);
+    t.backdrop.places.built.get(CRUCIBLE).ending(false);
     t.backdrop.places.setFlight(null);
     t.backdrop.ring.follow = RING.follow;
     t.renderer.toneMappingExposure = this.exposure;
     this.setFov(this.baseFov);
+  }
+
+  /** The scene drawn instead of the field's: an empty one while black. */
+  get scene() {
+    return this.active && this.black ? this.blank : null;
   }
 
   get progress() {
@@ -250,7 +294,8 @@ export class EndingScene {
 
   /**
    * This frame of the beat, after the rig has posed `camera`: the camera,
-   * the places, the Ring's wake and hold, the look and Sovereign's pose.
+   * the places, the Ring's wake and hold, the look and Sovereign's pose;
+   * the slip shown only in the last image.
    */
   frame(camera) {
     if (!this.active) return;
@@ -258,21 +303,34 @@ export class EndingScene {
     const u = this.progress;
     const { beat, boss } = this;
     const t = this.t;
-    const shot = SHOTS[beat];
-    this.cut = Boolean(shot.sector);
+    const revelation = isRevelationBeat(beat);
     // Sovereign: as it fell, shut, then open; its orders turn to REBUILD's
-    // once sealed (both orders would open only half the shells)
+    // once sealed (both orders would open only half the shells); it stays
+    // open after
     const opening = beat === 'opens';
     boss.plateOpen = opening ? shellsAt(u, this.fell.plateOpen) : SHOTS.open;
     boss.order =
       opening && u < (SHOTS.opens.sealed * 2) / 3 ? this.fell.order : 'rebuild';
-    let wake = 1;
-    if (this.cut) wake = this.poseCut(camera, shot, u);
+    t.backdrop.places.built.get(CRUCIBLE).ending(!revelation);
+    this.last.show(beat === 'twin');
+    this.cut = beat === 'twin' || Boolean(SHOTS[beat]?.sector);
+    this.black = false;
+    this.look = null;
+    t.backdrop.ring.follow = RING.follow;
+    t.renderer.toneMappingExposure = this.exposure;
+    let wake;
+    if (beat === 'twin') wake = this.poseTwin(camera, u);
+    else if (!revelation) {
+      // answer; the beats at home hold its last picture until drawn
+      const k = easeInOut(beat === 'answer' ? u : 1);
+      this.poseRise(camera, k, ENDING_SHOTS.answer);
+      wake = lerp(1, ENDING_WAKE[this.ending] ?? 1, k);
+    } else if (this.cut) wake = this.poseCut(camera, SHOTS[beat], u);
     else if (beat === 'recoil') {
-      this.poseRecoil(camera, easeInOut(u));
+      this.poseRise(camera, easeInOut(u), SHOTS.recoil);
       wake = wakeAt(u);
     } else {
-      const { pull } = shot;
+      const { pull } = SHOTS[beat];
       this.poseHero(heroAngle(beat, u), lerp(pull[0], pull[1], easeInOut(u)));
       this.up.set(...UP);
       this.aimCamera(camera, SHOTS.hero.fov);
@@ -280,12 +338,26 @@ export class EndingScene {
       t.backdrop.places.setFlight(CRUCIBLE, 1, this.star.x, this.star.z);
       wake = beat === 'known' ? 1 : 0;
     }
-    if (!this.cut) {
-      this.look = null;
-      t.backdrop.ring.follow = RING.follow;
-      t.renderer.toneMappingExposure = this.exposure;
-    }
     t.backdrop.setWake(wake);
+  }
+
+  // The last image (endingTwin.js): its camera, the slip, the exposure
+  // and the black. Returns the Ring's wake.
+  poseTwin(camera, u) {
+    const t = this.t;
+    const twin = this.last.frame(
+      u,
+      this.ending,
+      this.durationMs,
+      this.eye,
+      this.aim
+    );
+    this.up.set(...UP);
+    this.aimCamera(camera, ENDING_SHOTS.twin.fov);
+    t.renderer.toneMappingExposure = this.exposure * twin.exposure;
+    t.backdrop.ring.follow = 0;
+    this.black = twin.black;
+    return twin.wake;
   }
 
   // The hero view turned `angle` about Sovereign, `pull` × as far.
@@ -333,13 +405,13 @@ export class EndingScene {
     );
   }
 
-  // From the hero view's end (count's) up and back over the whole
-  // Crucible, `k` of the way: the eye's offset turns and grows
-  // geometrically, the star eases from behind Sovereign to where the play
-  // view would lay it.
-  poseRecoil(camera, k) {
-    const { range, tilt, ahead, fov } = SHOTS.recoil;
-    this.poseHero(0, SHOTS.count.pull[1]);
+  // From the hero view's end (count's, known's) up and back over the
+  // whole Crucible to `shot`'s pose, `k` of the way: the eye's offset turns
+  // and grows geometrically, the star eases from behind Sovereign to where
+  // the view would lay it.
+  poseRise(camera, k, shot) {
+    const { range, tilt, ahead, fov } = shot;
+    this.poseHero(0, 1);
     this.holdStar(this.eye, this.aim);
     const sx = this.star.x;
     const sz = this.star.z;
@@ -418,26 +490,36 @@ export class EndingScene {
       ship.rotation.y = -Math.atan2(-z, -x);
     }
     this.hideField();
+    if (this.beat === 'twin' && !this.black) this.last.light(this.ending);
   }
 
-  // Every root of the fight out of the frame (showField after the draw).
+  // Every root of the fight out of the frame (showField after the draw),
+  // the Ring too in the last image.
   hideField() {
     const roots = this.t.scene.children;
     const husk = this.mirror.husk?.object;
     const ship = this.t.player.group;
+    const { ring, structures } = this.t.backdrop;
+    const twin = this.beat === 'twin';
     for (let i = 0; i < roots.length; i += 1) {
       const root = roots[i];
-      if (!root.visible || root.isLight || root === husk || root === ship) {
+      if (!root.visible || root.isLight) continue;
+      // the last image shows no Ring: only the Crucible's arcs and star
+      const ringRoot = root === ring.object || root === structures.group;
+      if (twin && ringRoot) {
+        root.visible = false;
+        this.hidden.push(root);
         continue;
       }
-      if (this.keep.has(root)) continue;
+      if (root === husk || root === ship || this.keep.has(root)) continue;
       root.visible = false;
       this.hidden.push(root);
     }
   }
 
-  /** After the draw: the fight's roots as they were. */
+  /** After the draw: the fight's roots and the lights as they were. */
   showField() {
+    this.last.unlight();
     for (let i = 0; i < this.hidden.length; i += 1) {
       this.hidden[i].visible = true;
     }
