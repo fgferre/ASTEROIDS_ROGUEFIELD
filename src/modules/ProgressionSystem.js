@@ -660,11 +660,11 @@ class ProgressionSystem extends UpgradeSystem {
     }
   }
 
-  exportState() {
+  getSnapshotState() {
     return this.serialize();
   }
 
-  importState(snapshot) {
+  restoreSnapshotState(snapshot) {
     try {
       this.deserialize(snapshot);
       this._snapshotFallbackWarningIssued = false;
@@ -680,22 +680,6 @@ class ProgressionSystem extends UpgradeSystem {
 
       return false;
     }
-  }
-
-  getSnapshotState() {
-    return this.exportState();
-  }
-
-  captureSnapshot() {
-    return this.exportState();
-  }
-
-  restoreSnapshotState(snapshot) {
-    return this.importState(snapshot);
-  }
-
-  applySnapshot(snapshot) {
-    return this.importState(snapshot);
   }
 
   restoreState(data) {
