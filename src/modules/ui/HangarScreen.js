@@ -19,6 +19,7 @@ import {
   pressureNoteText,
   salvageBalanceText,
 } from './hangar.js';
+import { isPilotStale } from '../../core/storage.js';
 import { getAllShipModels, getShipModelById } from '../../data/shipModels.js';
 
 export class HangarScreen {
@@ -105,6 +106,12 @@ export class HangarScreen {
       button?.addEventListener('click', () => this.closeHangar())
     );
     refs.overlay.addEventListener('click', (event) => {
+      // Another tab changed this pilot: nothing here may change it, so leave
+      // the Hangar and let the menu send the tab back to the start gate.
+      if (isPilotStale()) {
+        this.closeHangar();
+        return;
+      }
       if (event.target === refs.overlay) {
         this.closeHangar();
         return;

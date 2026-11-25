@@ -7,7 +7,7 @@
 // tip that runs out unused is only set aside for the run: it comes back on
 // the next one, until it has run out TIP_EXPIRIES_TO_DONE times.
 
-import { loadJSON, saveJSON } from '../../core/storage.js';
+import { loadJSON, saveProgress } from '../../core/storage.js';
 
 export const ONBOARDING_STORAGE_KEY = 'roguefield:onboarding:v1';
 /** Pause between one tip finishing and the next appearing. */
@@ -372,7 +372,7 @@ export class Onboarding {
   }
 
   save() {
-    saveJSON(ONBOARDING_STORAGE_KEY, {
+    saveProgress(ONBOARDING_STORAGE_KEY, {
       done: [...this.done],
       expired: this.expired,
     });
