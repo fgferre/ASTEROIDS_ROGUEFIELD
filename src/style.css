@@ -11,6 +11,9 @@
   --status: #bcff00;
   --boss: #8a2be2;
   --xp: #ffd700;
+  /* The game's warning amber: PALETTE.shot, as cardScreens.css and the touch
+     buttons' refused state use it */
+  --amber: #ffb347;
   /* Layer-modifier banner frame: indigo, apart from the cyan --accent */
   --modifier: #7b86ff;
 
@@ -3098,6 +3101,13 @@ kbd[data-binding][hidden] {
   border-color: var(--accent);
   color: var(--accent);
   box-shadow: var(--glow-accent);
+}
+
+/* First slot of an action with no key on this device: amber, dashed (shape
+   cue besides colour), until it listens (is-listening has its own look). */
+.settings-binding-btn.is-unbound:not(.is-listening) {
+  border: 1px dashed var(--amber);
+  color: var(--amber);
 }
 
 .settings-footer {

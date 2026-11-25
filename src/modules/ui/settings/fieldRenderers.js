@@ -306,7 +306,10 @@ function renderBindingField(categoryId, field, value = {}, options = {}) {
     const bindingValue = bindings[slot] ?? '';
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'settings-binding-btn';
+    button.className =
+      slot === 0 && !bindingValue
+        ? 'settings-binding-btn is-unbound'
+        : 'settings-binding-btn';
     button.disabled = Boolean(options.inactive);
     button.dataset.action = 'capture-binding';
     button.dataset.settingKey = field.key;

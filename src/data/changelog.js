@@ -26,7 +26,7 @@ export const NEXT = {
   fixed: [
     'If the same pilot was changed in another tab, any click in the Hangar (buying, licences, seals, Pressure, the starting card) now closes it and takes the game back to the start screen, instead of changing something that would not be saved.', // not confirmed
     'The key hints in the menu, the Flight Computer briefing and the pause screen show the keys and pad buttons you set in Settings, not the defaults; the first move tip names your movement keys too.', // not confirmed
-    'In Settings → Controls, giving an action a key or pad button another flight action already uses now takes it from that action (its slot shows Set), so one key never does two things in flight.', // not confirmed
+    'In Settings → Controls, giving an action a key or pad button another flight action already uses now takes it from that action (its slot shows Set, dashed amber), so one key never does two things in flight.', // not confirmed
     'A Retry no longer doubles your rewards: XP, pickups and chests dropped by kills your shots made after the ship blew up are gone with those kills, the rocks come back as they were at your death, and an Overcharge keeps the time it had left then.', // not confirmed
     'A Tether that appears next to the ship no longer goes off at once: every one takes its half second to arm, as the first ones of a run did.', // not confirmed
     'A Tether that blows up later in a run flashes, shakes the screen and gives its brief stop again, like the first ones; some went off without any of it.', // not confirmed

@@ -192,6 +192,29 @@ describe('Settings panel', () => {
     expect(keep).toHaveBeenCalledOnce();
   });
 
+  it('marks only the first slot of an action left with no key', () => {
+    const flags = (row) => {
+      const out = [];
+      const visit = (node) => {
+        for (const c of node.children ?? []) {
+          if (c.dataset?.slot !== undefined) {
+            out.push(c.className.split(' ').includes('is-unbound'));
+          }
+          visit(c);
+        }
+      };
+      visit(row);
+      return out;
+    };
+    const keyless = { keyboard: [], gamepad: [] };
+    const bare = renderSection('controls', {}, [
+      ['controls', 'activateShield', keyless],
+    ]).row('activateShield');
+    expect(flags(bare).slice(0, 2)).toEqual([true, false]);
+    const kept = renderSection('controls').row('dash');
+    expect(flags(kept).slice(0, 2)).toEqual([false, false]);
+  });
+
   it('greys Camera Lead with the Classic camera, with its reason', () => {
     expect(isGreyed(renderSection('game').row('cameraLead'))).toBe(false);
 
