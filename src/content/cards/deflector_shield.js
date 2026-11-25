@@ -7,6 +7,7 @@ export default {
   icon: '💠',
   themeColor: '#5EC8FF',
   unlockLevel: 2,
+  unlock: { by: 'medal', medal: 'ring-breaker' },
   tags: ['escudo', 'defesa ativa'],
   prerequisites: [
     {

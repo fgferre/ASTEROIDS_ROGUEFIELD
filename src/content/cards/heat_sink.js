@@ -9,6 +9,7 @@ export default {
   icon: '♨️',
   themeColor: PALETTE.shot,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 2 },
   tags: ['fire-rate', 'weaponry'],
   text: {
     name: 'Heat Sink',

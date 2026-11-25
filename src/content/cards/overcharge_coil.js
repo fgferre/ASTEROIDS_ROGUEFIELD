@@ -9,6 +9,7 @@ export default {
   icon: '🌀',
   themeColor: PALETTE.status,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 9 },
   tags: ['projectile-speed', 'weaponry'],
   text: {
     name: 'Overcharge Coil',

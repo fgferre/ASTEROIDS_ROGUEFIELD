@@ -7,6 +7,7 @@ export default {
   icon: '🛡️',
   themeColor: '#4ECDC4',
   unlockLevel: 1,
+  unlock: { by: 'start', at: 13 },
   tags: ['health', 'hull'],
   text: {
     name: 'Energy Shield',

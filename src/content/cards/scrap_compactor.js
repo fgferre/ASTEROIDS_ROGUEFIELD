@@ -9,6 +9,7 @@ export default {
   icon: '🗜️',
   themeColor: PALETTE.xp,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 24 },
   tags: ['repair', 'level-up'],
   text: {
     name: 'Scrap Compactor',

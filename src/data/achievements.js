@@ -1,6 +1,7 @@
 // src/data/achievements.js
 
 import { deepFreeze } from '../utils/deepFreeze.js';
+import { cardsUnlockedBy } from './upgrades/index.js';
 
 // Local achievements, listed in the Codex (PLAN.md R5.6). Thresholds are the
 // "proposta 18/10"; AchievementService decides when each one unlocks.
@@ -8,11 +9,12 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 // target: present only on countable ones; the Codex shows "n / target".
 // enemy: counts one per pilot kill of this enemy type.
 // reward: what the medal pays once, in the Hangar (progression plan H1,
-// "proposta 16/11"): `salvage`, a card `license` (read by the card draw once
-// the cards side reads the Hangar's contract) and `opensPressure` (the first
-// Pressure rung). HangarService pays it.
+// "proposta 16/11"): `salvage`, a card `license` and `opensPressure` (the
+// first Pressure rung). HangarService pays it. The `license` is not written
+// here: the card names its medal (`unlock: { by: 'medal', medal }` in its
+// file) and joins that medal's reward below.
 
-export const ACHIEVEMENTS = deepFreeze([
+const MEDALS = [
   {
     id: 'first-light',
     title: 'First Light',
@@ -32,21 +34,18 @@ export const ACHIEVEMENTS = deepFreeze([
     title: 'Ring Breaker',
     description: 'Break Warden Prime and walk out of its ring.',
     glyph: '◎',
-    reward: { license: 'deflector_shield' },
   },
   {
     id: 'choir-silenced',
     title: 'Choir Silenced',
     description: 'Still every voice of the Warden Choir.',
     glyph: '♫',
-    reward: { license: 'arc_lattice' },
   },
   {
     id: 'null-and-void',
     title: 'Null and Void',
     description: 'Unmake Warden Null at the bottom of the descent.',
     glyph: '⊘',
-    reward: { license: 'reactor_bleed' },
   },
   {
     id: 'herald-hunter',
@@ -54,7 +53,6 @@ export const ACHIEVEMENTS = deepFreeze([
     description: 'Fell all three Heralds. Dust, Heat and Silence.',
     glyph: '✶',
     target: 3,
-    reward: { license: 'bounty_ledger' },
   },
   {
     id: 'deep-field',
@@ -68,21 +66,18 @@ export const ACHIEVEMENTS = deepFreeze([
     title: 'Untouchable',
     description: 'Clear a Warden layer without a scratch on the hull.',
     glyph: '◇',
-    reward: { license: 'phase_dash' },
   },
   {
     id: 'full-set',
     title: 'Full Set',
     description: 'Complete an upgrade family and hear it resonate.',
     glyph: '❖',
-    reward: { license: 'thermal_lens' },
   },
   {
     id: 'apex-predator',
     title: 'Apex Predator',
     description: 'Raise a weapon evolution to its Apex with five of a kind.',
     glyph: '✸',
-    reward: { license: 'lucky_fragment' },
   },
   {
     id: 'harmonic',
@@ -155,4 +150,20 @@ export const ACHIEVEMENTS = deepFreeze([
     glyph: '▣',
     reward: { salvage: 100 },
   },
-]);
+];
+
+// Medal id → the card it licenses.
+const LICENSED_BY_MEDAL = new Map(
+  cardsUnlockedBy('medal').map(({ id, unlock }) => [unlock.medal, id])
+);
+
+export const ACHIEVEMENTS = deepFreeze(
+  MEDALS.map((medal) =>
+    LICENSED_BY_MEDAL.has(medal.id)
+      ? {
+          ...medal,
+          reward: { ...medal.reward, license: LICENSED_BY_MEDAL.get(medal.id) },
+        }
+      : medal
+  )
+);

@@ -9,6 +9,7 @@ export default {
   icon: '🌑',
   themeColor: PALETTE.text,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 16 },
   tags: ['control', 'slow'],
   text: {
     name: 'Gravity Brake',

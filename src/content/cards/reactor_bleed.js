@@ -9,6 +9,7 @@ export default {
   icon: '☢️',
   themeColor: PALETTE.shot,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'null-and-void' },
   tags: ['damage', 'trade-off'],
   text: {
     name: 'Reactor Bleed',

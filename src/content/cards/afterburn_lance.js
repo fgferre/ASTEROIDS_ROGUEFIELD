@@ -18,6 +18,7 @@ export default {
   icon: '🔥',
   themeColor: PALETTE.shot,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 3 },
   tags: ['range', 'weaponry'],
   text: {
     name: 'Afterburn Lance',

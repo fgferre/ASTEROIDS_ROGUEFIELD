@@ -12,6 +12,7 @@ export default {
   icon: '🎯',
   themeColor: PALETTE.shot,
   unlockLevel: 4,
+  unlock: { by: 'start', at: 8 },
   tags: ['damage', 'risk'],
   text: {
     name: 'Close Quarters',

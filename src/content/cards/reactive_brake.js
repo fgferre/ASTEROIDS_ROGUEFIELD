@@ -9,6 +9,7 @@ export default {
   icon: '💢',
   themeColor: PALETTE.boss,
   unlockLevel: 3,
+  unlock: { by: 'license', at: 8, cost: 250 },
   tags: ['braking', 'shockwave', 'area damage'],
   prerequisites: [
     {

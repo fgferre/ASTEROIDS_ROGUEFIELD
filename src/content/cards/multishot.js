@@ -28,6 +28,7 @@ export default {
   icon: '💥',
   themeColor: '#A56DFF',
   unlockLevel: 1,
+  unlock: { by: 'start', at: 5 },
   tags: ['projectiles', 'weaponry'],
   text: {
     name: 'Multishot',

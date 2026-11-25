@@ -94,6 +94,7 @@ export default {
     icon: '💠',
     themeColor: colors.edge,
     unlockLevel: 3,
+    unlock: { by: 'license', at: 2, cost: 325 },
     tags: ['weapon', 'weaponry'],
     text: {
       name: 'Shard Halo',

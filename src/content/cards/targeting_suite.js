@@ -11,6 +11,7 @@ export default {
   icon: '🎯',
   themeColor: '#FFD166',
   unlockLevel: 3,
+  unlock: { by: 'start', at: 12 },
   // The nose cannon has no lock, so the suite needs the turret first.
   newFlightPrerequisites: [
     {

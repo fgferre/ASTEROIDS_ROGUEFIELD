@@ -11,6 +11,7 @@ export default {
   icon: '🔺',
   themeColor: PALETTE.boss,
   unlockLevel: 4,
+  unlock: { by: 'license', at: 9, cost: 250 },
   tags: ['damage', 'cursed'],
   text: {
     name: 'Glass Cannon',

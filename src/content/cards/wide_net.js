@@ -11,6 +11,7 @@ export default {
   icon: '📡',
   themeColor: PALETTE.xp,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 23 },
   tags: ['collection', 'magnetism'],
   text: {
     name: 'Wide Net',

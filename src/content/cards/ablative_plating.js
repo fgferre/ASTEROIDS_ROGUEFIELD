@@ -11,6 +11,7 @@ export default {
   icon: '🧱',
   themeColor: PALETTE.text,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 14 },
   tags: ['armor', 'hull'],
   text: {
     name: 'Ablative Plating',
