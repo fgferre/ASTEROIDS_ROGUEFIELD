@@ -120,11 +120,6 @@ export class Projectiles {
     bullet.pierceLeft = projectile.pierce
       ? weapon.lancePierce + weapon.pierceBonus
       : 0;
-    if (!bullet.pierced) {
-      bullet.pierced = [];
-    } else {
-      bullet.pierced.length = 0;
-    }
 
     // Initialize trail array
     if (!bullet.trail) {
@@ -578,18 +573,9 @@ export class Projectiles {
           });
           bullet.destroyLogEmitted = true;
         }
-        bullet.source = null;
-        bullet.enemyId = null;
-        bullet.enemyType = null;
-        bullet.isBossProjectile = false;
-        bullet.destroyed = false;
-        bullet.destroyReason = null;
-        bullet.destroyLogEmitted = false;
-        bullet.createdAt = 0;
         if (Array.isArray(bullet.trail)) {
           bullet.trail.length = 0;
         }
-        bullet.trailMax = 0;
         GamePools.bullets.release(bullet);
       }
     }
@@ -620,14 +606,9 @@ export class Projectiles {
       if (!bullet) {
         continue;
       }
-      bullet.source = null;
-      bullet.enemyId = null;
-      bullet.enemyType = null;
-      bullet.isBossProjectile = false;
       if (Array.isArray(bullet.trail)) {
         bullet.trail.length = 0;
       }
-      bullet.trailMax = 0;
       GamePools.bullets.release(bullet);
     }
 

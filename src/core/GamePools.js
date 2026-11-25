@@ -96,6 +96,35 @@ export class GamePools {
     this.bullets = new ObjectPool(
       // Factory function
       () => ({
+        // The ship's shots and the enemies' share this pool (Projectiles.js):
+        // every field either kind writes starts here, and the reset puts it
+        // back, so a reused shot carries nothing from its last life.
+        hit: false,
+        offscreenTimer: 0,
+        originX: 0,
+        originY: 0,
+        shrapnel: 0,
+        volley: null,
+        projectile: null,
+        colors: null,
+        kind: null,
+        seeker: null,
+        ricochet: null,
+        ricochets: 0,
+        glance: null,
+        scrapAge: 0,
+        pierceLeft: 0,
+        pierced: [],
+        isBossProjectile: false,
+        destroyed: false,
+        destroyReason: null,
+        destroyLogEmitted: false,
+        createdAt: 0,
+        stasisTimer: 0,
+        trailMax: 0,
+        enemyId: null,
+        enemyType: null,
+        source: null,
         x: 0,
         y: 0,
         vx: 0,
@@ -114,6 +143,32 @@ export class GamePools {
 
       // Reset function
       (bullet) => {
+        bullet.hit = false;
+        bullet.offscreenTimer = 0;
+        bullet.originX = 0;
+        bullet.originY = 0;
+        bullet.shrapnel = 0;
+        bullet.volley = null;
+        bullet.projectile = null;
+        bullet.colors = null;
+        bullet.kind = null;
+        bullet.seeker = null;
+        bullet.ricochet = null;
+        bullet.ricochets = 0;
+        bullet.glance = null;
+        bullet.scrapAge = 0;
+        bullet.pierceLeft = 0;
+        bullet.pierced.length = 0;
+        bullet.isBossProjectile = false;
+        bullet.destroyed = false;
+        bullet.destroyReason = null;
+        bullet.destroyLogEmitted = false;
+        bullet.createdAt = 0;
+        bullet.stasisTimer = 0;
+        bullet.trailMax = 0;
+        bullet.enemyId = null;
+        bullet.enemyType = null;
+        bullet.source = null;
         bullet.x = 0;
         bullet.y = 0;
         bullet.vx = 0;
@@ -158,6 +213,7 @@ export class GamePools {
           rotation: 0,
           rotationSpeed: 0,
           type: 'normal',
+          material: null,
           active: true,
         };
 
@@ -193,6 +249,7 @@ export class GamePools {
         particle.rotation = 0;
         particle.rotationSpeed = 0;
         particle.type = 'normal';
+        particle.material = null;
         particle.active = true;
       },
 

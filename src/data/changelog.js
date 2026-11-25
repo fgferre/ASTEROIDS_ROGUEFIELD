@@ -26,6 +26,8 @@ export const NEXT = {
   fixed: [
     'A Tether that appears next to the ship no longer goes off at once: every one takes its half second to arm, as the first ones of a run did.', // not confirmed
     'A Tether that blows up later in a run flashes, shakes the screen and gives its brief stop again, like the first ones; some went off without any of it.', // not confirmed
+    'Seeker Swarm missiles whose target is destroyed turn to the next enemy again; some flew off toward a corner of the field instead.', // not confirmed
+    "The Herald of Silence's shards all turn after the ship at the same rate; now and then one turned twice as sharply and was harder to dodge.", // not confirmed
   ],
   unseen: [],
 };
