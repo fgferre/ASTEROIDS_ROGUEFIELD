@@ -8,10 +8,7 @@ import MenuBackgroundSystem from '../modules/MenuBackgroundSystem.js';
 import { createServiceResolver } from '../core/serviceUtils.js';
 import { createSimulationManifest } from './simulationManifest.js';
 
-export {
-  DEFAULT_POOL_CONFIG,
-  DEFAULT_GC_OPTIONS,
-} from './simulationManifest.js';
+export { DEFAULT_POOL_CONFIG } from './simulationManifest.js';
 
 export function createServiceManifest(context = {}) {
   return createSimulationManifest(context, {
