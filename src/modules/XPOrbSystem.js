@@ -664,6 +664,67 @@ class XPOrbSystem extends BaseSystem {
     return orb.value;
   }
 
+  // The orbs on the field as plain data (a fusion holds its orbs by index),
+  // what moves them and the system's draws: the death snapshot
+  // (session/deathSnapshot.js) puts them back on a retry.
+  getSnapshotState() {
+    const orbs = this.xpOrbs;
+    return {
+      orbs: orbs.map((orb) => ({ ...orb, home: orb.home && { ...orb.home } })),
+      fusions: this.fusion.activeFusionAnimations.map((animation) => ({
+        ...animation,
+        center: { ...animation.center },
+        orbs: animation.orbs.map((entry) => ({
+          ...entry,
+          orb: orbs.indexOf(entry.orb),
+        })),
+      })),
+      fusionCheckTimer: this.fusion.fusionCheckTimer,
+      globalPull: this.globalPull && { ...this.globalPull },
+      towPulse: this.towPulse && { ...this.towPulse },
+      drift: this.drift && {
+        ...this.drift,
+        random: this.drift.random.serialize(),
+      },
+      random: Object.fromEntries(
+        Object.entries(this.randomForks).map(([name, fork]) => [
+          name,
+          fork.serialize(),
+        ])
+      ),
+    };
+  }
+
+  restoreSnapshotState(snapshot) {
+    this.field.reset();
+    const orbs = snapshot.orbs.map((data) => {
+      const orb = Object.assign(this.field.acquireOrb(), data, {
+        home: data.home && { ...data.home },
+      });
+      this.field.addOrbToPools(orb);
+      return orb;
+    });
+    this.fusion.activeFusionAnimations = snapshot.fusions.map((animation) => ({
+      ...animation,
+      center: { ...animation.center },
+      orbs: animation.orbs.map((entry) => ({ ...entry, orb: orbs[entry.orb] })),
+    }));
+    this.fusion.fusionCheckTimer = snapshot.fusionCheckTimer;
+    this.homing = new Set(orbs.filter((orb) => orb.home));
+    this.globalPull = snapshot.globalPull && { ...snapshot.globalPull };
+    this.towPulse = snapshot.towPulse && { ...snapshot.towPulse };
+    this.drift = null;
+    if (snapshot.drift) {
+      const random = new RandomService(snapshot.drift.random.seed);
+      random.restore(snapshot.drift.random);
+      this.drift = { ...snapshot.drift, random };
+    }
+    Object.entries(snapshot.random).forEach(([name, state]) =>
+      this.randomForks[name].restore(state)
+    );
+    return true;
+  }
+
   reset() {
     super.reset();
     this.field.reset();
