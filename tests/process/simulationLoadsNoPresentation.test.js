@@ -41,8 +41,6 @@ const SYSTEMS = [
 
 // importer → target: why the simulation may load that presentation file.
 const ALLOWED = {
-  'src/modules/WorldSystem.js → src/modules/ui/upgradeCard.js':
-    'familyForm names the evolution a run summary records',
   'src/services/GameSessionService.js → src/modules/ui/remoteLink.js':
     'playRemoteLink and remoteLinkLines play the link into a run from the menu',
 };

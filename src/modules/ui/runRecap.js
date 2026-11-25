@@ -2,6 +2,7 @@
 
 import { biomeForLayer } from '../../data/biomes.js';
 import { localLayer } from '../../data/sectors.js';
+import { familyForm } from '../../data/weapons.js';
 import { CODEX_ENTRIES, codexIdOf } from '../../data/codex.js';
 import { ASTEROID_VARIANTS } from '../../data/enemies/asteroid-configs.js';
 import {
@@ -15,7 +16,6 @@ import {
   familyColor,
   FIFTH_IN_HANGAR,
   fifthInHangar,
-  familyForm,
   glyphMarkup,
   shortName,
   trackMarkup,

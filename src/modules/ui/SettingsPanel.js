@@ -432,9 +432,8 @@ export class SettingsPanel {
       : Number.isFinite(Number(values.hudScale))
         ? Number(values.hudScale)
         : 1;
-    const baseScale = Math.max(0.6, Math.min(1.4, hudScale));
 
-    this.setHudBaseScale(baseScale);
+    this.setHudBaseScale(hudScale);
   }
 
   deriveVisualPreferences(
