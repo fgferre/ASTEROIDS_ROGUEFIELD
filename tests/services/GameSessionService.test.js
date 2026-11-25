@@ -145,13 +145,13 @@ function createServiceHarness(options = {}) {
   });
 
   service.initialize({ seedInfo: { seed: 99, source: 'test' } });
-  service.retryCountElement = { textContent: '0', isConnected: true };
-  service.retryButtonElement = {
+  service.retry.retryCountElement = { textContent: '0', isConnected: true };
+  service.retry.retryButtonElement = {
     disabled: false,
     style: {},
     isConnected: true,
   };
-  service.retryCountdownElement = {
+  service.retry.retryCountdownElement = {
     textContent: '',
     isConnected: true,
     classList: {
@@ -202,7 +202,7 @@ describe('GameSessionService lifecycle flows', () => {
     expect(getScreenEvents()).toEqual([
       expect.objectContaining({ screen: 'playing', source: 'session.start' }),
     ]);
-    service.setRetryCount(2);
+    service.retry.setRetryCount(2);
     vi.useFakeTimers();
 
     service.handlePlayerDeath({ reason: 'spec' });
@@ -224,13 +224,13 @@ describe('GameSessionService lifecycle flows', () => {
       }),
     ]);
 
-    expect(service.hasDeathSnapshot()).toBe(true);
+    expect(service.snapshots.hasDeathSnapshot()).toBe(true);
     expect(random.serialize).toHaveBeenCalled();
 
-    const started = service.requestRetry({ source: 'unit-test' });
+    const started = service.retry.requestRetry({ source: 'unit-test' });
 
     expect(started).toBe(true);
-    expect(service.getRetryCount()).toBe(1);
+    expect(service.retry.getRetryCount()).toBe(1);
     expect(eventBus.emit).toHaveBeenCalledWith(
       'session-retry-countdown',
       expect.objectContaining({ phase: 'start' })
@@ -241,7 +241,7 @@ describe('GameSessionService lifecycle flows', () => {
     expect(player.respawn).toHaveBeenCalled();
     expect(world.reset).toHaveBeenCalled();
     expect(service.getSessionState()).toBe('running');
-    expect(service.isRetryCountdownActive).toBe(false);
+    expect(service.retry.isRetryCountdownActive).toBe(false);
     expect(service.getScreen()).toBe('playing');
     expect(getScreenEvents()).toEqual([
       expect.objectContaining({ screen: 'playing', source: 'session.start' }),
@@ -281,23 +281,23 @@ describe('GameSessionService lifecycle flows', () => {
     const { service, player } = createServiceHarness();
 
     player.isRetrying = true;
-    service.retryButtonElement.disabled = true;
-    service.retryButtonElement.style.opacity = '0.5';
-    service.deathSnapshot = { random: null };
+    service.retry.retryButtonElement.disabled = true;
+    service.retry.retryButtonElement.style.opacity = '0.5';
+    service.snapshots.deathSnapshot = { random: null };
 
     const restoreSpy = vi
-      .spyOn(service, 'restoreFromSnapshot')
+      .spyOn(service.snapshots, 'restoreFromSnapshot')
       .mockReturnValue(false);
 
-    const result = service.completeRetryRespawn();
+    const result = service.retry.completeRetryRespawn();
 
     expect(result).toBe(false);
     expect(restoreSpy).toHaveBeenCalledWith({
-      snapshot: service.deathSnapshot,
+      snapshot: service.snapshots.deathSnapshot,
     });
     expect(player.isRetrying).toBe(false);
-    expect(service.retryButtonElement.disabled).toBe(false);
-    expect(service.retryButtonElement.style.opacity).toBe('1');
+    expect(service.retry.retryButtonElement.disabled).toBe(false);
+    expect(service.retry.retryButtonElement.style.opacity).toBe('1');
   });
 
   it('toggles pause state and emits pause events while playing', () => {
@@ -358,7 +358,7 @@ describe('GameSessionService lifecycle flows', () => {
     expect(service.togglePause()).toBe(false);
     expect(service.getSessionState()).toBe('quitting');
     service.handlePlayerDeath({ reason: 'collision-during-exit' });
-    expect(service.hasDeathSnapshot()).toBe(false);
+    expect(service.snapshots.hasDeathSnapshot()).toBe(false);
 
     vi.advanceTimersByTime(3500);
     vi.runAllTimers();
@@ -456,7 +456,7 @@ describe('GameSessionService lifecycle flows', () => {
     vi.useFakeTimers();
     service.startNewRun({ source: 'test' });
 
-    service.handleBossDefeatedEvent({ wave: RUN_FINAL_LAYER });
+    service.runEnd.handleBossDefeatedEvent({ wave: RUN_FINAL_LAYER });
 
     expect(eventBus.emit).toHaveBeenCalledWith('run-won', {
       wave: RUN_FINAL_LAYER,
@@ -468,17 +468,17 @@ describe('GameSessionService lifecycle flows', () => {
     const { service, eventBus } = createServiceHarness();
     service.startNewRun({ source: 'test' });
     eventBus.emit('transmission-shown', { key: 'death:0' });
-    expect(service.transmissionOnAir).toBe(true);
+    expect(service.runEnd.transmissionOnAir).toBe(true);
 
     service.startNewRun({ source: 'test' });
 
-    expect(service.transmissionOnAir).toBe(false);
+    expect(service.runEnd.transmissionOnAir).toBe(false);
   });
 
   it('restores the snapshot hull before retry state recovery completes', () => {
     const { service, player } = createServiceHarness();
 
-    const restored = service.restoreFromSnapshot({
+    const restored = service.snapshots.restoreFromSnapshot({
       snapshot: {
         random: null,
         player: {
@@ -546,7 +546,7 @@ describe('GameSessionService lifecycle flows', () => {
     service.services.physics = physics;
 
     const physicsRestoreSpy = vi.spyOn(physics, 'restoreSnapshotState');
-    const restored = service.restoreFromSnapshot({
+    const restored = service.snapshots.restoreFromSnapshot({
       snapshot: {
         random: null,
         player: {
@@ -627,7 +627,7 @@ describe('GameSessionService lifecycle flows', () => {
       { x: 650, y: 450 },
     ]);
 
-    const spawnPoint = service.findSafeSpawnPoint();
+    const spawnPoint = service.retry.findSafeSpawnPoint();
 
     expect(spawnPoint).toEqual({ x: 600, y: 450 });
   });

@@ -35,13 +35,16 @@ function retryDeadShip(game) {
   vi.advanceTimersByTime(3000);
   expect(game.session.getScreen()).toBe('gameover');
 
-  game.session.retryCountElement = { textContent: '1', isConnected: true };
-  game.session.retryCountdownElement = {
+  game.session.retry.retryCountElement = {
+    textContent: '1',
+    isConnected: true,
+  };
+  game.session.retry.retryCountdownElement = {
     textContent: '',
     isConnected: true,
     classList: { add() {}, remove() {} },
   };
-  expect(game.session.requestRetry({ source: 'test' })).toBe(true);
+  expect(game.session.retry.requestRetry({ source: 'test' })).toBe(true);
   vi.advanceTimersByTime(3000);
   expect(game.session.getScreen()).toBe('playing');
 }

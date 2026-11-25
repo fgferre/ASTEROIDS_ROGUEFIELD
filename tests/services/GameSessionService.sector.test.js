@@ -299,7 +299,7 @@ describe('sector runs', () => {
       next: 'furnace-drift',
     });
     expect(sector.bestTime).toBe(sector.time);
-    expect(game.session.continueBeyondVictory()).toBe(false);
+    expect(game.session.runEnd.continueBeyondVictory()).toBe(false);
     expect(loadRecords()).toMatchObject({
       bestLayer: 0,
       bestTime: 0,
