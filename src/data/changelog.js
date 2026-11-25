@@ -31,6 +31,9 @@ export const NEXT = {
     'A `?replay=` link that points at a damaged or hostile recording (wrong shapes, absurd lengths, another site over plain http, a huge file) now ends in the replay notice instead of a frozen page; players cannot make replay links yet, so nobody notices.', // not confirmed
     'The first-visit tips now save through the held-progress path, so demo and profiling runs (?content=, ?profile=) leave the real pilot untouched; players never start those runs.', // not confirmed
   ],
+    'In Settings → Controls, giving an action a key or pad button another flight action already uses now takes it from that action (its slot shows Set), so one key never does two things in flight.', // not confirmed
+  ],
+  unseen: [],
 };
 
 export const RELEASES = [
