@@ -2704,6 +2704,11 @@ kbd {
   text-align: center;
 }
 
+/* A key hint whose binding was cleared (ui/bindingHints.js). */
+kbd[data-binding][hidden] {
+  display: none;
+}
+
 /* ============================================
    SETTINGS
    ============================================ */

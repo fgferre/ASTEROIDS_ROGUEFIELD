@@ -16,6 +16,7 @@ import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
 import { watchGameBox } from './core/viewport.js';
 import { TouchControls } from './modules/input/touchControls.js';
+import { followBindingHints } from './modules/ui/bindingHints.js';
 import {
   activateProfileHarness,
   startRun,
@@ -271,6 +272,9 @@ function init(recording = null, touch = false) {
         ),
     });
     services.input.touch.start();
+
+    // The key hints in the menu, briefing and pause name the bound keys.
+    followBindingHints(services['event-bus'], services.settings);
 
     holdLoadingForWarmUp(services['menu-background'], services.renderer);
 
