@@ -89,7 +89,7 @@ describe('death snapshot of the field rewards', () => {
       isConnected: true,
       classList: { add() {}, remove() {} },
     };
-    expect(game.session.requestRetry({ source: 'test' })).toBe(true);
+    expect(game.session.retry.requestRetry({ source: 'test' })).toBe(true);
     vi.advanceTimersByTime(3000);
     expect(game.session.getScreen()).toBe('playing');
 
