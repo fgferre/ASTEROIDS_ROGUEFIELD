@@ -420,8 +420,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   sempre. Depois da escolha: o Crisol responde à vista, a volta para casa (o Wake inteiro, os reatores firmes; em
   Severance a nave entra no hangar, o Anel apaga e o Wake vai embora; em Stewardship ninguém vai para casa) e a última
   imagem (outro Wake num berço do Crisol, vazio, uma janela acesa). Cinco falas são novas e ainda não têm voz gravada
-  (37). Fora das cenas, só a morte de Sovereign mudou: ele não se quebra em pedaços (onde não há final depois,
-  queima no lugar). Fecha quando ele aprovar jogando.
+  (37). Fora das cenas, só a morte de Sovereign mudou: ele não se quebra em pedaços (onde a cena não é desenhada,
+  como com movimento reduzido, queima no lugar). Toda vitória no Crisol toca o final, também para quem já venceu.
+  Cartão de conferência `final-do-jogo-5` (25/11) com os dois finais filmados pelo jogo. Fecha quando ele aprovar
+  jogando.
 
 ## Cenário (palavras dele, 19/11, na conferência)
 
