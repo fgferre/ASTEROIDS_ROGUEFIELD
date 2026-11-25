@@ -522,10 +522,13 @@ export class BaseEnemy {
    * Called when returning enemy to pool.
    */
   resetForPool() {
-    // Reset core state
+    // Reset core state. No id: what still holds this enemy (a missile's
+    // target, a burn) checks the id and lets go, as for a new one.
+    this.id = null;
     this.alive = false;
     this.initialized = false;
     this.lastHitTime = -Infinity;
+    this.hitFlashSeconds = HIT_FLASH_SECONDS;
     this.useComponents = false;
 
     // Reset position & velocity
@@ -554,9 +557,13 @@ export class BaseEnemy {
     this.rotation = 0;
     this.rotationSpeed = 0;
 
-    // Clear metadata
+    // Clear metadata (a Warden's minion is marked in boss/minions.js)
     this.tags.clear();
     this.spawnedBy = null;
+    this.spawnSource = null;
+    this.spawnedByBossId = null;
+    this.isBossMinion = false;
+    this.metadata = null;
     this.resetAffixes([]);
 
     // Reset components

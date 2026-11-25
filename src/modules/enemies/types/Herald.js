@@ -273,10 +273,14 @@ export class Herald extends BaseEnemy {
     const { shardSpeed, shardDamage, shardLifetime } = this.data;
     const angle = Math.atan2(target.y - this.y, target.x - this.x);
     this.fire(angle, shardSpeed, shardDamage, 'herald-shard', shardLifetime);
-    // The combat system keeps the bullet; the Herald steers it.
+    // The combat system keeps the bullet; the Herald steers it. Bullets are
+    // pooled: a shard that burned out since the last steer can come back as
+    // this one, already in the list.
     const bullets = this.system?.getCachedCombat?.()?.enemyBullets;
     const bullet = bullets?.[bullets.length - 1];
-    if (bullet?.enemyId === this.id) this.shards.push(bullet);
+    if (bullet?.enemyId === this.id && !this.shards.includes(bullet)) {
+      this.shards.push(bullet);
+    }
   }
 
   steerShards(target, deltaTime) {

@@ -4,6 +4,8 @@ import {
   HERALD_KINDS,
   HERALD_SPAWN_INVULNERABILITY,
 } from '../../../src/data/enemies/herald.js';
+import { GamePools } from '../../../src/core/GamePools.js';
+import { Projectiles } from '../../../src/modules/combat/Projectiles.js';
 import Herald from '../../../src/modules/enemies/types/Herald.js';
 import UISystem from '../../../src/modules/UISystem.js';
 
@@ -186,6 +188,41 @@ describe('Herald', () => {
     run(0.5);
 
     expect(Math.atan2(shard.vy, shard.vx)).toBeLessThan(before);
+  });
+
+  it('Silence steers a shard once a frame when it reuses its last shard from the pool', () => {
+    const { herald, system, player } = createHerald('silence');
+    const projectiles = new Projectiles({
+      physics: () => null,
+      emit: () => {},
+      weapon: () => null,
+      burstFlak: () => {},
+    });
+    system.getCachedCombat = () => projectiles;
+    system.eventBus.emit.mockImplementation((event, payload) => {
+      if (event === 'enemy-fired') projectiles.createEnemyBullet(payload);
+    });
+    if (!GamePools.initialized) GamePools.initialize();
+    GamePools.bullets.clear();
+
+    herald.fireShard(player.position);
+    const [first] = projectiles.enemyBullets;
+    first.life = 1e-9; // it burns out and goes back to the pool
+    projectiles.updateEnemyBullets(STEP);
+    herald.fireShard(player.position);
+    const [second] = projectiles.enemyBullets;
+    const before = Math.atan2(second.vy, second.vx);
+    // the ship darts aside: the shard turns at its full rate, once
+    player.position = { x: 700, y: 300 };
+    herald.steerShards(player.position, STEP);
+
+    expect(second).toBe(first);
+    expect(herald.shards).toEqual([second]);
+    expect(Math.abs(Math.atan2(second.vy, second.vx) - before)).toBeCloseTo(
+      HERALD_KINDS.silence.shardTurnRate * STEP,
+      9
+    );
+    GamePools.releaseAll();
   });
 
   it('announces its defeat with its kind and position (the guaranteed drop)', () => {
