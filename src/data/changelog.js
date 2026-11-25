@@ -27,15 +27,13 @@ export const NEXT = {
     'If the same pilot was changed in another tab, any click in the Hangar (buying, licences, seals, Pressure, the starting card) now closes it and takes the game back to the start screen, instead of changing something that would not be saved.', // not confirmed
     'The key hints in the menu, the Flight Computer briefing and the pause screen show the keys and pad buttons you set in Settings, not the defaults; the first move tip names your movement keys too.', // not confirmed
     'In Settings → Controls, giving an action a key or pad button another flight action already uses now takes it from that action (its slot shows Set), so one key never does two things in flight.', // not confirmed
+    'A Retry no longer doubles your rewards: XP, pickups and chests dropped by kills your shots made after the ship blew up are gone with those kills, the rocks come back as they were at your death, and an Overcharge keeps the time it had left then.', // not confirmed
   ],
   unseen: [
     'A `?replay=` link that points at a damaged or hostile recording (wrong shapes, absurd lengths, another site over plain http, a huge file) now ends in the replay notice instead of a frozen page; players cannot make replay links yet, so nobody notices.', // not confirmed
     'The first-visit tips now save through the held-progress path, so demo and profiling runs (?content=, ?profile=) leave the real pilot untouched; players never start those runs.', // not confirmed
     "A reused sound node now drops the fade left over from the sound that used it before, and two pools that could never hold anything are gone; nobody notices because no audible case was found, it only removes a way for a sound to start with the tail of the previous sound's fade.", // not confirmed
   ],
-    'A Retry no longer doubles your rewards: XP, pickups and chests dropped by kills your shots made after the ship blew up are gone with those kills, the rocks come back as they were at your death, and an Overcharge keeps the time it had left then.', // not confirmed
-  ],
-  unseen: [],
 };
 
 export const RELEASES = [
