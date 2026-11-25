@@ -50,18 +50,32 @@ describe('Key hints follow the bindings', () => {
     expect(hints.wasd.textContent).toBe('WASD');
   });
 
-  it('hide a hint whose key was cleared, and show it once a key is bound again', () => {
+  it('show a dash for an action with no key, hide an empty second slot, and show a key bound again', () => {
     const shield = kbd('E', 'activateShield', 'keyboard');
     const wasd = kbd('WASD', 'moveUp moveLeft moveDown moveRight', 'keyboard');
-    const root = { querySelectorAll: () => [shield, wasd] };
+    const up2 = kbd('↑', 'moveUp', 'keyboard', '1');
+    const root = { querySelectorAll: () => [shield, wasd, up2] };
     const controls = defaults();
 
     controls.activateShield.keyboard = [];
     controls.moveUp.keyboard = ['', 'ArrowUp'];
+    controls.moveDown.keyboard = [];
     fillBindingHints(controls, root);
-    expect(shield.hidden).toBe(true);
+    expect(shield.hidden).toBe(false);
+    expect(shield.textContent).toBe('—');
     expect(wasd.hidden).toBe(false);
-    expect(wasd.textContent).toBe('ASD');
+    expect(wasd.textContent).toBe('AD');
+    expect(up2.hidden).toBe(false);
+
+    controls.moveUp.keyboard = [];
+    fillBindingHints(controls, root);
+    expect(up2.hidden).toBe(true);
+
+    for (const action of ['moveUp', 'moveLeft', 'moveDown', 'moveRight'])
+      controls[action].keyboard = [];
+    fillBindingHints(controls, root);
+    expect(wasd.hidden).toBe(false);
+    expect(wasd.textContent).toBe('—');
 
     controls.activateShield.keyboard = ['KeyQ'];
     fillBindingHints(controls, root);

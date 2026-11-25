@@ -36,12 +36,16 @@ export function fillBindingHints(controls, root = document) {
     const unchanged = actions.every(
       (action, i) => codes[i] === DEFAULT_BINDINGS[action]?.[device]?.[slot]
     );
-    // A slot with no key bound leaves the hint (never "Set").
     const bound = codes.filter(Boolean);
-    kbd.hidden = !unchanged && bound.length === 0;
-    kbd.textContent = unchanged
-      ? originalText.get(kbd)
-      : joinKeyLabels(bound.map((code) => formatBindingLabel(code, device)));
+    const missing = !unchanged && bound.length === 0;
+    // Bindings are compact: an empty first slot means the action has no key,
+    // shown as a dash; an empty later slot is an optional key, hidden.
+    kbd.hidden = missing && slot > 0;
+    kbd.textContent = !missing
+      ? unchanged
+        ? originalText.get(kbd)
+        : joinKeyLabels(bound.map((code) => formatBindingLabel(code, device)))
+      : '—';
   });
 }
 
