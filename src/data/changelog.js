@@ -33,6 +33,9 @@ export const NEXT = {
     'The first-visit tips now save through the held-progress path, so demo and profiling runs (?content=, ?profile=) leave the real pilot untouched; players never start those runs.', // not confirmed
     "A reused sound node now drops the fade left over from the sound that used it before, and two pools that could never hold anything are gone; nobody notices because no audible case was found, it only removes a way for a sound to start with the tail of the previous sound's fade.", // not confirmed
   ],
+    'A Retry no longer doubles your rewards: XP, pickups and chests dropped by kills your shots made after the ship blew up are gone with those kills, the rocks come back as they were at your death, and an Overcharge keeps the time it had left then.', // not confirmed
+  ],
+  unseen: [],
 };
 
 export const RELEASES = [

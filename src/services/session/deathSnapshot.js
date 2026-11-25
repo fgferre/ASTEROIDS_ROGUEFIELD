@@ -1,7 +1,8 @@
 // src/services/session/deathSnapshot.js
 //
 // What a retry rewinds to: the snapshot taken when the ship dies (hull and
-// health, build, field, physics, RNG state) and its restoration, with the
+// health, build, field, physics, RNG state, the rewards on the field and
+// rolled) and its restoration, with the
 // upgrade effects re-applied on top of the reset stats.
 
 import { debugLog } from '../../core/debugLogging.js';
@@ -165,6 +166,7 @@ export class DeathSnapshot {
       timestamp: Date.now(),
       randomSeed: this.gameState?.randomSeed ?? this.seedInfo.seed,
       random: randomSnapshot,
+      rewards: this.captureRewards(),
     };
 
     this.deathSnapshot = snapshot;
@@ -390,6 +392,8 @@ export class DeathSnapshot {
       }
     }
 
+    this.restoreRewards(payload.rewards);
+
     this.deathSnapshot = payload;
     if (payload.random) {
       this.randomSnapshot = payload.random;
@@ -405,6 +409,34 @@ export class DeathSnapshot {
     }
 
     return true;
+  }
+
+  // What holds the player's rewards: the field's orbs, hearts, pickups and
+  // chests, and the card-roll count. Shots still in flight after the death
+  // kill on; their drops and rolls must not outlive a retry.
+  rewardHolders() {
+    return {
+      xpOrbs: this.resolveServiceInstance('xpOrbs'),
+      healthHearts: this.resolveServiceInstance('healthHearts'),
+      pickups: this.resolveServiceInstance('pickups'),
+      cards: this.resolveServiceInstance('combat')?.cards,
+    };
+  }
+
+  captureRewards() {
+    const rewards = {};
+    Object.entries(this.rewardHolders()).forEach(([name, holder]) => {
+      if (typeof holder?.getSnapshotState === 'function') {
+        rewards[name] = holder.getSnapshotState();
+      }
+    });
+    return rewards;
+  }
+
+  restoreRewards(rewards = {}) {
+    Object.entries(this.rewardHolders()).forEach(([name, holder]) => {
+      if (rewards[name]) holder.restoreSnapshotState(rewards[name]);
+    });
   }
 
   reapplyProgressionUpgrades({ progression, snapshot } = {}) {
