@@ -170,6 +170,51 @@ describe('Renderer3D hull flash', () => {
   });
 });
 
+describe('Renderer3D flash under a held run', () => {
+  it("keeps a head start's level-up flash off the opening, then shows it as the run goes on", () => {
+    const eventBus = new EventBus();
+    const effects = new EffectsSystem({
+      eventBus,
+      random: new RandomService('held-flash'),
+      audio: {},
+      settings: { getCategoryValues: () => null },
+    });
+    const flash = { style: {} };
+    const renderer = Object.create(Renderer3D.prototype);
+    renderer.three = {
+      shockwaves: [],
+      flashes: { observe: () => false },
+      flash,
+      flashAlpha: 0,
+      flashEdges: false,
+    };
+    const mirror = () =>
+      renderer.mirrorEffects({
+        screenFlash: effects.screenFlash,
+        flashHeld: effects.flashHeld,
+      });
+
+    // the launch: the story holds the run, the head start levels up under it
+    eventBus.emit('cinematic-started', { kind: 'story', holdsRun: true });
+    eventBus.emit('player-leveled-up', { newLevel: 2 });
+    mirror();
+    expect(Number(flash.style.opacity || 0)).toBe(0);
+    eventBus.emit('cinematic-ended', { kind: 'story' });
+    eventBus.emit('cinematic-started', { kind: 'travel', holdsRun: true });
+    mirror();
+    expect(Number(flash.style.opacity || 0)).toBe(0);
+    eventBus.emit('cinematic-ended', { kind: 'travel' });
+    // the run goes on: the flash shows and fades as in play
+    mirror();
+    expect(Number(flash.style.opacity)).toBeCloseTo(0.2, 5);
+
+    // a cinematic that does not hold the run shows its flashes
+    eventBus.emit('cinematic-started', { kind: 'arrival', holdsRun: false });
+    mirror();
+    expect(Number(flash.style.opacity)).toBeCloseTo(0.2, 5);
+  });
+});
+
 describe('Renderer3D shadows', () => {
   it('builds a resized shadow map inside a seeded frame, into the frame target', () => {
     // three r128: shadowMap.render reads the per-frame light state, which

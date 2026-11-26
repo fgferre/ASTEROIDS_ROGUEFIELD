@@ -369,6 +369,38 @@ describe('sample layer', () => {
     expect(context.createOscillator).not.toHaveBeenCalled();
   });
 
+  it("the ending's opening sounds Sovereign's shells right after its last protect move, the fight's gap untouched", async () => {
+    const manifest = JSON.parse(
+      readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')
+    );
+    const id = 'sovereign-protect';
+    const { gap } = manifest[id];
+    const { bus, context, sources } = makeBus();
+    await bus.samples.load(fetchFor({ [id]: manifest[id] }));
+    const fight = (time) => {
+      context.currentTime = time;
+      bus.playBossAttack({ kind: 'sovereign', pan: 0, distance: null });
+    };
+    const scene = (time) => {
+      context.currentTime = time;
+      bus.playEndingBeat('opens');
+    };
+
+    fight(0);
+    // Sovereign falls half a second later: the scene's sound starts
+    scene(0.5);
+    expect(sources).toHaveLength(2);
+    // the fight's own gap still counts from its own last start
+    fight(gap / 1000 - 0.01);
+    expect(sources).toHaveLength(2);
+    fight(gap / 1000 + 0.01);
+    expect(sources).toHaveLength(3);
+    // and the scene's from its own
+    scene(0.5 + gap / 1000 - 0.01);
+    expect(sources).toHaveLength(3);
+    expect(sources.every((s) => s.buffer.path === `${id}/1.mp3`)).toBe(true);
+  });
+
   it('a health heart pickup plays its own file once, not again inside its gap', async () => {
     const manifest = JSON.parse(
       readFileSync(new URL(`${SFX}manifest.json`, import.meta.url), 'utf8')

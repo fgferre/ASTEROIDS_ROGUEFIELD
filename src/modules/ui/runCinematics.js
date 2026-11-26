@@ -591,7 +591,10 @@ export class RunCinematics {
   begin(kind, durationMs, onEnd) {
     this.kind = kind;
     if (onEnd) this.timer = setTimeout(onEnd, durationMs);
-    this.eventBus.emit('cinematic-started', { kind });
+    this.eventBus.emit('cinematic-started', {
+      kind,
+      holdsRun: this.introActive,
+    });
   }
 
   endIntro() {
