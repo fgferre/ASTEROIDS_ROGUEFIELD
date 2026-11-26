@@ -105,16 +105,17 @@ class SMAAPass extends EdgePass {
 }
 
 // Every bloom step is one opaque full-screen quad, so the clears before the
-// bright pass and each blur are wiped at once: only the composite's (and the
-// screen's) clear runs. The frame is bit-identical.
+// bright pass and each blur are wiped at once: only the composite's (the
+// second clear of the first horizontal target) and the screen's run. The
+// frame is bit-identical.
 class UnrealBloomPass extends BloomPass {
   render(renderer, ...rest) {
     const clear = renderer.clear;
+    const first = this.renderTargetsHorizontal[0];
+    let cleared = 0;
     renderer.clear = (...args) => {
-      if (
-        this.fsQuad.material === this.compositeMaterial ||
-        renderer.getRenderTarget() === null
-      ) {
+      const target = renderer.getRenderTarget();
+      if (target === null || (target === first && cleared++ > 0)) {
         clear.apply(renderer, args);
       }
     };

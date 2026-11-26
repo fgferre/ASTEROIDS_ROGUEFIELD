@@ -199,7 +199,7 @@ export function createOpeningScene(menu, random, shotName = null) {
   composer.addPass(overlayPass);
   // The last pass draws to the screen: it stays on at every quality (the
   // menu's own pass alone would draw only the hull).
-  if (THREE.SMAAPass) composer.addPass(new THREE.SMAAPass(size.x, size.y));
+  if (THREE.SMAAPass) composer.addPass(new THREE.SMAAPass());
 
   const biomes = new BiomeController(THREE, {
     key,

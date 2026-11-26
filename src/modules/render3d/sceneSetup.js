@@ -294,10 +294,10 @@ export function setupThree(seeded) {
   });
   composer.addPass(outputPass);
   foldBloom(bloomPass, [impactPass, outputPass]);
-  const smaaPass = new THREE.SMAAPass(width, height);
+  const smaaPass = new THREE.SMAAPass();
   // its weights read only the edges' red and green: two bytes a pixel, not four
-  smaaPass.edgesRT.texture.format = THREE.RGFormat;
-  smaaPass.edgesRT.texture.internalFormat = 'RG8';
+  smaaPass._edgesRT.texture.format = THREE.RGFormat;
+  smaaPass._edgesRT.texture.internalFormat = 'RG8';
   composer.addPass(smaaPass);
   displayTarget(THREE, composer, [impactPass, outputPass], smaaPass);
 
