@@ -17,6 +17,7 @@ import { mobileGuard } from './bootstrap/mobileGuard.js';
 import { watchGameBox } from './core/viewport.js';
 import { TouchControls } from './modules/input/touchControls.js';
 import { followBindingHints } from './modules/ui/bindingHints.js';
+import { showStartFailure } from './modules/menu/loadingScreen.js';
 import {
   activateProfileHarness,
   startRun,
@@ -239,7 +240,7 @@ function init(recording = null, touch = false) {
       if (DEV_MODE) {
         GameDebugLogger.log('ERROR', 'DI bootstrap failed; aborting init');
       }
-      alert('Service initialization failed. Reload the page.');
+      showStartFailure();
 
       return;
     }
@@ -430,7 +431,7 @@ function init(recording = null, touch = false) {
     requestAnimationFrame(gameLoop);
   } catch (error) {
     console.error('Erro na inicialização:', error);
-    alert('Game failed to start. Reload the page.');
+    showStartFailure();
   }
 }
 

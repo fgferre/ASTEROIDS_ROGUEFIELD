@@ -376,6 +376,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   da tecla/botao o contorno. nem precisa montar regua para isso so fazer o que pedi simples assim"_. Construído: segurar
   1,5 s o Espaço, o Start (Options no PlayStation) ou o botão SKIP na tela pula a cena; um toque rápido vai para a
   próxima fala. Fecha quando ele aprovar jogando.
+- **(55)** Uma peça que falha ao ligar (25/11): _"Se uma peça do jogo falhar ao ligar, o menu aparece normal e o Launch
+  não faz nada, sem aviso."_ Ele quer resolvido antes da próxima publicação. Construído no ramo `aviso/falha-ao-ligar`:
+  se uma peça falha ao ligar, a tela de carregamento fica, a nave apaga o motor e a linha de baixo diz, em vermelho,
+  "The game could not start. Reload the page to try again."; o menu não abre por trás. Antes, o navegador mostrava uma
+  caixinha "Game failed to start. Reload the page." e, ao fechá-la, o menu abria normal. Ligar sem falha ficou igual.
+  Fecha quando ele aprovar vendo.
 
 ## Som (palavras dele, 19/11)
 

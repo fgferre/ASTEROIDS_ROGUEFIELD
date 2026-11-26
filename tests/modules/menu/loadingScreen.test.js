@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   MENU_IDLE_MS,
+  START_FAILED_LINE,
   setupLoadingScreen,
+  showStartFailure,
 } from '../../../src/modules/menu/loadingScreen.js';
 import { morphIntoTitle } from '../../../src/modules/menu/openingMorph.js';
 import { openPilotSelect } from '../../../src/modules/menu/pilotSelect.js';
@@ -102,7 +104,8 @@ function boot(
     onStart,
     onLeave
   );
-  if (via === 'loading') return { screen, line, progress, complete };
+  if (via === 'loading')
+    return { screen, line, menu, docListeners, progress, complete };
   complete();
   // The opening: a click (a gesture) or a pad press goes on to the gate.
   if (via === 'click') screen.listeners.click();
@@ -195,6 +198,24 @@ describe('loading screen opening', () => {
     const { screen } = boot('', { pads: [] }, { awake: false, via: 'pad' });
     expect(screen.classes.has('loading-screen--gate')).toBe(true);
     expect(screen.classes.has('loading-screen--asleep')).toBe(true);
+  });
+
+  it('a start-up failure stays on its line and never opens the menu', () => {
+    const { screen, line, menu, docListeners, progress, complete } = boot(
+      '',
+      undefined,
+      { via: 'loading' }
+    );
+    showStartFailure();
+    progress(0.5);
+    vi.advanceTimersByTime(5000);
+    complete();
+    vi.advanceTimersByTime(1000);
+    expect(line.textContent).toBe(START_FAILED_LINE);
+    expect(screen.classes.has('loading-screen--ready')).toBe(false);
+    expect(screen.classes.has('hidden')).toBe(false);
+    expect(menu.classes.has('hidden')).toBe(true);
+    expect(docListeners.keydown).toBeUndefined();
   });
 });
 
