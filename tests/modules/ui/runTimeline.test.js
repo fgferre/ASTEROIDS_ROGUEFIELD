@@ -29,7 +29,7 @@ describe('run end headline', () => {
 
   it('a Boss Rush death counts Wardens', () => {
     expect(
-      runHeadline({ outcome: 'death', layer: 10, bossRush: { stage: 2 } })
+      runHeadline({ outcome: 'death', layer: 10, rush: { stage: 2 } })
     ).toMatchObject({ title: 'Warden 2', of: 'of 3', line: 'Boss Rush' });
   });
 
@@ -50,7 +50,7 @@ describe('run end headline', () => {
       badge: 'New best',
     });
     expect(
-      runHeadline({ outcome: 'victory', bossRush: { stage: 3 }, time: 600 })
+      runHeadline({ outcome: 'victory', rush: { stage: 3 }, time: 600 })
     ).toMatchObject({ title: 'Boss Rush cleared', line: '3 Wardens · 10:00' });
   });
 

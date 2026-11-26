@@ -9,10 +9,10 @@
 // (core/replay.js), the menu's launch options (menuButtons.js, the object's
 // inputs) and the story's Boss Rush line (content).
 //
-// Allowed until this branch's last commit, which waits for the coordinator's
-// word (the ending's screens and the 3D files are another conversation's):
-// the files listed in PENDING and the lines in PENDING_LINES. The last commit
-// empties both; a pending entry that no longer matches anything fails here.
+// Allowed until the 3D files are this work's to change (the 3D engine's sweep
+// holds them, 26/11): the files listed in PENDING and the lines in
+// PENDING_LINES, emptied then; a pending entry that no longer matches
+// anything fails here.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -36,12 +36,8 @@ const ALLOWED_LINES = [
   ['src/data/story.js', 'bossRush:'],
   ['src/modules/ui/transmissions.js', 'text: STORY.bossRush,'],
 ];
-const PENDING = [
-  'src/modules/ui/RunEndScreens.js',
-  'src/modules/ui/runTimeline.js',
-  'src/modules/render3d/Renderer3D.js',
-];
-const PENDING_LINES = [['src/services/session/runEnd.js', 'bossRush: {']];
+const PENDING = ['src/modules/render3d/Renderer3D.js'];
+const PENDING_LINES = [];
 
 const CHECKS = [
   ['a bossRush flag', /\bbossRush\b/],

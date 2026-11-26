@@ -103,22 +103,22 @@ describe('Boss Rush', () => {
     expect(wardens).toEqual(['prime', 'choir', 'null']);
     expect(game.session.getSessionState()).toBe('victory');
     expect(victories).toHaveLength(1);
-    const { bossRush } = victories[0].data;
-    expect(bossRush.stage).toBe(3);
-    expect(bossRush.bestStage).toBe(3);
-    expect(bossRush.bestTime).toBeGreaterThan(0);
+    const { rush } = victories[0].data;
+    expect(rush.stage).toBe(3);
+    expect(rush.bestStage).toBe(3);
+    expect(rush.bestTime).toBeGreaterThan(0);
     // The clear is the last Warden's death; the screen opened later, after
     // the spoils, and the badge still knows it is a new best.
     expect(victories[0].data.stats.timeElapsed).toBeGreaterThan(
-      bossRush.bestTime + 1
+      rush.bestTime + 1
     );
-    expect(bossRush.newBest).toBe(true);
+    expect(rush.newBest).toBe(true);
     expect(game.session.runEnd.continueBeyondVictory()).toBe(false);
     // The layer records only count full runs.
     expect(loadRecords()).toMatchObject({
       bestLayer: 0,
       bossRushStage: 3,
-      bossRushTime: bossRush.bestTime,
+      bossRushTime: rush.bestTime,
     });
   });
 
@@ -147,7 +147,7 @@ describe('Boss Rush', () => {
     game.eventBus.emit('player-died', game.services.world.buildRunSummary());
     vi.advanceTimersByTime(7000);
 
-    expect(gameovers[0].data.bossRush).toMatchObject({
+    expect(gameovers[0].data.rush).toMatchObject({
       stage: 2,
       bestTime: 0,
     });

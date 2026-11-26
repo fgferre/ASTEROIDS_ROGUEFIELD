@@ -670,8 +670,8 @@ class UISystem extends BaseSystem {
       }
     });
 
-    // The ending's flow: it asks the mode in this branch's last commit, with
-    // the ending's screens.
+    // The won sector's id rides on the event: the ending's choice and the
+    // win's lines are about that sector.
     this.registerEventListener('run-won', ({ wave, sector } = {}) => {
       this.runWon = true;
       this.chestCeremony.clear();

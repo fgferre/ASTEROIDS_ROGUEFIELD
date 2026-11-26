@@ -713,6 +713,8 @@ export default class GameSessionService {
     this.runEnd.scheduleGameOverScreenTransition({
       ...data,
       ...this.runEnd.recordRunReached(data),
+      // The end screens ask the run's kind (src/core/runMode.js).
+      mode: this.mode,
     });
 
     const retriesRemaining = this.retry.getRetryCount();
