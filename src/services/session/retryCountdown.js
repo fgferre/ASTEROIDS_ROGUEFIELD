@@ -247,6 +247,15 @@ export class RetryCountdown {
       }
     }
 
+    // After every reset above (rebuilding the field, physics-reset,
+    // world-reset reseed them): the layer's draws go on from the death
+    // (outside audit 8, verdict A9).
+    if (snapshot.enemies?.random) {
+      this.resolveServiceInstance('enemies').restoreRandomStreams(
+        snapshot.enemies.random
+      );
+    }
+
     const gameoverScreen = this.lookupDomElement('gameover-screen');
     if (gameoverScreen) {
       gameoverScreen.classList.add('hidden');
