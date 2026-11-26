@@ -169,6 +169,6 @@ describe('Boss Rush', () => {
     click(game, 'boss-rush-btn');
     click(game, 'daily-field-btn');
     expect(game.session.bossRush).toBe(false);
-    expect(game.services.difficulty.isDaily()).toBe(true);
+    expect(game.session.mode.kind).toBe('daily');
   });
 });

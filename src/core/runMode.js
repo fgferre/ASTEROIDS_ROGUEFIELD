@@ -17,6 +17,7 @@
 // menuButtons.js, GameSessionService.startNewRun).
 
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
+import { DAILY_DIFFICULTY } from '../data/difficulty.js';
 import { sectorById } from '../data/sectors.js';
 
 const DESCENT = Object.freeze({
@@ -41,12 +42,21 @@ const DESCENT = Object.freeze({
   writesSectorRecord: false,
   /** The run flies today's seed. */
   usesTodaysSeed: false,
+  /** The preset every run of this kind flies, whatever was chosen, or null. */
+  forcedDifficulty: null,
+  /** The run's end writes today's Daily Field record. */
+  writesTodaysRecord: false,
+  /** The mode a recording of the run keeps (src/core/replay.js). */
+  replayMode: 'normal',
 });
 
 const DAILY = Object.freeze({
   ...DESCENT,
   kind: 'daily',
   usesTodaysSeed: true,
+  forcedDifficulty: DAILY_DIFFICULTY,
+  writesTodaysRecord: true,
+  replayMode: 'daily',
 });
 
 const BOSS_RUSH = Object.freeze({
@@ -57,6 +67,7 @@ const BOSS_RUSH = Object.freeze({
   goesOnAfterVictory: false,
   writesLayerRecord: false,
   writesRushRecord: true,
+  replayMode: 'bossRush',
 });
 
 function sectorMode(sector) {
@@ -89,6 +100,11 @@ export function runModeFor(
   if (bossRush ?? previous.kind === 'bossRush') return BOSS_RUSH;
   if (daily ?? previous.kind === 'daily') return DAILY;
   return DESCENT;
+}
+
+/** The options that start the run a recording kept (its `replayMode`). */
+export function replayModeOptions(replayMode) {
+  return { daily: replayMode === 'daily', bossRush: replayMode === 'bossRush' };
 }
 
 /** The mode before any run is played. */

@@ -21,6 +21,7 @@
 import { createPlayer, createRecorder, deserialize } from '../core/replay.js';
 import { CHEST_REVEAL_MS } from '../data/pickups.js';
 import { resolveService } from '../core/serviceUtils.js';
+import { replayModeOptions } from '../core/runMode.js';
 
 /** `?replay=<url>` value, or null. */
 export function getReplayUrl() {
@@ -162,13 +163,9 @@ export function createReplayController({
       seed: difficulty.getRunSeed(),
       hull: session.getConfiguredHullId(),
       difficulty: difficulty.getDifficulty(),
-      mode: session.bossRush
-        ? 'bossRush'
-        : difficulty.isDaily()
-          ? 'daily'
-          : 'normal',
+      mode: session.mode.replayMode,
       date: difficulty.dateKey,
-      sector: session.sector?.id ?? null,
+      sector: session.mode.sector?.id ?? null,
       stick: playerService.stickSensitivity,
       hangar: hangar.getRunSetup(),
     });
@@ -252,8 +249,7 @@ export function createReplayController({
       difficulty.useReplay(recording);
       hangar.useReplaySetup(recording.hangar);
       session.replayStart = {
-        daily: recording.mode === 'daily',
-        bossRush: recording.mode === 'bossRush',
+        ...replayModeOptions(recording.mode),
         sector: recording.sector ?? null,
         hull: recording.hull,
       };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import { createReplayController } from '../../src/bootstrap/replaySession.js';
+import { FIRST_RUN_MODE } from '../../src/core/runMode.js';
 
 // The recording ends at the death; a Retry plays on past it, so the dev F9
 // must not offer that recording as the run's (outside audit 8, verdict A6).
@@ -11,7 +12,6 @@ describe('the run recording and a Retry', () => {
       difficulty: {
         getRunSeed: () => 7,
         getDifficulty: () => 'veteran',
-        isDaily: () => false,
         dateKey: null,
       },
       player: { stickSensitivity: 'medium' },
@@ -19,6 +19,7 @@ describe('the run recording and a Retry', () => {
     };
     const session = {
       replayRecorder: null,
+      mode: FIRST_RUN_MODE,
       services,
       getConfiguredHullId: () => 'interceptor',
     };

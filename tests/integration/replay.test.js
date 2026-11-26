@@ -447,7 +447,7 @@ describe('run replay', () => {
       daily: false,
       bossRush: false,
     });
-    expect(replay.services.difficulty.isDaily()).toBe(true);
+    expect(replay.session.mode.kind).toBe('daily');
     expect(replay.services.difficulty.getRunSeed()).toBe(recording.seed);
   });
 

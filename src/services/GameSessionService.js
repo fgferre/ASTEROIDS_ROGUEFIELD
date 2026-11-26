@@ -574,7 +574,7 @@ export default class GameSessionService {
     // the last mode), an armed replay winning over the mode picked (above).
     this.runEnd.mode = runModeFor({ daily, bossRush, sector }, this.mode);
     const difficulty = resolveService('difficulty', this.services);
-    const seed = difficulty.beginRun({ daily: this.mode.usesTodaysSeed });
+    const seed = difficulty.beginRun({ mode: this.mode });
     if (this.gameState) {
       this.gameState.randomSeed = seed;
     }
