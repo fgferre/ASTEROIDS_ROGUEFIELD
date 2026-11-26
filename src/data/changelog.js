@@ -46,6 +46,7 @@ export const NEXT = {
     'If part of the game fails to start, the loading screen now stays and says so, asking you to reload the page, instead of opening a menu whose Launch does nothing.', // not confirmed
   ],
   unseen: [
+    'A card matrix now runs with every test: every card and every rank must move the number its text promises (or be excused in the test with its reason), every new card needs a probe, and the level-up draw over a hundred seeds never offers a card at its top rank, without its prerequisites, dead for the weapon in hand, or a Hull Patch at full hull; nobody sees it, it stops a broken card from being made.', // not confirmed
     'Development-only switches in the address (?cadencia, ?bleed, ?freio, ?matriz9) let Felipe play each option of four pending card decisions on the test server; the published game never reads them, and they go once he chooses.', // not confirmed
     "Five error catches that hid real bugs now say why they ignore an error or let it show (a boss blast that fails on one enemy logs it, a thruster sound's volume node goes back to its pool even if already disconnected); nothing changes while nothing breaks.", // not confirmed
     "Three small clean-ups with nothing to notice: the run's session no longer loads the screen code of the link into a run (the game hands it over), the Retries left are a number the session keeps instead of the button's text, and the death snapshot loses fallbacks to methods no system has.", // not confirmed
