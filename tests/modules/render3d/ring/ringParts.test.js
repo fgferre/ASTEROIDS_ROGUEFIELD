@@ -1,18 +1,8 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { mergeStatic } from '../../../../src/modules/render3d/mergeStatic.js';
 import { ringParts } from '../../../../src/modules/render3d/ring/ringParts.js';
 import { RING } from '../../../../src/modules/render3d/ring/ringShape.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../../src/modules/render3d/three.js';
 
 // Chunks worth checking: the stump and the frame by it, plain hull with
 // ribs, both ends of the gap.

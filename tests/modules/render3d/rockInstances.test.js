@@ -1,19 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   ROCK_INSTANCE_CAP,
   RockInstances,
 } from '../../../src/modules/render3d/rockInstances.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const rockView = (family, shape, x) => {
   const object = new THREE.Object3D();

@@ -4,6 +4,7 @@
 // flashes, returned as one kit (Renderer3D's `three`).
 
 import { KEY_LIGHT_DIR, PALETTE } from '../../data/constants/palette.js';
+import THREE from './three.js';
 import {
   CapsuleBatch,
   PointBatch,
@@ -197,7 +198,6 @@ function displayTarget(THREE, composer, encoders, smaaPass) {
 // `seeded` runs object creation inside the menu's seeded Math.random swap
 // (Three.js draws UUIDs from it).
 export function setupThree(seeded) {
-  const THREE = window.THREE;
   skipDarkPointLights(THREE);
   const canvas = document.getElementById('game-canvas');
   const renderer = new THREE.WebGLRenderer({

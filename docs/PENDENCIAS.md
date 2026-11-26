@@ -455,3 +455,9 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   `lascas-do-menu-1`: _"Pedras escuras do menu — Três jeitos, o mesmo instante: Nossos asteroides, pequenos e ao
   longe"_. Só no menu; no jogo os pedaços ficam como estão (coordenadora, 23/11). Ramo `conserto/lascas-do-menu`;
   fecha quando ele conferir.
+- **(61)** O motor 3D novo (25/11, a uma auditoria de fora que propôs trocar o three r128, de 2021, por uma versão
+  atual): _"pode ser uma boa sim. vamos fazer, pode melhorar o app"_; e, sobre trazer antes e depois de cada cena,
+  _"nao preicsa antes depois do three... nao deve ser tao complexo assim..."_; e, na conversa do motor,
+  _"nao precisa ser 100% igual, pode variar um pouco cores sem problema..."_. Ramo `motor/three-novo`: o three passa
+  a vir do npm, com a versão fixada, subindo de dez em dez versões até a mais nova (r187), com o jogo de mesma cara.
+  Fecha quando ele jogar a versão nova.

@@ -46,6 +46,7 @@
     "vitest": "^4.1.12"
   },
   "dependencies": {
-    "nipplejs": "^1.0.4"
+    "nipplejs": "^1.0.4",
+    "three": "0.128.0"
   }
 }

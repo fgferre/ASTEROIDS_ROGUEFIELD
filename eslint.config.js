@@ -48,7 +48,6 @@ export default [
         // runtime globals the game still relies on (see AGENTS.md traps)
         gameServices: 'readonly',
         gameEvents: 'readonly',
-        THREE: 'readonly',
         CANNON: 'readonly',
         lucide: 'readonly',
         Stats: 'readonly',

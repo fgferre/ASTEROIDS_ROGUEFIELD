@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { listContent } from '../../../src/content/registry.js';
 import { AFFIX_IDS } from '../../../src/data/enemies/affixes.js';
@@ -17,18 +16,7 @@ import {
   VIEW_KINDS,
 } from '../../../src/modules/render3d/enemyMirror.js';
 import { LENS } from '../../../src/modules/render3d/enemies/sentinels/kit.js';
-
-// The vendored r128 build is UMD: evaluated with an `exports` object it
-// fills that object instead of a global.
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 describe('EnemyMirror', () => {
   it('builds every registered enemy in the look its content file picks', () => {

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
 import CombatSystem from '../../../src/modules/CombatSystem.js';
@@ -7,16 +6,7 @@ import {
   shotColor,
 } from '../../../src/modules/render3d/weaponMirror.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 function makeCombat() {
   return new CombatSystem({

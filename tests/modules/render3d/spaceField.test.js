@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { QUALITY_PRESETS } from '../../../src/core/qualityPresets.js';
 import { BIOMES, BiomeTransition } from '../../../src/data/biomes.js';
@@ -19,16 +18,7 @@ import {
   TWINKLE,
   layerSpan,
 } from '../../../src/modules/render3d/spaceField.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const linear = (css) => new THREE.Color(css).convertSRGBToLinear();
 const frame = { ship: null, shipLight: 0, pointScale: 1000, pixel: 1 };

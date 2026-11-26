@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ENDING_SHOTS,
@@ -17,16 +16,7 @@ import {
   STORY_FAR,
   StoryScene,
 } from '../../../src/modules/render3d/storyScene.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 // Just enough of Renderer3D's kit: a real scene and enemy mirror, the
 // backdrop's Ring and place sets as plain parts (the Crucible's slip a

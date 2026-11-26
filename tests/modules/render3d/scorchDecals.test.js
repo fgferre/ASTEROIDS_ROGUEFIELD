@@ -1,21 +1,10 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   DECAL_CAP,
   DECAL_LIFE,
   ScorchDecals,
 } from '../../../src/modules/render3d/scorchDecals.js';
-
-// The vendored r128 build is UMD: evaluated with an `exports` object.
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 function setup() {
   const scene = new THREE.Scene();

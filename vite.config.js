@@ -32,6 +32,12 @@ export default defineConfig(({ mode }) => ({
       input: {
         main: resolve(__dirname, 'src/index.html'),
       },
+      // three.js in a file of its own: its name changes only with its
+      // version, so a returning player keeps it across publications.
+      output: {
+        manualChunks: (id) =>
+          id.includes('/node_modules/three/') ? 'three' : undefined,
+      },
     },
   },
   server: {

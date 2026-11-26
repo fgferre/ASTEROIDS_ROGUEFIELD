@@ -3,10 +3,10 @@
 // `visual`, the Gnat (gnat.js, which names neither `view` nor `visual`) in
 // the default look. Both join the registry here as if they were
 // src/content/enemies files.
-import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import sentry from '../../__fixtures__/enemies/sentry.js';
 import { PALETTE } from '../../../src/data/constants/palette.js';
+import THREE from '../../../src/modules/render3d/three.js';
 
 vi.mock('../../../src/content/registry.js', async (importOriginal) => {
   const registry = await importOriginal();
@@ -27,18 +27,6 @@ vi.mock('../../../src/content/registry.js', async (importOriginal) => {
         : registry.getContent(kind, id),
   };
 });
-
-// The vendored r128 build is UMD: evaluated with an `exports` object it
-// fills that object instead of a global.
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
 
 // The global setup has already loaded the mirror on the real registry: it is
 // loaded again, on this one, before the tests.

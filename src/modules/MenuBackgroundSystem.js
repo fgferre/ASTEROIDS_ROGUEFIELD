@@ -14,6 +14,7 @@ import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { MenuHullPreview } from './MenuHullPreview.js';
+import THREE from './render3d/three.js';
 import * as quality from './menu/adaptiveQuality.js';
 import { orbitCamera } from './menu/cameraOrbit.js';
 import * as loadingScreen from './menu/loadingScreen.js';
@@ -70,8 +71,7 @@ class MenuBackgroundSystem extends BaseSystem {
       typeof requestAnimationFrame === 'function' &&
       Boolean(this.canvas);
 
-    this.THREE = this.ready ? window.THREE : null;
-    this.ready = this.ready && Boolean(this.THREE);
+    this.THREE = this.ready ? THREE : null;
 
     this._threeMathUtilsState = threeUuid.createThreeMathUtilsState();
 
