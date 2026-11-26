@@ -72,6 +72,7 @@ export const NEXT = {
     'The controls code is split in three files by subject (the bindings, the pad, the rest), so it can be changed again without passing the line limit; it reads keys, pads and touch exactly as before.', // not confirmed
     'The controls hand each step to the ship directly instead of through a command queue that copied every step six times and kept the shield presses forever; nobody notices (it cost a few hundredths of a millisecond a step) and the recorded runs play the same.', // not confirmed
     'A card matrix now runs with every test: every card and every rank must move the number its text promises (or be excused in the test with its reason), every new card needs a probe, and the level-up draw over a hundred seeds never offers a card at its top rank, without its prerequisites, dead for the weapon in hand, or a Hull Patch at full hull; nobody sees it, it stops a broken card from being made.', // not confirmed
+    'The interface, the menu background and the reward code now find the services they use the one way the rest of the game does, instead of through shortcuts of their own, and a test keeps the shortcuts from coming back; each finds the same service as before, so nothing changes in play.', // not confirmed
   ],
 };
 
