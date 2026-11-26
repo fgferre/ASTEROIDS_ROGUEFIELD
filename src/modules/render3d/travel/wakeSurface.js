@@ -630,7 +630,7 @@ function patchPaint(shader) {
   shader.fragmentShader = shader.fragmentShader
     .replace(
       '#include <map_fragment>',
-      'vec4 wakeTexel = mapTexelToLinear(texture2D(map, vUv));'
+      'vec4 wakeTexel = texture2D(map, vUv); // sRGB decoded on read'
     )
     .replace(
       '#include <color_fragment>',

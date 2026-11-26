@@ -47,6 +47,6 @@
   },
   "dependencies": {
     "nipplejs": "^1.0.4",
-    "three": "0.128.0"
+    "three": "0.138.0"
   }
 }
