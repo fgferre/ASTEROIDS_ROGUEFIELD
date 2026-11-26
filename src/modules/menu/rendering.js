@@ -32,22 +32,10 @@ export function createMenuRenderer(THREE, canvas) {
   renderer.setPixelRatio(resolveDevicePixelRatio());
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearColor(0x050916, 1);
-  if (
-    typeof renderer.outputEncoding !== 'undefined' &&
-    THREE &&
-    THREE.sRGBEncoding
-  ) {
-    renderer.outputEncoding = THREE.sRGBEncoding;
-  }
-  if (
-    typeof renderer.toneMapping !== 'undefined' &&
-    THREE &&
-    typeof THREE.NoToneMapping !== 'undefined'
-  ) {
-    // Monolith shader outputs in linear and lets renderer handle encoding.
-    renderer.toneMapping = THREE.NoToneMapping;
-    renderer.toneMappingExposure = 1.0;
-  }
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  // Monolith shader outputs in linear and lets renderer handle encoding.
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.toneMappingExposure = 1.0;
 
   return renderer;
 }

@@ -2,8 +2,8 @@
 // part's geometry is placed by its own transform and, given a `color`, baked
 // into a vertex colour, so the parts of a machine that never move apart draw
 // as one mesh under one shared material. `flat` parts take face normals (the
-// look of a flatShading material). The result is non-indexed and keeps uv/uv2
-// only when every part has them (baked surface maps). A part's `shine` (a
+// look of a flatShading material). The result is non-indexed and keeps uv
+// only when every part has it (baked surface maps). A part's `shine` (a
 // hullModel.js SHINE class) rides in a `shine` attribute (roughness,
 // metalness; 0 on the other parts: the material's own) that patchShine
 // reads, so steel and paint share one draw.
@@ -21,7 +21,7 @@ export function mergeStatic(THREE, parts) {
     0
   );
   const every = (name) => sources.every((g) => g.getAttribute(name));
-  const uvNames = ['uv', 'uv2'].filter(every);
+  const uvNames = ['uv'].filter(every);
   const colored = parts.some((part) => part.color);
   const position = new Float32Array(total * 3);
   const normal = new Float32Array(total * 3);

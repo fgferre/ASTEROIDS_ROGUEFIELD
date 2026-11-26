@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { createCameraScene } from '../../../src/core/camera.js';
 import { projectToScreen } from '../../../src/core/cameraShot.js';
@@ -11,18 +10,7 @@ import Renderer3D, {
 } from '../../../src/modules/render3d/Renderer3D.js';
 import { FOV } from '../../../src/modules/render3d/sceneSetup.js';
 import { CAMERA_FAR } from '../../../src/modules/render3d/spaceField.js';
-
-// The vendored r128 build is UMD: evaluated with an `exports` object it
-// fills that object instead of a global.
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 describe('Renderer3D camera clamp', () => {
   it('keeps the dollied-out follow point inside the field', () => {

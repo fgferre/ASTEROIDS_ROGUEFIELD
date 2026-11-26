@@ -1,19 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   FlashLights,
   VeinLights,
 } from '../../../src/modules/render3d/flashLights.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 describe('FlashLights', () => {
   it("lights a hit in the shot's colour on the dimmest light, once a frame", () => {

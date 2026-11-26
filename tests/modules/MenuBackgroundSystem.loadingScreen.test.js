@@ -7,7 +7,7 @@ function menuReadyToAnimate() {
   const system = new MenuBackgroundSystem({ random });
   Object.assign(system, {
     isActive: true,
-    clock: { getDelta: () => 1 / 60 },
+    timer: { update: () => ({ getDelta: () => 1 / 60 }) },
     stats: null,
     updateAdaptiveQuality: vi.fn(),
     opening: { update: vi.fn(), render: vi.fn() },

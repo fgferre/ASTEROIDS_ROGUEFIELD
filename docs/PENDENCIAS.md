@@ -461,3 +461,13 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   `lascas-do-menu-1`: _"Pedras escuras do menu — Três jeitos, o mesmo instante: Nossos asteroides, pequenos e ao
   longe"_. Só no menu; no jogo os pedaços ficam como estão (coordenadora, 23/11). Ramo `conserto/lascas-do-menu`;
   fecha quando ele conferir.
+- **(61)** O motor 3D novo (25/11, a uma auditoria de fora que propôs trocar o three r128, de 2021, por uma versão
+  atual): _"pode ser uma boa sim. vamos fazer, pode melhorar o app"_; e, sobre trazer antes e depois de cada cena,
+  _"nao preicsa antes depois do three... nao deve ser tao complexo assim..."_; e, na conversa do motor,
+  _"nao precisa ser 100% igual, pode variar um pouco cores sem problema..."_. Construído no ramo `motor/three-novo`:
+  o three vem do npm, fixado na r187 (a mais nova, de 30/10/2026), num arquivo próprio que quem volta não baixa de novo;
+  subiu de dez em dez versões, cada degrau com o menu, a nave do Hangar, um setor em ultra e em low, um chefe de perto,
+  a história, a viagem e o final comparados quadro a quadro com o jogo de hoje: a mesma cara (diferença só em bordas
+  finas). O quadro custa cerca de 5% a mais neste Mac (medido lado a lado), jogo pronto um pouco antes (0,1 a 0,4 s).
+  Junto (auditoria 8, B3): durante a partida a tela do menu deixa de segurar cerca de 380 MB da placa. Fecha quando
+  ele jogar a versão nova.

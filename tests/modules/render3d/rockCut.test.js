@@ -1,20 +1,10 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   createAsteroidGeometry,
   createSeededRandom,
 } from '../../../src/modules/render3d/asteroidMesh.js';
 import { cutRock } from '../../../src/modules/render3d/enemies/rockCut.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const rock = createAsteroidGeometry(THREE, 11.3, { detail: 4 });
 const triangles =

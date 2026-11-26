@@ -14,6 +14,7 @@ import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { MenuHullPreview } from './MenuHullPreview.js';
+import THREE from './render3d/three.js';
 import * as quality from './menu/adaptiveQuality.js';
 import { orbitCamera } from './menu/cameraOrbit.js';
 import * as loadingScreen from './menu/loadingScreen.js';
@@ -70,14 +71,13 @@ class MenuBackgroundSystem extends BaseSystem {
       typeof requestAnimationFrame === 'function' &&
       Boolean(this.canvas);
 
-    this.THREE = this.ready ? window.THREE : null;
-    this.ready = this.ready && Boolean(this.THREE);
+    this.THREE = this.ready ? THREE : null;
 
     this._threeMathUtilsState = threeUuid.createThreeMathUtilsState();
 
     this.animationFrame = null;
     this.isActive = false;
-    this.clock = null;
+    this.timer = null;
     this.elapsedTime = 0;
 
     // Pre-loading state
@@ -335,7 +335,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.scene.add(this.camera);
 
     this.renderer = rendering.createMenuRenderer(THREE, this.canvas);
-    this.clock = new THREE.Clock();
+    this.timer = new THREE.Timer();
     this.keyLight = rendering.createLighting(THREE, this.scene);
 
     this.hullPreview = new MenuHullPreview(THREE, this.camera);
@@ -490,7 +490,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
     this.animationFrame = requestAnimationFrame(this.animate);
 
-    const delta = Math.min(this.clock.getDelta(), 0.05);
+    const delta = Math.min(this.timer.update().getDelta(), 0.05);
     this.stats = this.stats || this.resolveStatsPanel();
     this.stats?.begin();
     this.elapsedTime += delta;
@@ -537,10 +537,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.handleResize();
     // A Hangar purchase may have unlocked the selected hull.
     this.syncHullPreview();
-    if (this.clock) {
-      this.clock.start();
-      this.clock.getDelta();
-    }
+    this.timer?.reset();
     this.elapsedTime = 0;
     this.animationFrame = requestAnimationFrame(this.animate);
   }
@@ -552,13 +549,12 @@ class MenuBackgroundSystem extends BaseSystem {
 
     this.isActive = false;
     this.opening?.release();
+    // Its drawing buffer too (about 300 MB at 2560×1600 with antialiasing,
+    // held the whole run): start() gives it its size back.
+    this.renderer.setSize(1, 1, false);
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
       this.animationFrame = null;
-    }
-
-    if (this.clock) {
-      this.clock.stop();
     }
   }
 

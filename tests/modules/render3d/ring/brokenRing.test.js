@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   BrokenRing,
@@ -10,16 +9,7 @@ import {
   RING,
   ringPoint,
 } from '../../../../src/modules/render3d/ring/ringShape.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../../src/modules/render3d/three.js';
 
 // The gameplay camera (cameraRig.js): the follow shot on world (x, z), its
 // distance × `k`, tilted `tilt`° — the field's centre, its left (the break in

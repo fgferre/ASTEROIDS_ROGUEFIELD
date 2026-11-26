@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { SECTORS } from '../../../src/data/sectors.js';
 import { ShipMotion } from '../../../src/modules/render3d/travel/motion.js';
@@ -15,16 +14,7 @@ import {
   linePauses,
   travelLeg,
 } from '../../../src/modules/render3d/travelScene.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const frame = (id) =>
   placeFrame(id, {

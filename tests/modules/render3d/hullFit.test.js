@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ALL_HULLS } from '../../../src/data/shipModels.js';
 import { HullArt } from '../../../src/modules/player/hullArt.js';
@@ -10,18 +9,7 @@ import {
   seatNoseGun,
   seatTurret,
 } from '../../../src/modules/render3d/hullModel.js';
-
-// The vendored r128 build is UMD: evaluated with an `exports` object it
-// fills that object instead of a global.
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 // The guns against each hull's 3D shape at every visual upgrade level, on a
 // top-view grid (field units: the hull draws at VISUAL_SCALE, the guns

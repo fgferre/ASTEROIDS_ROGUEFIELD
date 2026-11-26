@@ -1,19 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   DEBRIS_CAPACITY,
   DebrisChunks,
 } from '../../../src/modules/render3d/debrisChunks.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const particle = (i, life) => ({
   x: 100 + i,

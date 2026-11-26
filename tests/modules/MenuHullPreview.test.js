@@ -1,17 +1,7 @@
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MenuHullPreview } from '../../src/modules/MenuHullPreview.js';
 import { createCanvasDocumentStub } from '../__helpers__/stubs.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../src/modules/render3d/three.js';
 
 describe('MenuHullPreview', () => {
   it('shows a locked hull as a dark silhouette without plumes', () => {

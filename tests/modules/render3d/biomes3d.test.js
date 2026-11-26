@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   BIOMES,
@@ -6,16 +5,7 @@ import {
   BiomeTransition,
 } from '../../../src/data/biomes.js';
 import { BiomeController } from '../../../src/modules/render3d/biomes3d.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const linear = (css) => new THREE.Color(css).convertSRGBToLinear();
 

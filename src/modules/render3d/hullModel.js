@@ -454,7 +454,6 @@ class ToneParts {
       geometry.setAttribute('position', attribute(pos, 3));
       geometry.setAttribute('normal', attribute(nor, 3));
       geometry.setAttribute('uv', attribute(uv, 2));
-      geometry.setAttribute('uv2', attribute(uv, 2));
       return { geometry, color: colors[tone], finish: this.finish };
     });
   }

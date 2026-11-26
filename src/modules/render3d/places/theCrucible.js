@@ -124,7 +124,7 @@ void main() {
   }
   gl_FragColor = vec4(color * ${STAR.level.toFixed(2)} * uLevel * uOpacity, 1.0);
   #include <tonemapping_fragment>
-  #include <encodings_fragment>
+  #include <colorspace_fragment>
 }`;
 
 // The star, faded with the set like its other materials (PlaceSets.apply

@@ -1,17 +1,7 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { DeathBursts } from '../../../src/modules/render3d/dissolve.js';
 import { EnemyMirror } from '../../../src/modules/render3d/enemyMirror.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const mirrorOf = () =>
   new EnemyMirror(

@@ -164,7 +164,7 @@ void main() {
     0.0
   );
   color = g * g;
-  gl_FragColor = LinearTosRGB(vec4(color, 1.0));
+  gl_FragColor = sRGBTransferOETF(vec4(color, 1.0));
 }`,
 };
 

@@ -165,8 +165,8 @@ export class PointBatch {
     this.material.uniforms.uScale.value = pointScale;
     for (let i = 0; i < this.attributes.length; i += 1) {
       const attribute = this.attributes[i];
-      attribute.updateRange.offset = 0;
-      attribute.updateRange.count = this.count * attribute.itemSize;
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0, this.count * attribute.itemSize);
       attribute.needsUpdate = true;
     }
     this.geometry.setDrawRange(0, this.count);
@@ -204,7 +204,7 @@ varying float vAcross;
 void main() {
   float a = min(1.0, abs(vAcross));
   gl_FragColor = vec4(vColor * (1.0 - a * a), 1.0);
-  #include <encodings_fragment>
+  #include <colorspace_fragment>
 }`;
 
 const MAX_POLYLINE = 64;
@@ -525,8 +525,8 @@ export class RibbonBatch {
   end() {
     for (let i = 0; i < this.attributes.length; i += 1) {
       const attribute = this.attributes[i];
-      attribute.updateRange.offset = 0;
-      attribute.updateRange.count = this.verts * attribute.itemSize;
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0, this.verts * attribute.itemSize);
       attribute.needsUpdate = true;
     }
     this.geometry.setDrawRange(0, (this.verts / 4) * 6);
@@ -587,7 +587,7 @@ void main() {
   gl_FragColor = vHeat < 0.0
     ? vec4(vColor * (0.25 + 0.75 * facing), 1.0)
     : vec4(mix(vColor * 0.7, vec3(hot), core), 1.0);
-  #include <encodings_fragment>
+  #include <colorspace_fragment>
 }`;
 
 /** The shapes' triangles: { position, normal, part } flat arrays. */
@@ -787,11 +787,11 @@ export class CapsuleBatch {
     this.mesh.count = this.count;
     if (this.count === 0) return;
     const matrices = this.mesh.instanceMatrix;
-    matrices.updateRange.offset = 0;
-    matrices.updateRange.count = this.count * 16;
+    matrices.clearUpdateRanges();
+    matrices.addUpdateRange(0, this.count * 16);
     matrices.needsUpdate = true;
-    this.tint.updateRange.offset = 0;
-    this.tint.updateRange.count = this.count * 4;
+    this.tint.clearUpdateRanges();
+    this.tint.addUpdateRange(0, this.count * 4);
     this.tint.needsUpdate = true;
   }
 }

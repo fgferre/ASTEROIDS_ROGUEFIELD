@@ -4,6 +4,7 @@
 // flashes, returned as one kit (Renderer3D's `three`).
 
 import { KEY_LIGHT_DIR, PALETTE } from '../../data/constants/palette.js';
+import THREE from './three.js';
 import {
   CapsuleBatch,
   PointBatch,
@@ -79,7 +80,7 @@ void main() {
 ${SCENE_READ}
 varying vec2 vUv;
 void main() {
-  gl_FragColor = LinearTosRGB(vec4(sceneAt(vUv), 1.0));
+  gl_FragColor = sRGBTransferOETF(vec4(sceneAt(vUv), 1.0));
 }`,
 };
 
@@ -153,7 +154,7 @@ function skipDarkPointLights(THREE) {
 // 0a.8). The bloom's copy draw is hidden; `passes` add its result on frames
 // it ran.
 function foldBloom(bloomPass, passes) {
-  bloomPass.materialCopy.visible = false;
+  bloomPass.blendMaterial.visible = false;
   passes.forEach(({ uniforms }) => {
     uniforms.tBloom.value = bloomPass.renderTargetsHorizontal[0].texture;
     Object.defineProperty(uniforms.uBloom, 'value', {
@@ -197,7 +198,6 @@ function displayTarget(THREE, composer, encoders, smaaPass) {
 // `seeded` runs object creation inside the menu's seeded Math.random swap
 // (Three.js draws UUIDs from it).
 export function setupThree(seeded) {
-  const THREE = window.THREE;
   skipDarkPointLights(THREE);
   const canvas = document.getElementById('game-canvas');
   const renderer = new THREE.WebGLRenderer({
@@ -207,7 +207,7 @@ export function setupThree(seeded) {
     powerPreference: 'high-performance',
   });
   renderer.setPixelRatio(1);
-  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = EXPOSURE;
   renderer.setClearColor(colorOf(THREE, PALETTE.background), 1);
@@ -232,7 +232,7 @@ export function setupThree(seeded) {
   key.shadow.normalBias = KEY_SHADOW.normalBias;
   key.shadow.camera.near = KEY_SHADOW.distance - KEY_SHADOW.depth;
   key.shadow.camera.far = KEY_SHADOW.distance + KEY_SHADOW.depth;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap; // soft since r182
   // Fill: cool, from below-right; hemisphere keeps shadows from going void.
   const fill = new THREE.DirectionalLight(
     colorOf(THREE, PALETTE.neutral),
@@ -294,10 +294,12 @@ export function setupThree(seeded) {
   });
   composer.addPass(outputPass);
   foldBloom(bloomPass, [impactPass, outputPass]);
-  const smaaPass = new THREE.SMAAPass(width, height);
-  // its weights read only the edges' red and green: two bytes a pixel, not four
-  smaaPass.edgesRT.texture.format = THREE.RGFormat;
-  smaaPass.edgesRT.texture.internalFormat = 'RG8';
+  const smaaPass = new THREE.SMAAPass();
+  // its weights read only the edges' red and green: two bytes a pixel, not
+  // four (8-bit as in r128; three makes the target half-float since r158)
+  smaaPass._edgesRT.texture.type = THREE.UnsignedByteType;
+  smaaPass._edgesRT.texture.format = THREE.RGFormat;
+  smaaPass._edgesRT.texture.internalFormat = 'RG8';
   composer.addPass(smaaPass);
   displayTarget(THREE, composer, [impactPass, outputPass], smaaPass);
 

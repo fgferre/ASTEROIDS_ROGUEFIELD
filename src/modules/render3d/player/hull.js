@@ -74,6 +74,10 @@ export function createSurface(mirror, THREE) {
       const material = new THREE.MeshStandardMaterial(finish);
       Object.assign(material.userData, { uRim: rim, uBlink: blink, livery });
       material.onBeforeCompile = patchHull;
+      // patchHull writes another shader with the livery, but three keys a
+      // program on its text: the define keeps the turret's apart (sharing
+      // the hull's, it lacked the livery maps and the GPU refused the draw)
+      if (livery) material.defines.HULL_LIVERY = '';
       return addRimLight(material);
     });
   mirror.hullMaterials = finishes(mirror.livery);

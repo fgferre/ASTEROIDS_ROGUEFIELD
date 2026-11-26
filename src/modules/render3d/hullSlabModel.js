@@ -102,12 +102,10 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
         position.setXYZ(i, v.x, v.y, v.z);
       }
     }
-    solid.setAttribute('uv2', solid.getAttribute('uv'));
     return solid;
   }
   function box(sx, sy, sz, at) {
     const solid = new THREE.BoxGeometry(sx, sy, sz).translate(...at);
-    solid.setAttribute('uv2', solid.getAttribute('uv'));
     return solid;
   }
   // A drum along x from x0 back to x1, radius r0 to r1, centred on [h, z].
@@ -115,7 +113,6 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
     const solid = new THREE.CylinderGeometry(r0, r1, x0 - x1, sides)
       .rotateZ(-Math.PI / 2)
       .translate((x0 + x1) / 2, h, z);
-    solid.setAttribute('uv2', solid.getAttribute('uv'));
     return solid;
   }
   const part = (solid, tone, finish = FINISH.paint, flat = true) => ({
@@ -181,7 +178,6 @@ export function buildSlabHull(THREE, geometry, colors, pivotX) {
     const solid = new THREE.BufferGeometry();
     solid.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
     solid.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    solid.setAttribute('uv2', solid.getAttribute('uv'));
     solid.setIndex(index);
     solid.computeVertexNormals();
     // The dash uses the same vertex range as the base plates of the hull.

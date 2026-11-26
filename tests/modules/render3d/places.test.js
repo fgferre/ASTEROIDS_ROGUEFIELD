@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { biomeForLayer } from '../../../src/data/biomes.js';
 import { SECTORS, sectorById } from '../../../src/data/sectors.js';
@@ -10,16 +9,7 @@ import { createPlaceKit } from '../../../src/modules/render3d/places/kit.js';
 import { crystal } from '../../../src/modules/render3d/places/pieces.js';
 import { buildWake } from '../../../src/modules/render3d/travel/wake.js';
 import { lightWake } from '../../../src/modules/render3d/travel/wakeRig.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 // A BiomeController look standing in one place.
 const lookAt = (place) => ({

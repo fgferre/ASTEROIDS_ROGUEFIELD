@@ -161,7 +161,7 @@ export function createAffixViews(kit) {
       ctx.translate(BADGE_TEXTURE / 2, BADGE_TEXTURE / 2);
       drawAffixBadge(ctx, ELITE_AFFIXES[id], BADGE_TEXTURE * 0.44, 5);
       const texture = new THREE.CanvasTexture(canvas);
-      texture.encoding = THREE.sRGBEncoding;
+      texture.colorSpace = THREE.SRGBColorSpace;
       badges[id] = new THREE.SpriteMaterial({
         map: texture,
         transparent: true,
@@ -266,6 +266,8 @@ export function createAffixViews(kit) {
     if (trail) {
       parts.hull.updateWorldMatrix(true, false);
       parts.hull.matrixWorld.decompose(hullAt, hullTurn, hullSize);
+      // a hull at scale 0 decomposes to scale 1 since three r187
+      if (parts.hull.matrixWorld.determinant() === 0) hullSize.setScalar(0);
       hullAt.sub(parts.group.position);
     }
     parts.ghosts.forEach((ghost, i) => {

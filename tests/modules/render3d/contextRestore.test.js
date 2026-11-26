@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { QUALITY_PRESETS } from '../../../src/core/qualityPresets.js';
 import { watchContextRestore } from '../../../src/modules/render3d/sceneSetup.js';
@@ -6,16 +5,7 @@ import {
   CAMERA_FAR,
   SpaceField,
 } from '../../../src/modules/render3d/spaceField.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 describe('a restored graphics context', () => {
   it('bakes the far nebula again and rebuilds both reflection skies with one generator', () => {

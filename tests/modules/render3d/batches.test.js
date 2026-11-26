@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   CapsuleBatch,
@@ -6,16 +5,7 @@ import {
   SHOT_SHAPES,
   rgbOf,
 } from '../../../src/modules/render3d/batches.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const WHITE = [1, 1, 1];
 
