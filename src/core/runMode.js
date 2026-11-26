@@ -61,6 +61,12 @@ const DESCENT = Object.freeze({
   usesTodaysSeed: false,
   /** The preset every run of this kind flies, whatever was chosen, or null. */
   forcedDifficulty: null,
+  /** Its layers count for the layer medals (First Light, Deep Field). */
+  layersCountForMedals: true,
+  /** A win counts as the First Victory (the medal opens the Pressure ladder). */
+  winCountsAsFirstVictory: true,
+  /** A win counts for the challenge medals (Null and Void, Cursed Run, Iron Escort). */
+  winCountsForChallengeMedals: true,
   /** A won run counts on the Hangar's Pressure ladder. */
   winClimbsPressure: true,
   /** The run's end writes today's Daily Field record. */
@@ -90,6 +96,8 @@ const BOSS_RUSH = Object.freeze({
   goesOnAfterVictory: false,
   writesLayerRecord: false,
   writesRushRecord: true,
+  layersCountForMedals: false,
+  winCountsAsFirstVictory: false,
   winClimbsPressure: false,
   replayMode: 'bossRush',
 });
@@ -108,6 +116,7 @@ function sectorMode(sector) {
     goesOnAfterVictory: false,
     writesLayerRecord: false,
     writesSectorRecord: true,
+    winCountsForChallengeMedals: false,
   });
 }
 
