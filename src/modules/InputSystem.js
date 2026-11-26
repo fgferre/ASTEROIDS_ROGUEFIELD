@@ -1,6 +1,9 @@
 // src/modules/InputSystem.js
+//
+// Keys, mouse and pads in; each fixed step's input frame out (update()), and
+// the press events the menus and the flight hear. The bindings live in
+// input/keyBindings.js, the pad's reading in input/gamepadReading.js.
 
-import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { debugLog } from '../core/debugLogging.js';
 import {
   normalizeDependencies,
@@ -8,23 +11,26 @@ import {
   resolveService,
 } from '../core/serviceUtils.js';
 import { createInputFrame } from '../core/replay.js';
+import { GAMEPAD_RUMBLE } from '../data/constants/gamepad.js';
 import {
-  GAMEPAD_NAV_BUTTONS,
-  GAMEPAD_RUMBLE,
-  GAMEPAD_STICK_DEADZONE,
-} from '../data/constants/gamepad.js';
-import { asArray } from './upgradeCatalog.js';
+  CONTROLS_CATEGORY_ID,
+  applyControlSettings,
+  collectKeyboardActions,
+  extractDefaultsFromSchema,
+  isMovementBinding,
+  normalizeKeyboardBinding,
+  resolveControlFieldMap,
+} from './input/keyBindings.js';
+import {
+  CENTRED_STICKS,
+  DEFAULT_GAMEPAD_AXIS_THRESHOLD,
+  clearGamepadActions,
+  pollGamepad,
+  rumble,
+  startMenuPadPolling,
+} from './input/gamepadReading.js';
 
-const CONTROLS_CATEGORY_ID = 'controls';
-export const DEFAULT_GAMEPAD_AXIS_THRESHOLD = 0.45;
 const PASSWORD_MANAGER_GUARD_CODES = new Set(['KeyS', 'ArrowDown']);
-// The move actions: their keys keep the page from scrolling.
-const MOVEMENT_ACTIONS = new Set([
-  'moveUp',
-  'moveDown',
-  'moveLeft',
-  'moveRight',
-]);
 // Gameplay presses are applied at the next fixed step (not in the DOM handler)
 // so a recorded run replays them at the same step.
 const STEP_PRESS_FIELDS = {
@@ -33,45 +39,6 @@ const STEP_PRESS_FIELDS = {
   toggleAimMode: 'aim',
   dash: 'dash',
 };
-
-const CENTRED_STICKS = Object.freeze({
-  moveX: 0,
-  moveY: 0,
-  aimX: 0,
-  aimY: 0,
-  pad: false,
-});
-
-/** Radial deadzone; past it the magnitude is rescaled to 0..1. */
-export function applyStickDeadzone(x = 0, y = 0) {
-  const magnitude = Math.hypot(x, y);
-  if (magnitude <= GAMEPAD_STICK_DEADZONE) {
-    return { x: 0, y: 0 };
-  }
-  const scaled =
-    Math.min(
-      1,
-      (magnitude - GAMEPAD_STICK_DEADZONE) / (1 - GAMEPAD_STICK_DEADZONE)
-    ) / magnitude;
-  return { x: x * scaled, y: y * scaled };
-}
-
-// The pad's pointer (ui/padPointer.js) marks the page while it shows: its
-// A clicks and its right stick scrolls under it.
-const padPointerShown = () =>
-  globalThis.document?.body?.dataset.padPointer === 'shown';
-
-function clone(value) {
-  if (value === undefined) {
-    return undefined;
-  }
-  try {
-    return JSON.parse(JSON.stringify(value));
-  } catch (error) {
-    console.warn('[InputSystem] Failed to clone value:', error);
-    return value;
-  }
-}
 
 class InputSystem {
   constructor(dependencies = {}) {
@@ -117,11 +84,11 @@ class InputSystem {
 
     this.keyAliases = { w: 'keyw', a: 'keya', s: 'keys', d: 'keyd' };
 
-    this.controlFieldDefinitions = this.resolveControlFieldMap();
+    this.controlFieldDefinitions = resolveControlFieldMap(this);
 
     this.setupEventListeners();
     this.initializeBindings();
-    this.startMenuPadPolling();
+    startMenuPadPolling(this);
 
     debugLog('[InputSystem] Initialized');
   }
@@ -132,24 +99,6 @@ class InputSystem {
       this.eventBus = eventBus;
     }
     return eventBus;
-  }
-
-  resolveControlFieldMap() {
-    const schema = Array.isArray(SETTINGS_SCHEMA) ? SETTINGS_SCHEMA : [];
-    const category = schema.find((entry) => entry.id === CONTROLS_CATEGORY_ID);
-    if (!category) {
-      return new Map();
-    }
-
-    const map = new Map();
-    category.fields.forEach((field) => {
-      map.set(field.key, field);
-      const threshold = Number(field.metadata?.gamepad?.threshold);
-      if (Number.isFinite(threshold)) {
-        this.gamepadAxisThreshold = threshold;
-      }
-    });
-    return map;
   }
 
   resolveSettingsService() {
@@ -172,60 +121,10 @@ class InputSystem {
     }
 
     if (!values) {
-      values = this.extractDefaultsFromSchema();
+      values = extractDefaultsFromSchema(this);
     }
 
-    this.applyControlSettings(values);
-  }
-
-  extractDefaultsFromSchema() {
-    const defaults = {};
-    this.controlFieldDefinitions.forEach((field, key) => {
-      defaults[key] = clone(field.default) || { keyboard: [], gamepad: [] };
-    });
-    return defaults;
-  }
-
-  resetBindingMaps() {
-    this.keyboardBindingMap.clear();
-    this.gamepadButtonMap.clear();
-    this.gamepadAxisMap.clear();
-    this.movementBindings.clear();
-    this.actionBindings = {};
-  }
-
-  applyControlSettings(values = {}) {
-    this.resetBindingMaps();
-
-    Object.entries(values).forEach(([action, bindingValue]) => {
-      const field = this.controlFieldDefinitions.get(action);
-      if (field && field.type !== 'binding') {
-        return;
-      }
-      const normalized = this.normalizeBindingStructure(bindingValue);
-      this.actionBindings[action] = normalized;
-
-      if (field) {
-        const threshold = Number(field.metadata?.gamepad?.threshold);
-        if (Number.isFinite(threshold)) {
-          this.gamepadAxisThreshold = threshold;
-        }
-      }
-
-      this.registerKeyboardBindings(action, normalized.keyboard, field);
-      this.registerGamepadBindings(action, normalized.gamepad);
-    });
-  }
-
-  normalizeBindingStructure(binding) {
-    if (!binding || typeof binding !== 'object') {
-      return { keyboard: [], gamepad: [] };
-    }
-
-    return {
-      keyboard: asArray(binding.keyboard).filter(Boolean),
-      gamepad: asArray(binding.gamepad).filter(Boolean),
-    };
+    applyControlSettings(this, values);
   }
 
   setupEventListeners() {
@@ -269,7 +168,7 @@ class InputSystem {
     if (eventBus?.on) {
       eventBus.on('settings-controls-changed', (payload = {}) => {
         if (payload?.values) {
-          this.applyControlSettings(payload.values);
+          applyControlSettings(this, payload.values);
         }
       });
 
@@ -300,31 +199,14 @@ class InputSystem {
 
       eventBus.on('player-took-damage', (payload = {}) => {
         if ((payload.healthDamage ?? payload.damage) > 0) {
-          this.rumble(GAMEPAD_RUMBLE.hullHit);
+          rumble(this, GAMEPAD_RUMBLE.hullHit);
         }
       });
       eventBus.on('boss-spawned', () =>
-        this.rumble(GAMEPAD_RUMBLE.wardenSpawn)
+        rumble(this, GAMEPAD_RUMBLE.wardenSpawn)
       );
-      eventBus.on('player-dashed', () => this.rumble(GAMEPAD_RUMBLE.dash));
+      eventBus.on('player-dashed', () => rumble(this, GAMEPAD_RUMBLE.dash));
     }
-  }
-
-  /**
-   * Off the fixed steps (menus, pause, level-up) nothing else polls the pad,
-   * so a frame loop does; during play `update()` polls once per step.
-   */
-  startMenuPadPolling() {
-    if (typeof window.requestAnimationFrame !== 'function') {
-      return;
-    }
-    const tick = () => {
-      if (!this.isGameRunning()) {
-        this.pollGamepad();
-      }
-      this.menuPollFrame = window.requestAnimationFrame(tick);
-    };
-    this.menuPollFrame = window.requestAnimationFrame(tick);
   }
 
   isGameRunning() {
@@ -342,31 +224,6 @@ class InputSystem {
 
   getActiveDevice() {
     return this.activeDevice;
-  }
-
-  /**
-   * One dual-rumble effect on the active pad, unless the player turned it off
-   * or a replay is playing.
-   */
-  rumble(effect) {
-    const actuator = this.gamepad?.vibrationActuator;
-    if (this.replaying || !actuator || !this.isVibrationEnabled()) {
-      return;
-    }
-    actuator
-      .playEffect('dual-rumble', { startDelay: 0, ...effect })
-      .catch(() => {});
-  }
-
-  isVibrationEnabled() {
-    const settings = this.settings;
-    if (!settings?.getSetting) {
-      return true;
-    }
-    return (
-      settings.getSetting(CONTROLS_CATEGORY_ID, 'vibration') !== false &&
-      !settings.getSetting('accessibility', 'reducedMotion')
-    );
   }
 
   shouldBlockPasswordManager(event) {
@@ -414,7 +271,7 @@ class InputSystem {
     if (code) this.codes[code] = true;
     this.setActiveDevice('keyboard');
 
-    if (this.isMovementBinding(key) || this.isMovementBinding(code)) {
+    if (isMovementBinding(this, key) || isMovementBinding(this, code)) {
       event.preventDefault();
     }
     // A Space's repeats arm no button, nor does the release of one begun in
@@ -424,10 +281,10 @@ class InputSystem {
       if (this.spaceFromFlight || event.repeat) event.preventDefault();
     }
 
-    const normalizedKey = this.normalizeKeyboardBinding(event.key);
-    const normalizedCode = this.normalizeKeyboardBinding(event.code);
+    const normalizedKey = normalizeKeyboardBinding(event.key);
+    const normalizedCode = normalizeKeyboardBinding(event.code);
 
-    const actions = this.collectKeyboardActions(normalizedKey, normalizedCode);
+    const actions = collectKeyboardActions(this, normalizedKey, normalizedCode);
 
     if (!wasPressed) {
       actions.forEach((action) => {
@@ -461,9 +318,9 @@ class InputSystem {
     if (code) this.codes[code] = false;
     if (code === 'space' && this.spaceFromFlight) event.preventDefault();
 
-    const normalizedKey = this.normalizeKeyboardBinding(event.key);
-    const normalizedCode = this.normalizeKeyboardBinding(event.code);
-    const actions = this.collectKeyboardActions(normalizedKey, normalizedCode);
+    const normalizedKey = normalizeKeyboardBinding(event.key);
+    const normalizedCode = normalizeKeyboardBinding(event.code);
+    const actions = collectKeyboardActions(this, normalizedKey, normalizedCode);
 
     actions.forEach((action) => {
       this.handleActionRelease(action, 'keyboard', {
@@ -540,22 +397,8 @@ class InputSystem {
   onGamepadDisconnected() {
     this.gamepadConnected = false;
     this.gamepad = null;
-    this.clearGamepadActions();
+    clearGamepadActions(this);
     debugLog('[InputSystem] Gamepad disconnected');
-  }
-
-  collectKeyboardActions(...inputs) {
-    const actions = new Set();
-    inputs
-      .filter((input) => typeof input === 'string' && input.length > 0)
-      .forEach((input) => {
-        const normalized = input.toLowerCase();
-        const mapped = this.keyboardBindingMap.get(normalized);
-        if (mapped) {
-          mapped.forEach((action) => actions.add(action));
-        }
-      });
-    return actions;
   }
 
   handleActionPress(action, source, context = {}) {
@@ -714,321 +557,6 @@ class InputSystem {
     return null;
   }
 
-  emitGamepadDetection(details) {
-    const eventBus = this.getEventBus();
-    if (!eventBus?.emit) {
-      return;
-    }
-
-    eventBus.emit('gamepad-input-detected', {
-      ...details,
-      timestamp:
-        typeof performance !== 'undefined' ? performance.now() : Date.now(),
-    });
-  }
-
-  pollGamepad() {
-    if (
-      typeof navigator === 'undefined' ||
-      typeof navigator.getGamepads !== 'function'
-    ) {
-      return;
-    }
-
-    const pads = navigator.getGamepads();
-    const pad =
-      pads?.[this.gamepadIndex] ||
-      pads?.find((candidate) => Boolean(candidate)) ||
-      null;
-
-    if (!pad) {
-      if (this.gamepadConnected || this.activeGamepadActions.size > 0) {
-        this.clearGamepadActions();
-      }
-      this.gamepadConnected = false;
-      this.gamepad = null;
-      this.padSticks = CENTRED_STICKS;
-      return;
-    }
-
-    this.gamepad = pad;
-    this.gamepadConnected = true;
-    this.gamepadIndex = pad.index;
-
-    const activeActions = new Set();
-
-    pad.buttons.forEach((button, index) => {
-      const pressed = Boolean(button?.pressed);
-      if (pressed) {
-        const key = `button:${index}`;
-        const mapped = this.gamepadButtonMap.get(key);
-        if (mapped) {
-          mapped.forEach((action) => activeActions.add(action));
-        }
-      }
-
-      if (pressed && !this.previousGamepadButtons[index]) {
-        this.setActiveDevice('gamepad');
-        this.emitGamepadDetection({
-          type: 'button',
-          index,
-          value: button?.value ?? 1,
-        });
-        this.emitPadNav(GAMEPAD_NAV_BUTTONS[index]);
-      }
-
-      this.previousGamepadButtons[index] = pressed;
-    });
-
-    pad.axes.forEach((value, index) => {
-      const positive = value >= this.gamepadAxisThreshold;
-      const negative = value <= -this.gamepadAxisThreshold;
-      const previous = this.previousGamepadAxes[index] || {
-        positive: false,
-        negative: false,
-      };
-
-      if (positive) {
-        const key = `axis:${index}:positive`;
-        const mapped = this.gamepadAxisMap.get(key);
-        if (mapped) {
-          mapped.forEach((action) => activeActions.add(action));
-        }
-        if (!previous.positive) {
-          this.emitGamepadDetection({
-            type: 'axis',
-            index,
-            direction: 'positive',
-            value,
-          });
-        }
-      }
-
-      if (negative) {
-        const key = `axis:${index}:negative`;
-        const mapped = this.gamepadAxisMap.get(key);
-        if (mapped) {
-          mapped.forEach((action) => activeActions.add(action));
-        }
-        if (!previous.negative) {
-          this.emitGamepadDetection({
-            type: 'axis',
-            index,
-            direction: 'negative',
-            value,
-          });
-        }
-      }
-
-      this.previousGamepadAxes[index] = { positive, negative };
-    });
-
-    this.readPadSticks(pad.axes);
-    this.syncGamepadActions(activeActions);
-  }
-
-  readPadSticks(axes) {
-    const move = applyStickDeadzone(axes[0], axes[1]);
-    const aim = applyStickDeadzone(axes[2], axes[3]);
-    const pad = Boolean(move.x || move.y || aim.x || aim.y);
-    this.padSticks = {
-      moveX: move.x,
-      moveY: move.y,
-      aimX: aim.x,
-      aimY: aim.y,
-      pad,
-    };
-    if (pad) this.setActiveDevice('gamepad');
-
-    // Off play the left stick moves the pad's pointer (ui/padPointer.js) and
-    // the right stick scrolls the menu's lists (gamepadNav.js).
-    if (aim.y && !this.isGameRunning() && !padPointerShown()) {
-      this.getEventBus()?.emit?.('gamepad-ui-scroll', { y: aim.y });
-    }
-  }
-
-  /** Menu/overlay navigation (UISystem); nothing to navigate during play. */
-  emitPadNav(action) {
-    if (!action || this.isGameRunning()) {
-      return;
-    }
-    // A clicks under the pad's pointer while it shows (ui/padPointer.js).
-    if (action === 'confirm' && padPointerShown()) return;
-    this.getEventBus()?.emit?.('gamepad-ui-nav', { action });
-  }
-
-  syncGamepadActions(activeActions) {
-    const previous = new Set(this.activeGamepadActions);
-
-    activeActions.forEach((action) => {
-      if (!this.activeGamepadActions.has(action)) {
-        this.handleActionPress(action, 'gamepad', { device: 'gamepad' });
-      }
-    });
-
-    previous.forEach((action) => {
-      if (!activeActions.has(action)) {
-        this.handleActionRelease(action, 'gamepad', { device: 'gamepad' });
-      }
-    });
-  }
-
-  clearGamepadActions() {
-    const active = Array.from(this.activeGamepadActions);
-    active.forEach((action) => {
-      this.handleActionRelease(action, 'gamepad', {
-        device: 'gamepad',
-        forced: true,
-      });
-    });
-    this.activeGamepadActions.clear();
-    this.previousGamepadButtons = [];
-    this.previousGamepadAxes = [];
-    this.padSticks = CENTRED_STICKS;
-  }
-
-  parseGamepadBinding(binding) {
-    if (typeof binding !== 'string') {
-      return null;
-    }
-
-    const normalized = binding.trim().toLowerCase();
-    if (!normalized) {
-      return null;
-    }
-
-    if (normalized.startsWith('button:')) {
-      const index = Number(normalized.split(':')[1]);
-      return Number.isInteger(index) ? { type: 'button', index } : null;
-    }
-
-    if (normalized.startsWith('axis:')) {
-      const parts = normalized.split(':');
-      if (parts.length < 3) {
-        return null;
-      }
-      const index = Number(parts[1]);
-      if (!Number.isInteger(index)) {
-        return null;
-      }
-      const directionPart = parts[2];
-      const direction =
-        directionPart.startsWith('-') || directionPart === 'negative'
-          ? 'negative'
-          : 'positive';
-      return { type: 'axis', index, direction };
-    }
-
-    return null;
-  }
-
-  normalizeKeyboardBinding(value) {
-    if (typeof value !== 'string') {
-      return '';
-    }
-    return value.trim().toLowerCase();
-  }
-
-  getKeyboardSynonyms(binding) {
-    const synonyms = new Set();
-    if (!binding) {
-      return synonyms;
-    }
-
-    if (binding.startsWith('key') && binding.length === 4) {
-      synonyms.add(binding.slice(3));
-    }
-
-    if (binding === 'space') {
-      synonyms.add(' ');
-      synonyms.add('spacebar');
-    }
-
-    if (binding.startsWith('shift')) {
-      synonyms.add('shift');
-    }
-
-    if (binding.startsWith('control')) {
-      synonyms.add('control');
-      synonyms.add('ctrl');
-    }
-
-    if (binding.startsWith('alt')) {
-      synonyms.add('alt');
-    }
-
-    if (binding.startsWith('meta')) {
-      synonyms.add('meta');
-    }
-
-    return synonyms;
-  }
-
-  addKeyboardBinding(binding, action) {
-    if (!binding) {
-      return;
-    }
-
-    if (!this.keyboardBindingMap.has(binding)) {
-      this.keyboardBindingMap.set(binding, new Set());
-    }
-
-    this.keyboardBindingMap.get(binding).add(action);
-
-    if (this.isMovementAction(action)) {
-      this.movementBindings.add(binding);
-    }
-  }
-
-  registerKeyboardBindings(action, bindings = []) {
-    const entries = asArray(bindings);
-    entries.forEach((binding) => {
-      const normalized = this.normalizeKeyboardBinding(binding);
-      if (!normalized) {
-        return;
-      }
-
-      this.addKeyboardBinding(normalized, action);
-      const synonyms = this.getKeyboardSynonyms(normalized);
-      synonyms.forEach((synonym) => this.addKeyboardBinding(synonym, action));
-    });
-  }
-
-  registerGamepadBindings(action, bindings = []) {
-    const entries = asArray(bindings);
-    entries.forEach((binding) => {
-      const parsed = this.parseGamepadBinding(binding);
-      if (!parsed) {
-        return;
-      }
-
-      if (parsed.type === 'button') {
-        const key = `button:${parsed.index}`;
-        if (!this.gamepadButtonMap.has(key)) {
-          this.gamepadButtonMap.set(key, new Set());
-        }
-        this.gamepadButtonMap.get(key).add(action);
-      } else if (parsed.type === 'axis') {
-        const key = `axis:${parsed.index}:${parsed.direction}`;
-        if (!this.gamepadAxisMap.has(key)) {
-          this.gamepadAxisMap.set(key, new Set());
-        }
-        this.gamepadAxisMap.get(key).add(action);
-      }
-    });
-  }
-
-  isMovementAction(action) {
-    return MOVEMENT_ACTIONS.has(action);
-  }
-
-  isMovementBinding(binding) {
-    if (!binding) {
-      return false;
-    }
-    return this.movementBindings.has(binding.toLowerCase());
-  }
-
   isKeyDown(key) {
     if (!key) return false;
 
@@ -1114,7 +642,7 @@ class InputSystem {
   }
 
   update() {
-    this.pollGamepad();
+    pollGamepad(this);
 
     const liveFrame = this.sampleInputFrame();
     const frame = this.inputSource?.(liveFrame) ?? liveFrame;
