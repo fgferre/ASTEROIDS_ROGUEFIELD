@@ -53,7 +53,7 @@ export const NEXT = {
     'The run session no longer forwards about twenty calls to its own parts; the tests reach the part directly, so the file stays under its size limit and the game plays the same.', // not confirmed
     'A shield blast, a mine blast or the Reactive Brake no longer nudges a phased Shade when nothing else is in range (it already ignored it when another enemy was near); the Shade is invisible then and steers itself again the next frame, so nobody sees it.', // not confirmed
     'The garbage-collection manager is gone: the pools already trim themselves on the same schedule, so nothing in the game changes.', // not confirmed
-    'The 3D engine (three.js) moves from r128, of 2021, to r187, of October 2026, and comes with the game in a file of its own that a returning player keeps until the engine changes again; every kind of scene was compared frame by frame with the old engine and looks the same, a frame costs the same (within a few percent) and the game is ready a little sooner, so nobody notices.', // not confirmed
+    'The 3D engine (three.js) moves from r128, of 2021, to r187, of October 2026, and comes with the game in a file of its own that a returning player keeps until the engine changes again; every kind of scene was compared frame by frame with the old engine and looks the same, a frame costs about 5% more on this Mac and the game is ready a little sooner, so nobody notices.', // not confirmed
     'While a run plays, the menu behind it no longer keeps its full-size picture in the graphics card: about 380 MB freed on a 2560×1600 screen (less on a phone), and the menu is back as before when the run ends; nobody sees it, the game just holds less memory.', // not confirmed
   ],
 };

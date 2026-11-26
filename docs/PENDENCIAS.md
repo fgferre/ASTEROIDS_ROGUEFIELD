@@ -468,6 +468,6 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   o three vem do npm, fixado na r187 (a mais nova, de 30/10/2026), num arquivo próprio que quem volta não baixa de novo;
   subiu de dez em dez versões, cada degrau com o menu, a nave do Hangar, um setor em ultra e em low, um chefe de perto,
   a história, a viagem e o final comparados quadro a quadro com o jogo de hoje: a mesma cara (diferença só em bordas
-  finas). O mesmo custo por quadro (dentro de poucos por cento), jogo pronto um pouco antes (0,1 a 0,4 s). Junto
-  (auditoria 8, B3): durante a partida a tela do menu deixa de segurar cerca de 380 MB da placa. Fecha quando ele
-  jogar a versão nova.
+  finas). O quadro custa cerca de 5% a mais neste Mac (medido lado a lado), jogo pronto um pouco antes (0,1 a 0,4 s).
+  Junto (auditoria 8, B3): durante a partida a tela do menu deixa de segurar cerca de 380 MB da placa. Fecha quando
+  ele jogar a versão nova.
