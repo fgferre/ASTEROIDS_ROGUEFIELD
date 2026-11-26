@@ -318,7 +318,9 @@ describe('Onboarding', () => {
     const ui = {
       onboarding: new Onboarding(fakeView()),
       isOnboardingEnabled: () => true,
-      getService: () => ({ purchaseState: () => purchase }),
+      dependencies: {
+        serviceResolver: () => ({ purchaseState: () => purchase }),
+      },
       hangarScreen: { hangarState: { isOpen: false } },
       domRefs: {
         menu: { tip: node(), hangarTip: node(), hangarBtn: node() },

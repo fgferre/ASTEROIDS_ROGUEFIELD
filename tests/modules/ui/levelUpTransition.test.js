@@ -586,7 +586,7 @@ describe('Level-up card choices', () => {
         tacticalHud: { refreshHudFromServices: () => {} },
         queueTransmission: () => {},
         getRandomFork: () => new RandomService(1),
-        getService: () => progression,
+        dependencies: { serviceResolver: () => progression },
         showScreen: (name) => screens.push(name),
         cinematics: { afterTravel: (show) => show() },
         registerEventListener: (name, fn) => eventBus.on(name, fn),
@@ -677,7 +677,9 @@ describe('UISystem overlay handoffs', () => {
           queue: [{}],
           openNext: () => (calls.push('chest'), true),
         },
-        getService: () => ({ openNextLevelUpOffer: () => false }),
+        dependencies: {
+          serviceResolver: () => ({ openNextLevelUpOffer: () => false }),
+        },
         showScreen: (...args) => calls.push(args),
         tacticalHud: { refreshHudFromServices: vi.fn() },
         runWon: false,
@@ -705,9 +707,11 @@ describe('UISystem overlay handoffs', () => {
       },
       UISystem.prototype
     );
-    ui.getService = () => ({
-      getRawState: () => ({ sessionState: 'quitting' }),
-    });
+    ui.dependencies = {
+      serviceResolver: () => ({
+        getRawState: () => ({ sessionState: 'quitting' }),
+      }),
+    };
     ui.hudEditor = { isOpen: false };
     ui.pauseScreen = { updatePauseScreen };
     ui.settingsPanel = { handleSettingsMenuRequest };
@@ -737,7 +741,7 @@ describe('UISystem overlay handoffs', () => {
       },
       UISystem.prototype
     );
-    ui.getService = () => session;
+    ui.dependencies = { serviceResolver: () => session };
     ui.settingsPanel = { handleSettingsMenuRequest };
     Object.assign(ui, noChoiceOnScreen());
     ui.setupEventListeners();
@@ -771,11 +775,13 @@ describe('UISystem overlay handoffs', () => {
       },
       UISystem.prototype
     );
-    ui.getService = () => ({
-      getScreen: () => 'levelup',
-      isPaused: () => false,
-      getRawState: () => ({ sessionState: 'running' }),
-    });
+    ui.dependencies = {
+      serviceResolver: () => ({
+        getScreen: () => 'levelup',
+        isPaused: () => false,
+        getRawState: () => ({ sessionState: 'running' }),
+      }),
+    };
     ui.settingsPanel = { handleSettingsMenuRequest };
     Object.assign(ui, noChoiceOnScreen());
     open(ui);
@@ -819,7 +825,9 @@ describe('UISystem overlay handoffs', () => {
             closeSettingsPanel: vi.fn(),
             openSettingsPanel: vi.fn(),
           },
-          getService: () => ({ getScreen: () => screen }),
+          dependencies: {
+            serviceResolver: () => ({ getScreen: () => screen }),
+          },
           pauseScreen: { currentPauseState: false },
           domRefs: { pause: {} },
         },
