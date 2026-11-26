@@ -77,7 +77,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
     this.animationFrame = null;
     this.isActive = false;
-    this.clock = null;
+    this.timer = null;
     this.elapsedTime = 0;
 
     // Pre-loading state
@@ -335,7 +335,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.scene.add(this.camera);
 
     this.renderer = rendering.createMenuRenderer(THREE, this.canvas);
-    this.clock = new THREE.Clock();
+    this.timer = new THREE.Timer();
     this.keyLight = rendering.createLighting(THREE, this.scene);
 
     this.hullPreview = new MenuHullPreview(THREE, this.camera);
@@ -490,7 +490,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
     this.animationFrame = requestAnimationFrame(this.animate);
 
-    const delta = Math.min(this.clock.getDelta(), 0.05);
+    const delta = Math.min(this.timer.update().getDelta(), 0.05);
     this.stats = this.stats || this.resolveStatsPanel();
     this.stats?.begin();
     this.elapsedTime += delta;
@@ -537,10 +537,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.handleResize();
     // A Hangar purchase may have unlocked the selected hull.
     this.syncHullPreview();
-    if (this.clock) {
-      this.clock.start();
-      this.clock.getDelta();
-    }
+    this.timer?.reset();
     this.elapsedTime = 0;
     this.animationFrame = requestAnimationFrame(this.animate);
   }
@@ -555,10 +552,6 @@ class MenuBackgroundSystem extends BaseSystem {
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
       this.animationFrame = null;
-    }
-
-    if (this.clock) {
-      this.clock.stop();
     }
   }
 

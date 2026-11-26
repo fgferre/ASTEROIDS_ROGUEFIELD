@@ -104,11 +104,94 @@ class SMAAPass extends EdgePass {
   }
 }
 
+// The bloom's blur and composite as r128 to r178 drew them, which the game's
+// glows are tuned on: r187 doubled the kernels, narrowed the Gaussian to a
+// third of them and tripled the composite, so every halo came out tighter.
+const QUAD_VERTEX = `varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+function blurMaterial(radius) {
+  const weights = Array.from(
+    { length: radius },
+    (_, i) => (0.39894 * Math.exp((-0.5 * i * i) / (radius * radius))) / radius
+  );
+  return new core.ShaderMaterial({
+    defines: { KERNEL_RADIUS: radius },
+    uniforms: {
+      colorTexture: { value: null },
+      invSize: { value: new core.Vector2(0.5, 0.5) },
+      direction: { value: new core.Vector2(0.5, 0.5) },
+      gaussianCoefficients: { value: weights },
+    },
+    vertexShader: QUAD_VERTEX,
+    fragmentShader: `varying vec2 vUv;
+uniform sampler2D colorTexture;
+uniform vec2 invSize;
+uniform vec2 direction;
+uniform float gaussianCoefficients[KERNEL_RADIUS];
+void main() {
+  float weightSum = gaussianCoefficients[0];
+  vec3 diffuseSum = texture2D(colorTexture, vUv).rgb * weightSum;
+  for (int i = 1; i < KERNEL_RADIUS; i++) {
+    float w = gaussianCoefficients[i];
+    vec2 uvOffset = direction * invSize * float(i);
+    diffuseSum += (texture2D(colorTexture, vUv + uvOffset).rgb
+      + texture2D(colorTexture, vUv - uvOffset).rgb) * w;
+    weightSum += 2.0 * w;
+  }
+  gl_FragColor = vec4(diffuseSum / weightSum, 1.0);
+}`,
+  });
+}
+
+function compositeMaterial(mips, uniforms) {
+  const term = (i) =>
+    `lerpBloomFactor(bloomFactors[${i}]) * vec4(bloomTintColors[${i}], 1.0) * texture2D(blurTexture${i + 1}, vUv)`;
+  return new core.ShaderMaterial({
+    defines: { NUM_MIPS: mips },
+    uniforms,
+    vertexShader: QUAD_VERTEX,
+    fragmentShader: `varying vec2 vUv;
+uniform sampler2D blurTexture1;
+uniform sampler2D blurTexture2;
+uniform sampler2D blurTexture3;
+uniform sampler2D blurTexture4;
+uniform sampler2D blurTexture5;
+uniform float bloomStrength;
+uniform float bloomRadius;
+uniform float bloomFactors[NUM_MIPS];
+uniform vec3 bloomTintColors[NUM_MIPS];
+float lerpBloomFactor(const in float factor) {
+  float mirrorFactor = 1.2 - factor;
+  return mix(factor, mirrorFactor, bloomRadius);
+}
+void main() {
+  gl_FragColor = bloomStrength * (${[0, 1, 2, 3, 4].map(term).join(' + ')});
+}`,
+  });
+}
+
 // Every bloom step is one opaque full-screen quad, so the clears before the
 // bright pass and each blur are wiped at once: only the composite's (the
 // second clear of the first horizontal target) and the screen's run. The
 // frame is bit-identical.
 class UnrealBloomPass extends BloomPass {
+  constructor(...args) {
+    super(...args);
+    this.separableBlurMaterials = this.separableBlurMaterials.map((own, i) => {
+      const old = blurMaterial([3, 5, 7, 9, 11][i]);
+      old.uniforms.invSize.value.copy(own.uniforms.invSize.value);
+      own.dispose();
+      return old;
+    });
+    const own = this.compositeMaterial;
+    this.compositeMaterial = compositeMaterial(this.nMips, own.uniforms);
+    own.dispose();
+  }
+
   render(renderer, ...rest) {
     const clear = renderer.clear;
     const first = this.renderTargetsHorizontal[0];

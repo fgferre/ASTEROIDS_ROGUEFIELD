@@ -232,7 +232,7 @@ export function setupThree(seeded) {
   key.shadow.normalBias = KEY_SHADOW.normalBias;
   key.shadow.camera.near = KEY_SHADOW.distance - KEY_SHADOW.depth;
   key.shadow.camera.far = KEY_SHADOW.distance + KEY_SHADOW.depth;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap; // soft since r182
   // Fill: cool, from below-right; hemisphere keeps shadows from going void.
   const fill = new THREE.DirectionalLight(
     colorOf(THREE, PALETTE.neutral),

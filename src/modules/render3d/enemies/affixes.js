@@ -266,6 +266,8 @@ export function createAffixViews(kit) {
     if (trail) {
       parts.hull.updateWorldMatrix(true, false);
       parts.hull.matrixWorld.decompose(hullAt, hullTurn, hullSize);
+      // a hull at scale 0 decomposes to scale 1 since three r187
+      if (parts.hull.matrixWorld.determinant() === 0) hullSize.setScalar(0);
       hullAt.sub(parts.group.position);
     }
     parts.ghosts.forEach((ghost, i) => {

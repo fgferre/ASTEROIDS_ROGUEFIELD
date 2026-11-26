@@ -634,7 +634,7 @@ function patchPaint(shader) {
     )
     .replace(
       '#include <color_fragment>',
-      'diffuseColor.rgb *= wakeTexel.rgb * mix(vec3(1.0), vColor, wakeTexel.a);'
+      'diffuseColor.rgb *= wakeTexel.rgb * mix(vec3(1.0), vColor.rgb, wakeTexel.a);'
     );
 }
 
