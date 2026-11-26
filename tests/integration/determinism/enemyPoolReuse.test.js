@@ -1,7 +1,7 @@
 /**
- * Which pooled enemy the next spawn gets is decided by pool housekeeping
- * (GamePools.autoManageAll, on the wall clock in the game): an enemy taken
- * from the pool again must be the same, field by field, as a new one.
+ * Which pooled enemy the next spawn gets is decided by the pool's order: an
+ * enemy taken from the pool again must be the same, field by field, as a new
+ * one.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

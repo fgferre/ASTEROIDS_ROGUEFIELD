@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import InputSystem from '../../src/modules/InputSystem.js';
+import { pollGamepad } from '../../src/modules/input/gamepadReading.js';
 import { PAD_BUTTON } from '../../src/data/constants/gamepad.js';
 import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 import { installFakeGamepad } from '../__helpers__/fakeGamepad.js';
@@ -68,8 +69,8 @@ describe('InputSystem gamepad', () => {
     expect(frame.right).toBe(false);
     expect([frame.aimX, frame.aimY]).toEqual([0, -1]);
 
-    // The movement command carries the stick for PlayerSystem.
-    expect(input.lastMovementCommand.analog).toEqual({
+    // The ship takes the step's frame with the stick in it.
+    expect(input.takeStepFrame()).toMatchObject({
       moveX: 1,
       moveY: 0,
       aimX: 0,
@@ -94,7 +95,7 @@ describe('InputSystem gamepad', () => {
       shield: false,
     });
     expect(step({ pressed: [PAD_BUTTON.LB] }).strafeHold).toBe(true);
-    expect(input.lastMovementCommand.binary.strafeHold).toBe(true);
+    expect(input.takeStepFrame().strafeHold).toBe(true);
     expect(step({ pressed: [] }).strafeHold).toBe(false);
   });
 
@@ -103,9 +104,9 @@ describe('InputSystem gamepad', () => {
     eventBus.on('toggle-pause', () => pauses.push(gameState.paused));
     const tapStart = () => {
       fake.set({ pressed: [PAD_BUTTON.START] });
-      input.pollGamepad();
+      pollGamepad(input);
       fake.set();
-      input.pollGamepad();
+      pollGamepad(input);
     };
     gameState.paused = true;
     eventBus.emit('cinematic-started', { kind: 'story' });
@@ -121,9 +122,9 @@ describe('InputSystem gamepad', () => {
     eventBus.on('settings-menu-requested', () => opened.push(true));
     const tapView = () => {
       fake.set({ pressed: [PAD_BUTTON.VIEW] });
-      input.pollGamepad();
+      pollGamepad(input);
       fake.set();
-      input.pollGamepad();
+      pollGamepad(input);
     };
     ['revelation', 'ending'].forEach((kind) => {
       eventBus.emit('cinematic-started', { kind });
@@ -140,9 +141,9 @@ describe('InputSystem gamepad', () => {
 
   it('ignores pad presses on the pause screen', () => {
     gameState.paused = true;
-    input.pollGamepad();
+    pollGamepad(input);
     fake.set({ pressed: [PAD_BUTTON.RB] });
-    input.pollGamepad();
+    pollGamepad(input);
     gameState.paused = false;
     expect(step({ pressed: [PAD_BUTTON.RB] }).dash).toBe(false);
   });
@@ -164,22 +165,22 @@ describe('InputSystem gamepad', () => {
     const nav = [];
     eventBus.on('gamepad-ui-nav', ({ action }) => nav.push(action));
 
-    input.pollGamepad();
+    pollGamepad(input);
     fake.set({ pressed: [PAD_BUTTON.DOWN] });
-    input.pollGamepad();
+    pollGamepad(input);
     expect(nav).toEqual([]);
 
     gameState.screen = 'menu';
     fake.set();
-    input.pollGamepad();
+    pollGamepad(input);
     fake.set({ pressed: [PAD_BUTTON.DOWN] });
-    input.pollGamepad();
-    input.pollGamepad();
+    pollGamepad(input);
+    pollGamepad(input);
     fake.set({ pressed: [PAD_BUTTON.B, PAD_BUTTON.RB] });
-    input.pollGamepad();
+    pollGamepad(input);
     // The left stick moves the pad's pointer (ui/padPointer.js).
     fake.set({ axes: [0, -0.9, 0, 0] });
-    input.pollGamepad();
+    pollGamepad(input);
     expect(nav).toEqual(['down', 'back', 'tabNext']);
   });
 

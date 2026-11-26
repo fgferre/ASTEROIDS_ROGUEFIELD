@@ -16,8 +16,7 @@ function makePlayer(scheme = 'classic') {
   const eventBus = createEventBusMock();
   const player = new PlayerSystem({
     eventBus,
-    input: { getMovementInput: () => ({}) },
-    'command-queue': null,
+    input: { takeStepFrame: () => ({}) },
   });
   player.setFlightScheme(scheme, scheme === 'classic');
   player.position = { x: 400, y: 300 };

@@ -133,7 +133,7 @@ export default {
             'Cuts deal +20% damage to elites, heralds and bosses. The Halo never aims: the lead adds nothing.',
         },
         {
-          description: `Fire rate +${FIRE_RATE}%. The cuts keep their +20% on elites, heralds and bosses.`,
+          description: `The blades may cut the same enemy again ${FIRE_RATE}% sooner. The cuts keep their +20% on elites, heralds and bosses.`,
         },
       ],
     },

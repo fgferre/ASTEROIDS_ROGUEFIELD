@@ -135,10 +135,12 @@ class AudioPool {
 
     this.activeNodes.delete(filter);
 
-    // Disconnect
+    // Disconnect all connections
     try {
       filter.disconnect();
-    } catch (e) {}
+    } catch (e) {
+      // Node might already be disconnected
+    }
 
     // Make sure to reset params if needed, or caller handles it
     // For filters, we usually reset heavily on get/use, so simple return is fine.

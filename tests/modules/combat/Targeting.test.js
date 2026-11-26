@@ -32,6 +32,7 @@ describe('Targeting', () => {
       bulletSpeed: () => 550,
       spreadMode: () => 'concentrated',
       computeParallelOffset: () => ({ x: 0, y: 0 }),
+      weaponReach: () => Infinity,
     });
 
     targeting.findBestTarget();

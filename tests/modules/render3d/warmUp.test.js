@@ -29,8 +29,7 @@ const seeded = (fn) => fn();
 function warmable() {
   const player = new PlayerSystem({
     eventBus: createEventBusMock(),
-    input: { getMovementInput: () => ({}) },
-    'command-queue': null,
+    input: { takeStepFrame: () => ({}) },
   });
   const renderer = new Renderer3D({
     player,

@@ -280,29 +280,22 @@ export class EnemyRandomScopes {
     }
   }
 
+  // At the death: the scopes' seeds, and where each of the layer's streams
+  // stood (this system's scopes, rewards and movement included, and the wave
+  // manager's), so a Retry goes on from there rather than from the run's
+  // first draw (outside audit 8, verdict A9). The run's root stream (`base`)
+  // is the session's to keep and restore (session/randomScopes.js).
   captureRandomSnapshot() {
-    const base = this.getRandomService();
-    const baseSeed =
-      base && typeof base.seed === 'number' ? base.seed >>> 0 : null;
-
     return {
-      baseSeed,
       scopeSeeds: this.randomScopeSeeds ? { ...this.randomScopeSeeds } : null,
       sequences: this.randomSequences ? { ...this.randomSequences } : null,
+      states: streamStates(this.randomScopes),
+      waveStates: streamStates(this.waveManager?.waveRandom?.randomScopes),
     };
   }
 
   restoreRandomFromSnapshot(snapshot) {
     this.setupRandomGenerators();
-
-    const base = this.getRandomService();
-    if (base && typeof snapshot?.baseSeed === 'number') {
-      if (typeof base.reset === 'function') {
-        base.reset(snapshot.baseSeed);
-      } else {
-        base.seed = snapshot.baseSeed >>> 0;
-      }
-    }
 
     if (snapshot?.scopeSeeds && typeof snapshot.scopeSeeds === 'object') {
       this.randomScopeSeeds = { ...snapshot.scopeSeeds };
@@ -315,4 +308,28 @@ export class EnemyRandomScopes {
       this.randomSequences = { ...snapshot.sequences };
     }
   }
+
+  /** Each stream back where it stood, once the field is rebuilt. */
+  restoreStreamPositions(snapshot) {
+    restoreStreams(this.randomScopes, snapshot.states);
+    restoreStreams(
+      this.waveManager?.waveRandom?.randomScopes,
+      snapshot.waveStates
+    );
+  }
+}
+
+// Each stream's seed and position, `base` left out.
+function streamStates(scopes) {
+  return Object.fromEntries(
+    Object.entries(scopes ?? {})
+      .filter(([scope, generator]) => scope !== 'base' && generator?.serialize)
+      .map(([scope, generator]) => [scope, generator.serialize()])
+  );
+}
+
+function restoreStreams(scopes, states) {
+  Object.entries(states ?? {}).forEach(([scope, state]) => {
+    scopes?.[scope]?.restore(state);
+  });
 }

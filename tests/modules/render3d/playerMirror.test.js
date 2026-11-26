@@ -25,8 +25,7 @@ const ribbons = { px: [], py: [], polyline: vi.fn() };
 function mirrorFor(hull) {
   const player = new PlayerSystem({
     eventBus: createEventBusMock(),
-    input: { getMovementInput: () => ({}) },
-    'command-queue': null,
+    input: { takeStepFrame: () => ({}) },
   });
   player.noseAim = false; // the Auto Turret taken: the turret on its pivot
   player.setHull(hull);

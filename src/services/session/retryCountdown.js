@@ -51,6 +51,9 @@ export class RetryCountdown {
     this.emitScreenChanged = emitScreenChanged;
     this.setSessionState = setSessionState;
     this.isRetryCountdownActive = false;
+    // The Retries left in this run (a run starts with one): the number lives
+    // here, #retry-count only shows it (outside audit 8, verdict A7).
+    this.retriesLeft = 0;
 
     this.retryCountdownElement = this.lookupDomElement('retry-countdown');
     this.retryButtonElement = this.lookupDomElement('retry-game-btn');
@@ -247,6 +250,15 @@ export class RetryCountdown {
       }
     }
 
+    // After every reset above (rebuilding the field, physics-reset,
+    // world-reset reseed them): the layer's draws go on from the death
+    // (outside audit 8, verdict A9).
+    if (snapshot.enemies?.random) {
+      this.resolveServiceInstance('enemies').restoreRandomStreams(
+        snapshot.enemies.random
+      );
+    }
+
     const gameoverScreen = this.lookupDomElement('gameover-screen');
     if (gameoverScreen) {
       gameoverScreen.classList.add('hidden');
@@ -267,36 +279,17 @@ export class RetryCountdown {
   }
 
   getRetryCount() {
-    let element = this.retryCountElement;
-    if (!element || !element.isConnected) {
-      element = this.lookupDomElement('retry-count');
-      this.retryCountElement = element;
-    }
-
-    if (!element) {
-      return 0;
-    }
-
-    const parsed = parseInt(element.textContent || '0', 10);
-    return Number.isFinite(parsed) ? parsed : 0;
+    return this.retriesLeft;
   }
 
   setRetryCount(value) {
+    this.retriesLeft = Math.max(0, Math.trunc(value) || 0);
     let element = this.retryCountElement;
     if (!element || !element.isConnected) {
       element = this.lookupDomElement('retry-count');
       this.retryCountElement = element;
     }
-
-    if (!element) {
-      return;
-    }
-
-    const numeric = Number.isFinite(value)
-      ? value
-      : parseInt(String(value || '0'), 10);
-    const safeValue = Number.isFinite(numeric) ? Math.max(0, numeric) : 0;
-    element.textContent = String(safeValue);
+    if (element) element.textContent = String(this.retriesLeft);
   }
 
   setRetryButtonEnabled(enabled = true) {

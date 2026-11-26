@@ -14,7 +14,7 @@
  * ```
  */
 
-import { ObjectPool, TTLObjectPool } from './ObjectPool.js';
+import { ObjectPool } from './ObjectPool.js';
 import { debugLog } from './debugLogging.js';
 import { listContent } from '../content/registry.js';
 import { recipeEnemyClass } from '../modules/enemies/types/RecipeEnemy.js';
@@ -36,9 +36,6 @@ export class GamePools {
   // One pool per roster enemy, by content id, sized by its `pool` field.
   static enemyPools = new Map();
   static xpOrbs = null;
-  static shockwaves = null;
-  static tempObjects = null;
-  static lastAutoManageTime = 0;
 
   /**
    * Initializes all game object pools.
@@ -57,8 +54,6 @@ export class GamePools {
       particles: { initial: 50, max: 300 },
       asteroids: { initial: 15, max: 80 },
       xpOrbs: { initial: 30, max: 200 },
-      shockwaves: { initial: 5, max: 20 },
-      tempObjects: { initial: 10, max: 50 },
       ...options,
     };
 
@@ -74,11 +69,8 @@ export class GamePools {
       );
     }
     this.initializeXPOrbPool(config.xpOrbs);
-    this.initializeShockwavePool(config.shockwaves);
-    this.initializeTempObjectPool(config.tempObjects);
 
     this.initialized = true;
-    this.lastAutoManageTime = performance.now();
 
     debugLog('[GamePools] All pools initialized successfully');
     if (IS_DEV) {
@@ -490,126 +482,6 @@ export class GamePools {
   }
 
   /**
-   * Initializes shockwave effect pool.
-   *
-   * @private
-   * @param {Object} config - Pool configuration
-   */
-  static initializeShockwavePool(config) {
-    this.shockwaves = new ObjectPool(
-      // Factory function
-      () => ({
-        x: 0,
-        y: 0,
-        radius: 0,
-        maxRadius: 100,
-        thickness: 2,
-        color: 'rgba(255, 255, 255, 1)',
-        growthSpeed: 120,
-        life: 1,
-        maxLife: 1,
-        active: true,
-      }),
-
-      // Reset function
-      (shockwave) => {
-        shockwave.x = 0;
-        shockwave.y = 0;
-        shockwave.radius = 0;
-        shockwave.maxRadius = 100;
-        shockwave.thickness = 2;
-        shockwave.color = 'rgba(255, 255, 255, 1)';
-        shockwave.growthSpeed = 120;
-        shockwave.life = 1;
-        shockwave.maxLife = 1;
-        shockwave.active = true;
-      },
-
-      config.initial,
-      config.max
-    );
-  }
-
-  /**
-   * Initializes temporary object pool using TTL.
-   *
-   * @private
-   * @param {Object} config - Pool configuration
-   */
-  static initializeTempObjectPool(config) {
-    this.tempObjects = new TTLObjectPool(
-      // Factory function
-      () => ({
-        data: null,
-        timestamp: 0,
-        type: 'generic',
-        active: true,
-      }),
-
-      // Reset function
-      (obj) => {
-        obj.data = null;
-        obj.timestamp = 0;
-        obj.type = 'generic';
-        obj.active = true;
-      },
-
-      config.initial,
-      config.max
-    );
-  }
-
-  /**
-   * Updates all pools that require periodic updates (like TTL pools).
-   * Call this from your game loop.
-   *
-   * @param {number} [deltaTime] - Time since last update
-   */
-  static update() {
-    if (!this.initialized) {
-      console.warn(
-        '[GamePools] Not initialized - call GamePools.initialize() first'
-      );
-      return;
-    }
-
-    // Update TTL pools
-    if (this.tempObjects && typeof this.tempObjects.update === 'function') {
-      this.tempObjects.update();
-    }
-
-    // Auto-manage pool sizes periodically
-    const now = performance.now();
-    if (now - this.lastAutoManageTime >= 5000) {
-      this.autoManageAll();
-      this.lastAutoManageTime = now;
-    }
-  }
-
-  /**
-   * Auto-manages all pools based on usage patterns.
-   */
-  static autoManageAll() {
-    if (!this.initialized) return;
-
-    const pools = [
-      this.bullets,
-      this.particles,
-      this.asteroids,
-      ...this.enemyPools.values(),
-      this.xpOrbs,
-      this.shockwaves,
-      this.tempObjects,
-    ];
-
-    for (const pool of pools) {
-      if (pool && typeof pool.autoManage === 'function') {
-        pool.autoManage();
-      }
-    }
-  }
-
-  /**
    * Releases all objects from all pools.
    * Useful for level transitions or cleanup.
    */
@@ -622,8 +494,6 @@ export class GamePools {
       this.asteroids,
       ...this.enemyPools.values(),
       this.xpOrbs,
-      this.shockwaves,
-      this.tempObjects,
     ];
 
     for (const pool of pools) {
@@ -654,8 +524,6 @@ export class GamePools {
         [...this.enemyPools].map(([id, pool]) => [id, pool.getStats()])
       ),
       xpOrbs: this.xpOrbs?.getStats() || null,
-      shockwaves: this.shockwaves?.getStats() || null,
-      tempObjects: this.tempObjects?.getStats() || null,
     };
   }
 
@@ -683,8 +551,6 @@ export class GamePools {
       asteroids: this.asteroids,
       ...Object.fromEntries(this.enemyPools),
       xpOrbs: this.xpOrbs,
-      shockwaves: this.shockwaves,
-      tempObjects: this.tempObjects,
     };
 
     for (const [name, pool] of Object.entries(pools)) {
@@ -718,8 +584,6 @@ export class GamePools {
     this.asteroids = null;
     this.enemyPools.clear();
     this.xpOrbs = null;
-    this.shockwaves = null;
-    this.tempObjects = null;
 
     this.initialized = false;
 
@@ -750,10 +614,6 @@ export class GamePools {
       console.log('Hit Rate:', poolStats.hitRate);
       console.log('Max Size:', poolStats.maxSize);
 
-      if (poolStats.objectsWithTTL !== undefined) {
-        console.log('Objects with TTL:', poolStats.objectsWithTTL);
-      }
-
       console.groupEnd();
     }
 
@@ -772,6 +632,4 @@ export const {
   particles: ParticlePool,
   asteroids: AsteroidPool,
   xpOrbs: XPOrbPool,
-  shockwaves: ShockwavePool,
-  tempObjects: TempObjectPool,
 } = GamePools;

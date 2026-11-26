@@ -34,6 +34,13 @@ function fakeNode(rect = { left: 0, top: 0, width: 0, height: 0 }, id = '') {
 
 const cardRect = (left) => ({ left, top: 200, width: 200, height: 300 });
 
+// The three screens whose keys choose, all closed.
+const noChoiceOnScreen = () => ({
+  levelUpScreen: { levelUpState: { isVisible: false } },
+  chestCeremony: { current: null },
+  runEndScreens: { choice: null },
+});
+
 describe('Level-up card transition', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
@@ -732,6 +739,7 @@ describe('UISystem overlay handoffs', () => {
     );
     ui.getService = () => session;
     ui.settingsPanel = { handleSettingsMenuRequest };
+    Object.assign(ui, noChoiceOnScreen());
     ui.setupEventListeners();
 
     handlers.get('settings-menu-requested')({ source: 'gamepad' });
@@ -740,6 +748,43 @@ describe('UISystem overlay handoffs', () => {
     expect(handleSettingsMenuRequest).toHaveBeenCalledWith({
       source: 'playing',
     });
+  });
+
+  // Settings over a choice let its keys choose under them (outside audit 8,
+  // verdict B7): Enter or 1 picked a card and the run went on with Settings
+  // open and unseen; 2 picked and recorded an ending that played behind them.
+  it.each([
+    [
+      'the level-up cards',
+      (ui) => (ui.levelUpScreen.levelUpState.isVisible = true),
+    ],
+    ["a chest's ceremony", (ui) => (ui.chestCeremony.current = { cards: [] })],
+    ["the ending's choice", (ui) => (ui.runEndScreens.choice = { won: true })],
+  ])('does not open Settings over %s', (_, open) => {
+    const handlers = new Map();
+    const handleSettingsMenuRequest = vi.fn();
+    const ui = Object.setPrototypeOf(
+      {
+        eventBus: { emit: vi.fn() },
+        cinematics: { afterTravel: (show) => show() },
+        registerEventListener: (name, handler) => handlers.set(name, handler),
+      },
+      UISystem.prototype
+    );
+    ui.getService = () => ({
+      getScreen: () => 'levelup',
+      isPaused: () => false,
+      getRawState: () => ({ sessionState: 'running' }),
+    });
+    ui.settingsPanel = { handleSettingsMenuRequest };
+    Object.assign(ui, noChoiceOnScreen());
+    open(ui);
+    ui.setupEventListeners();
+
+    handlers.get('settings-menu-requested')({ source: 'keyboard' });
+
+    expect(handleSettingsMenuRequest).not.toHaveBeenCalled();
+    expect(ui.eventBus.emit).not.toHaveBeenCalledWith('toggle-pause');
   });
 
   it.each(['levelup', 'chest'])(

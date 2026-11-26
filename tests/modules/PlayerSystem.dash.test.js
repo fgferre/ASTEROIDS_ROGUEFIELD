@@ -31,11 +31,10 @@ describe('PlayerSystem dash', () => {
     const eventBus = createEventBusMock();
     const movement = { up: false, down: false, left: false, right: false };
     Object.assign(movement, held);
-    const input = { getMovementInput: vi.fn(() => ({ ...movement })) };
+    const input = { takeStepFrame: vi.fn(() => ({ ...movement })) };
     const player = new PlayerSystem({
       eventBus,
       input,
-      'command-queue': null,
     });
     player.setFlightScheme('modern', false); // the Flight Computer's flight
     player.position = { x: 400, y: 300 };
@@ -159,11 +158,10 @@ describe('Maneuver cards on the dash', () => {
   function makePlayer() {
     const eventBus = createEventBusMock();
     const movement = { up: false, down: false, left: false, right: false };
-    const input = { getMovementInput: vi.fn(() => ({ ...movement })) };
+    const input = { takeStepFrame: vi.fn(() => ({ ...movement })) };
     const player = new PlayerSystem({
       eventBus,
       input,
-      'command-queue': null,
     });
     player.setFlightScheme('modern', false); // the Flight Computer's flight
     player.position = { x: 400, y: 300 };

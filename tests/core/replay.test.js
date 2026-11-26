@@ -11,6 +11,10 @@ import {
   encodeInputFrame,
   serialize,
 } from '../../src/core/replay.js';
+import { EventBus } from '../../src/core/EventBus.js';
+import { CONTROL_ITEMS, HANGAR_ITEMS } from '../../src/data/hangar.js';
+import HangarService from '../../src/services/HangarService.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 
 describe('replay recording', () => {
   it('round-trips every input frame field through the encoded mask', () => {
@@ -194,6 +198,10 @@ describe('deserialize rejects damaged recordings', () => {
       date: '2026-11-24',
       hangar: {
         hullMultiplier: 1.05,
+        extraRerolls: 1,
+        extraBanishes: 0,
+        dashCooldownMultiplier: 0.9,
+        pickupRadiusMultiplier: 1,
         openCards: ['multishot'],
         sealed: [],
         holds: 0,
@@ -248,6 +256,45 @@ describe('deserialize rejects damaged recordings', () => {
     ['hangar an array', { hangar: [] }],
   ])('rejects %s', (_name, patch) => {
     expect(() => deserialize({ ...made(), ...patch })).toThrow(/replay/);
+  });
+
+  // A hostile link (outside audit 8, verdict A6) flew a ship with a hull of
+  // 100,000, a dash every 0.0016 s, a 4,400 px magnet and 100 rerolls.
+  it.each([
+    ['a hull of 1000', { hullMultiplier: 1000 }],
+    ['a dash cooldown of 0.001', { dashCooldownMultiplier: 0.001 }],
+    ['a magnet of 40', { pickupRadiusMultiplier: 40 }],
+    ['99 rerolls', { extraRerolls: 99 }],
+    ['half a banish', { extraBanishes: 1.5 }],
+    ['negative holds', { holds: -1 }],
+    ['a key no run writes', { damageMultiplier: 1e9 }],
+  ])('rejects a Hangar setup with %s', (_name, patch) => {
+    const json = made();
+    expect(() =>
+      deserialize({ ...json, hangar: { ...json.hangar, ...patch } })
+    ).toThrow(/replay/);
+  });
+
+  it('rejects a Hangar setup missing a key a run writes', () => {
+    const json = made();
+    delete json.hangar.hullMultiplier;
+    expect(() => deserialize(json)).toThrow(/replay/);
+  });
+
+  it('accepts the setup of a pilot who owns every item', () => {
+    const restoreDom = installDomStubs();
+    const hangar = new HangarService({
+      eventBus: new EventBus(),
+      difficulty: { setPressure() {}, getModifiers: () => ({ salvage: 1 }) },
+      achievements: { getEntries: () => [] },
+    });
+    [...HANGAR_ITEMS, ...CONTROL_ITEMS].forEach((item) => {
+      hangar.owned[item.id] = true;
+    });
+    const json = made();
+    json.hangar = JSON.parse(JSON.stringify(hangar.getRunSetup()));
+    expect(deserialize(json).hangar).toEqual(json.hangar);
+    restoreDom();
   });
 
   it('allows a missing stick and upgrades, and any string date outside the Daily Field', () => {

@@ -11,8 +11,7 @@ function makePlayer() {
   const eventBus = createEventBusMock();
   const player = new PlayerSystem({
     eventBus,
-    input: { getMovementInput: () => ({}) },
-    'command-queue': null,
+    input: { takeStepFrame: () => ({}) },
   });
   player.position = { x: 400, y: 300 };
   player.velocity = { vx: 0, vy: 0 };

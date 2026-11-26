@@ -35,15 +35,12 @@ export const REPLAY_FETCH_TIMEOUT_MS = 10000;
 /** A recording is a few hundred KB at most; a body past this is refused. */
 export const REPLAY_MAX_BYTES = 5 * 1024 * 1024;
 
-// Same-origin or https only: a link may not make the page read a local or
-// plain-http address, nor a data/blob/file URL.
+// Same-origin only: a link may not make the page ask another site (which
+// would learn who opened it), nor read a local, data or file URL.
 function resolveReplayUrl(url) {
   const target = new URL(url, window.location.href);
-  if (
-    target.origin !== window.location.origin &&
-    target.protocol !== 'https:'
-  ) {
-    throw new Error(`[replay] ${target.protocol} links are not allowed`);
+  if (target.origin !== window.location.origin) {
+    throw new Error(`[replay] Links to another site are not allowed`);
   }
   return target.href;
 }
@@ -191,6 +188,12 @@ export function createReplayController({
     recorder = null;
     player = null;
     input.setInputSource(null);
+  });
+
+  // A Retry plays on past the death the recording ends at: the recording no
+  // longer tells this run, so it is not offered (the dev F9).
+  eventBus.on('session-retry-countdown', () => {
+    session.replayRecorder = null;
   });
 
   // A pick answers an offer on screen; a chest's cards (collectibles/

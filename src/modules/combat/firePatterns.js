@@ -58,7 +58,7 @@ export function echoShot(w, fire) {
 
 // The next shot waits `cooldownMultiplier` × the lance's cooldown.
 function setCooldown(w, entry) {
-  w.lastShotTime = -w.shootCooldown * (entry.cooldownMultiplier - 1);
+  w.restartClock(w.shootCooldown * (entry.cooldownMultiplier - 1));
 }
 
 // A hit of `kind` on `enemy`'s rim facing (fromX, fromY), shoving it along

@@ -29,7 +29,7 @@ import { spinCoast, wrapAngle } from '../player/flight.js';
 import {
   DEFAULT_GAMEPAD_AXIS_THRESHOLD,
   applyStickDeadzone,
-} from '../InputSystem.js';
+} from './gamepadReading.js';
 
 /** 'aponta': a push lighter than this only turns the nose; past it, thrust. */
 export const POINT_THRUST_FORCE = 0.5;

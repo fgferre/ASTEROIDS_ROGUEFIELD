@@ -29,7 +29,7 @@ describe('fetchRecording', () => {
           signal?.addEventListener('abort', () => reject(new Error('aborted')));
         })
     );
-    const result = fetchRecording('https://example.test/r.json');
+    const result = fetchRecording('r.json');
     const settled = expect(result).rejects.toThrow();
     await vi.advanceTimersByTimeAsync(REPLAY_FETCH_TIMEOUT_MS + 1);
     await settled;
@@ -59,27 +59,21 @@ describe('fetchRecording guards', () => {
     expect(fetchSpy.mock.calls[0][0]).toBe('https://game.test/play/r.json');
   });
 
-  it('reads a link on another site over https', async () => {
-    answer(recording);
-    await expect(
-      fetchRecording('https://example.test/r.json')
-    ).resolves.toMatchObject({ seed: 1 });
+  // Another site would learn who opened the link (outside audit 8, A6).
+  it.each([
+    'https://example.test/r.json',
+    'http://example.test/r.json',
+    'data:text/plain,{}',
+    'file:///r',
+  ])('refuses %s without fetching', async (url) => {
+    const fetchSpy = answer(recording);
+    await expect(fetchRecording(url)).rejects.toThrow(/replay/);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
-
-  it.each(['http://example.test/r.json', 'data:text/plain,{}', 'file:///r'])(
-    'refuses %s without fetching',
-    async (url) => {
-      const fetchSpy = answer(recording);
-      await expect(fetchRecording(url)).rejects.toThrow(/replay/);
-      expect(fetchSpy).not.toHaveBeenCalled();
-    }
-  );
 
   it('refuses a body that declares more than 5 MB', async () => {
     answer(recording, { 'content-length': String(REPLAY_MAX_BYTES + 1) });
-    await expect(fetchRecording('https://example.test/r')).rejects.toThrow(
-      /too large/
-    );
+    await expect(fetchRecording('r')).rejects.toThrow(/too large/);
   });
 
   it('stops reading a body that grows past 5 MB without declaring it', async () => {
@@ -93,9 +87,7 @@ describe('fetchRecording guards', () => {
       },
     });
     answer(body);
-    await expect(fetchRecording('https://example.test/r')).rejects.toThrow(
-      /too large/
-    );
+    await expect(fetchRecording('r')).rejects.toThrow(/too large/);
     expect(sent).toBeLessThan(10);
   });
 });

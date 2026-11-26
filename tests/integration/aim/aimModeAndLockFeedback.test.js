@@ -814,7 +814,6 @@ describe('FIX-05 centerline invariant + toggles', () => {
         // Bare minimum surface the constructor pokes at; we are only proving
         // the resolved['game-state'] reference flows in, not exercising input.
       };
-      const stubCommandQueue = { register: () => () => {}, push: () => {} };
       const sentinelGameState = { __sentinel: 'game-state-flowed-through' };
       let constructed = null;
       try {
@@ -822,7 +821,6 @@ describe('FIX-05 centerline invariant + toggles', () => {
           resolved: {
             'event-bus': stubEventBus,
             settings: stubSettings,
-            'command-queue': stubCommandQueue,
             'game-state': sentinelGameState,
           },
         });

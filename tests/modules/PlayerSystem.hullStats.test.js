@@ -16,8 +16,7 @@ import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 const makePlayer = (dependencies = {}) =>
   new PlayerSystem({
     eventBus: createEventBusMock(),
-    input: { getMovementInput: vi.fn(() => ({})) },
-    'command-queue': null,
+    input: { takeStepFrame: vi.fn(() => ({})) },
     ...dependencies,
   });
 

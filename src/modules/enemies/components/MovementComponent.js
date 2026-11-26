@@ -80,7 +80,7 @@ const createDefaultStrategies = () => ({
 
     const speed = length(movement.vx, movement.vy);
     const maxSpeed = stats.maxSpeed;
-    if (speed > maxSpeed) {
+    if (!shovedFree(enemy, deltaTime) && speed > maxSpeed) {
       const dir = normalize(movement.vx, movement.vy);
       movement.vx = dir.x * maxSpeed;
       movement.vy = dir.y * maxSpeed;
@@ -160,7 +160,7 @@ const createDefaultStrategies = () => ({
       deltaTime;
 
     const speed = length(movement.vx, movement.vy);
-    if (speed > options.maxSpeed) {
+    if (!shovedFree(enemy, deltaTime) && speed > options.maxSpeed) {
       const dir = normalize(movement.vx, movement.vy);
       movement.vx = dir.x * options.maxSpeed;
       movement.vy = dir.y * options.maxSpeed;
@@ -267,7 +267,7 @@ const createDefaultStrategies = () => ({
     velocity.vy *= options.damping;
 
     const speed = length(velocity.vx, velocity.vy);
-    if (speed > options.maxSpeed) {
+    if (!shovedFree(enemy, deltaTime) && speed > options.maxSpeed) {
       const dir = normalize(velocity.vx, velocity.vy);
       velocity.vx = dir.x * options.maxSpeed;
       velocity.vy = dir.y * options.maxSpeed;
@@ -323,7 +323,7 @@ const createDefaultStrategies = () => ({
       // Limit speed to maxSpeed
       const maxSpeed = config.maxSpeed || 160;
       const currentSpeed = Math.sqrt(enemy.vx * enemy.vx + enemy.vy * enemy.vy);
-      if (currentSpeed > maxSpeed) {
+      if (!shovedFree(enemy, deltaTime) && currentSpeed > maxSpeed) {
         enemy.vx = (enemy.vx / currentSpeed) * maxSpeed;
         enemy.vy = (enemy.vy / currentSpeed) * maxSpeed;
       }
@@ -376,6 +376,14 @@ const createDefaultStrategies = () => ({
     wrapScreenEdges(enemy, bounds);
   },
 });
+
+// Dev-only `?freio=A`: the emergency brake's shove sets `shoveFreeTimer`; the
+// enemy's own top speed is not enforced until it runs out.
+function shovedFree(enemy, deltaTime) {
+  if (!(enemy.shoveFreeTimer > 0)) return false;
+  enemy.shoveFreeTimer -= deltaTime;
+  return true;
+}
 
 const defaultStrategies = createDefaultStrategies();
 

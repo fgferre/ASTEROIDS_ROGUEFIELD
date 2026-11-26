@@ -30,7 +30,7 @@ export function fireBeam(w, beam, playerPos, playerStats) {
     );
   const [end] = along();
   if (capacitorRoll(w, beam.capacitorTwice)) echoShot(w, along);
-  w.lastShotTime = -beam.cooldownPenalty;
+  w.restartClock(beam.cooldownPenalty);
   const targeting = w.targeting();
 
   w.emit('weapon-fired', {
@@ -224,7 +224,7 @@ export function fireFan(w, fan, playerPos, playerStats, echo = false) {
     }
   }
   if (!echo) {
-    w.lastShotTime = -w.shootCooldown * (fan.cooldownMultiplier - 1);
+    w.restartClock(w.shootCooldown * (fan.cooldownMultiplier - 1));
     if (capacitorRoll(w, fan.capacitorTwice)) {
       const stats = { ...playerStats };
       echoShot(w, () => fireFan(w, fan, w.player().getPosition(), stats, true));

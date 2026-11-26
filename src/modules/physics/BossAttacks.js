@@ -169,7 +169,12 @@ export class BossAttacks {
         try {
           enemy.takeDamage(scaledDamage, { source: boss, type: 'boss-area' });
         } catch (error) {
-          // ignore individual enemy damage errors
+          // The blast goes on to the others, but a bug here must show: it
+          // read as "the boss's blast sometimes misses" (outside audit 8, B9).
+          console.error(
+            '[BossAttacks] An enemy failed to take the area damage:',
+            error
+          );
         }
       } else {
         enemiesSystem.applyDamage(enemy, scaledDamage);

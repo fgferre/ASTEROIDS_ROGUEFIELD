@@ -96,14 +96,8 @@ export function isBossEnemy(enemy) {
     return true;
   }
 
-  if (typeof enemy.hasTag === 'function') {
-    try {
-      if (enemy.hasTag('boss')) {
-        return true;
-      }
-    } catch (error) {
-      // ignore
-    }
+  if (typeof enemy.hasTag === 'function' && enemy.hasTag('boss')) {
+    return true;
   }
 
   const { tags } = enemy;

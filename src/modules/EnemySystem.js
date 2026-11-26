@@ -327,6 +327,11 @@ class EnemySystem extends BaseSystem {
     return this.enemyRandom.reseedRandomScopes(...args);
   }
 
+  /** A Retry's last step: the layer's streams back where the death left them. */
+  restoreRandomStreams(snapshot) {
+    this.enemyRandom.restoreStreamPositions(snapshot);
+  }
+
   setupEnemyFactory() {
     try {
       this.factory = new EnemyFactory(this);

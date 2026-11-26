@@ -147,16 +147,12 @@ export class DeathSnapshot {
     const enemySnapshot =
       typeof enemies.getSnapshotState === 'function'
         ? enemies.getSnapshotState()
-        : typeof enemies.exportState === 'function'
-          ? enemies.exportState()
-          : null;
+        : null;
 
     const physicsSnapshot =
       typeof physics.getSnapshotState === 'function'
         ? physics.getSnapshotState()
-        : typeof physics.exportState === 'function'
-          ? physics.exportState()
-          : null;
+        : null;
 
     const snapshot = {
       player: playerSnapshot,
@@ -241,19 +237,6 @@ export class DeathSnapshot {
           progression.restoreState(payload.progression) !== false;
       } catch (error) {
         console.warn('[Retry] Failed to restore progression snapshot:', error);
-      }
-    } else if (
-      payload.progression &&
-      typeof progression.deserialize === 'function'
-    ) {
-      try {
-        progression.deserialize(payload.progression, { suppressEvents: false });
-        progressionRestored = true;
-      } catch (error) {
-        console.warn(
-          '[Retry] Failed to deserialize progression snapshot:',
-          error
-        );
       }
     }
 
@@ -352,12 +335,6 @@ export class DeathSnapshot {
       } catch (error) {
         console.warn('[Retry] Failed to restore enemy snapshot:', error);
       }
-    } else if (payload.enemies && typeof enemies.importState === 'function') {
-      try {
-        enemiesRestored = enemies.importState(payload.enemies) !== false;
-      } catch (error) {
-        console.warn('[Retry] Failed to import enemy snapshot:', error);
-      }
     }
 
     if (!enemiesRestored) {
@@ -375,12 +352,6 @@ export class DeathSnapshot {
           physics.restoreSnapshotState(payload.physics) !== false;
       } catch (error) {
         console.warn('[Retry] Failed to restore physics snapshot:', error);
-      }
-    } else if (payload.physics && typeof physics.importState === 'function') {
-      try {
-        physicsRestored = physics.importState(payload.physics) !== false;
-      } catch (error) {
-        console.warn('[Retry] Failed to import physics snapshot:', error);
       }
     }
 

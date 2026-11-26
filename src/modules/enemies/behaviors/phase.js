@@ -93,6 +93,15 @@ export default {
     outEvent: 'string',
     inEvent: 'string',
   },
+  // A Retry brings it back in the same step of its cycle (phased stays hidden).
+  kept: [
+    'phase',
+    'phaseTimer',
+    'fired',
+    'flankSide',
+    'flankAngle',
+    'intangible',
+  ],
   check: ({ flank, flankMin }) =>
     flankMin > flank ? 'flankMin is past flank' : null,
   usesRandom: true,

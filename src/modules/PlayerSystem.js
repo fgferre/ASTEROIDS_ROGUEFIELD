@@ -1,4 +1,5 @@
 // src/modules/PlayerSystem.js
+import { devChoice } from '../core/devChoice.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../core/GameConstants.js';
 import shipModels from '../data/shipModels.js';
@@ -62,22 +63,7 @@ class PlayerSystem extends BaseSystem {
       enableRandomManagement: false,
     });
 
-    const normalizedDependencies = this.dependencies;
-
-    if (config && typeof config === 'object' && !Array.isArray(config)) {
-      if (config['command-queue'] && !normalizedDependencies['command-queue']) {
-        normalizedDependencies['command-queue'] = config['command-queue'];
-      }
-
-      if (config.commandQueue && !normalizedDependencies['command-queue']) {
-        normalizedDependencies['command-queue'] = config.commandQueue;
-      }
-    }
-
-    this.dependencies = normalizedDependencies;
-    this.movementInput = new MovementInput({
-      dependencies: this.dependencies,
-    });
+    this.movementInput = new MovementInput();
     exposeFields(this, this.movementInput, ['cachedMovementInput']);
     const controls = resolveService(
       'settings',
@@ -158,6 +144,7 @@ class PlayerSystem extends BaseSystem {
     // No thrust key held and no dash this step (updateMovement): Reactor
     // Bleed and Grav Anchor read it.
     this.enginesIdle = true;
+    this.bleedChoice = devChoice('bleed');
     this.currentHull = null;
     this._currentHullMetrics = {
       outline: [],
@@ -460,15 +447,14 @@ class PlayerSystem extends BaseSystem {
 
   // === MÉTODO PRINCIPAL UPDATE ===
   update(deltaTime) {
-    const commandQueue = this.movementInput.getCommandQueue();
     const inputSystem = resolveService('input', this.dependencies);
 
-    if (!inputSystem && !commandQueue) {
-      console.warn('[PlayerSystem] InputSystem and CommandQueue not found');
+    if (!inputSystem) {
+      console.warn('[PlayerSystem] InputSystem not found');
       return;
     }
 
-    let movement = this.movementInput.readMovement(commandQueue, inputSystem);
+    let movement = this.movementInput.readMovement(inputSystem);
     movement.sensitivity = this.stickSensitivity;
     // In the two-stick classic the right stick turns the hull: no hand aim.
     this.aimStick =
@@ -485,7 +471,7 @@ class PlayerSystem extends BaseSystem {
       return; // Don't process input, movement, or effects when dead/retrying
     }
 
-    // Held, the input is read (so nothing queues up) and dropped.
+    // Held, the input is read (its frame taken) and dropped.
     if (this.controlHoldTimer > 0) {
       this.controlHoldTimer = Math.max(0, this.controlHoldTimer - deltaTime);
       movement = this.movementInput.getDefaultMovementBinary();
@@ -557,7 +543,9 @@ class PlayerSystem extends BaseSystem {
     this.enginesIdle =
       !thrust.isMainManual &&
       !thrust.isAuxManual &&
-      !(this.maneuvers.dashTimer > 0);
+      !(this.maneuvers.dashTimer > 0) &&
+      // dev-only `?bleed=B`: turning and strafing also cancel the bonus
+      !(this.bleedChoice === 'B' && thrust.isSideManual);
     this.updateTurret(deltaTime);
     this.thrusters.emitThrusterEffects(thrust);
   }

@@ -9,7 +9,7 @@
 // item by item (gamepadNav.js) and hides it, as the mouse, the keys and a
 // touch do; B and LB/RB keep their jobs. Never during the flight itself.
 
-import { applyStickDeadzone } from '../InputSystem.js';
+import { applyStickDeadzone } from '../input/gamepadReading.js';
 import { GAMEPAD_FOCUSABLE_SELECTOR } from './gamepadNav.js';
 
 // Full tilt crosses the screen's height in 0.9 s. Not confirmed: felt on
