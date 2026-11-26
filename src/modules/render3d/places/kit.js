@@ -52,14 +52,21 @@ uniform float uHazeDepth;
 uniform float uUnder;
 varying float vPlaceHaze;
 varying float vPlaceUnder;`;
-const VERTEX = `
+// The eye the haze is measured from. three r128 gave the camera's position
+// only to lit and shader materials, so the unlit kinds (`glow`, `lamp`) read
+// the world's origin: they sank as if seen through the arena, by their
+// distance from the origin, and their levels were tuned so. three now hands
+// every material the camera (the lights came out about twice as bright), so
+// those kinds keep the origin.
+const VERTEX = (eye) => `
+vec3 placeEye = ${eye};
 vec4 placeWorld = modelMatrix * vec4(transformed, 1.0);
-float placeReach = distance(placeWorld.xyz, cameraPosition);
-float placeBelow = clamp(-placeWorld.y / max(cameraPosition.y - placeWorld.y, 1.0),
+float placeReach = distance(placeWorld.xyz, placeEye);
+float placeBelow = clamp(-placeWorld.y / max(placeEye.y - placeWorld.y, 1.0),
   0.0, 1.0);
 vPlaceHaze = 1.0 - exp(-placeReach * placeBelow / uHazeDepth);
-vec2 placeOn = cameraPosition.xz + (placeWorld.xz - cameraPosition.xz)
-  * cameraPosition.y / max(cameraPosition.y - placeWorld.y, 1.0);
+vec2 placeOn = placeEye.xz + (placeWorld.xz - placeEye.xz)
+  * placeEye.y / max(placeEye.y - placeWorld.y, 1.0);
 vec2 placeIn = 1.0 - smoothstep(
   vec2(${FIELD_HALF[0] - FIELD_EDGE[0]}.0, ${FIELD_HALF[1] - FIELD_EDGE[0]}.0),
   vec2(${FIELD_HALF[0] + FIELD_EDGE[1]}.0, ${FIELD_HALF[1] + FIELD_EDGE[1]}.0),
@@ -94,7 +101,10 @@ function hazed(material, uniforms, kind) {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>${VERTEX_HEAD}`)
-      .replace('#include <fog_vertex>', `#include <fog_vertex>${VERTEX}`);
+      .replace(
+        '#include <fog_vertex>',
+        `#include <fog_vertex>${VERTEX(material.isMeshBasicMaterial ? 'vec3(0.0)' : 'cameraPosition')}`
+      );
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>${FRAGMENT_HEAD}`)
       .replace(
