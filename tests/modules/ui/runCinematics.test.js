@@ -65,6 +65,7 @@ function setup({ plays = true } = {}) {
     endCinematic: vi.fn(),
   };
   const events = [];
+  const holds = [];
   const beatEvents = [];
   const held = [];
   let skipKey = null;
@@ -83,6 +84,7 @@ function setup({ plays = true } = {}) {
     eventBus: {
       emit: (name, payload) => {
         if (name.startsWith('cinematic')) events.push([name, payload.kind]);
+        if (payload.holdsRun) holds.push(payload.kind);
         if (name === 'ending-beat') beatEvents.push(payload);
       },
     },
@@ -116,6 +118,7 @@ function setup({ plays = true } = {}) {
     renderer,
     banners,
     events,
+    holds,
     beatEvents,
     held,
     startRun,
@@ -596,6 +599,35 @@ describe('RunCinematics', () => {
     vi.advanceTimersByTime(500);
     expect(banners).toHaveLength(1);
     expect(card).toHaveBeenCalledTimes(1);
+  });
+
+  it("says the story, the journey and the intro hold the run, a Warden's entrance and the ending's acts do not", () => {
+    const { ui, renderer, events, holds } = setup();
+    renderer.playStory = vi.fn(() => true);
+    renderer.endStory = vi.fn();
+    ui.cinematics.armTravel({
+      sector: 'debris-wake',
+      source: 'campaign-launch-btn',
+    });
+    ui.cinematics.startIntro();
+    vi.advanceTimersByTime(STORY_MS);
+    expect(ui.cinematics.kind).toBe('travel');
+    ui.cinematics.endTravel();
+    expect(ui.cinematics.kind).toBe('intro');
+    ui.cinematics.endIntro();
+    ui.cinematics.startArrival({ x: 400, y: 84 });
+    ui.cinematics.endArrival();
+    ui.cinematics.startRevelation();
+    ui.cinematics.stop();
+
+    expect(events.filter(([name]) => name.endsWith('started'))).toEqual([
+      ['cinematic-started', 'story'],
+      ['cinematic-started', 'travel'],
+      ['cinematic-started', 'intro'],
+      ['cinematic-started', 'arrival'],
+      ['cinematic-started', 'revelation'],
+    ]);
+    expect(holds).toEqual(['story', 'travel', 'intro']);
   });
 
   it('tells the story on every campaign launch, a line opening each shot; a skip flies on to the journey', () => {

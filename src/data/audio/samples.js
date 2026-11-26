@@ -159,6 +159,8 @@ export const SAMPLE_CUES = deepFreeze({
   },
   // The ending's beats (eventCues `ending-beat`, by the beat's id): only
   // these three have a sound, one-shots of samples the game already has.
+  // `ownTurn`: the sample's repeat gap counts this cue's plays apart from
+  // the game's (Sovereign's own protect move just before it fell).
   playEndingBeat: {
     sample: {
       opens: 'sovereign-protect',
@@ -166,6 +168,7 @@ export const SAMPLE_CUES = deepFreeze({
       depart: 'travel-ignite',
     },
     bus: 'ambient',
+    ownTurn: true,
   },
   playStoryReactor: { sample: 'reactor-stutter', bus: 'ambient', loop: true },
   playUIHover: { sample: 'ui-hover', bus: 'ambient' },
