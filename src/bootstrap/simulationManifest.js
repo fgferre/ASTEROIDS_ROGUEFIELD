@@ -21,7 +21,6 @@ import RandomService from '../core/RandomService.js';
 import { gameEvents } from '../core/EventBus.js';
 import { createServiceResolver } from '../core/serviceUtils.js';
 import GameSessionService from '../services/GameSessionService.js';
-import CommandQueueService from '../services/CommandQueueService.js';
 import CodexService from '../services/CodexService.js';
 import AchievementService from '../services/AchievementService.js';
 import HangarService from '../services/HangarService.js';
@@ -311,30 +310,14 @@ export function createSimulationManifest(context = {}, presentation) {
     },
     slot('audio'),
     {
-      name: 'command-queue',
-      singleton: true,
-      lazy: false,
-      dependencies: [],
-      factory: ({ context: manifestContext }) =>
-        new CommandQueueService({
-          initialFrame: Number.isFinite(manifestContext?.initialFrame)
-            ? manifestContext.initialFrame
-            : 0,
-          frameSource: manifestContext?.frameSource,
-          hooks: manifestContext?.metrics?.commandQueue,
-        }),
-    },
-
-    {
       name: 'input',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'settings', 'command-queue', 'game-state'],
+      dependencies: ['event-bus', 'settings', 'game-state'],
       factory: ({ resolved }) =>
         new InputSystem({
           eventBus: resolved['event-bus'],
           settings: resolved['settings'],
-          'command-queue': resolved['command-queue'],
           'game-state': resolved['game-state'],
         }),
     },
@@ -342,19 +325,11 @@ export function createSimulationManifest(context = {}, presentation) {
       name: 'player',
       singleton: true,
       lazy: false,
-      dependencies: [
-        'event-bus',
-        'input',
-        'command-queue',
-        'hangar',
-        'difficulty',
-        'settings',
-      ],
+      dependencies: ['event-bus', 'input', 'hangar', 'difficulty', 'settings'],
       factory: ({ resolved }) =>
         new PlayerSystem({
           eventBus: resolved['event-bus'],
           input: resolved['input'],
-          'command-queue': resolved['command-queue'],
           hangar: resolved['hangar'],
           difficulty: resolved['difficulty'],
           settings: resolved['settings'],

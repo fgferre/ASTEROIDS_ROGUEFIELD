@@ -382,6 +382,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   "The game could not start. Reload the page to try again."; o menu não abre por trás. Antes, o navegador mostrava uma
   caixinha "Game failed to start. Reload the page." e, ao fechá-la, o menu abria normal. Ligar sem falha ficou igual.
   Fecha quando ele aprovar vendo.
+- **(62)** As auditorias de fora 7 e 8 antes de publicar (25/11): _"vamos resolver tudo antes de publicar,,,"_ (incluindo
+  _"A segunda parte da auditoria, que a nuvem faz depois desta publicação"_); _"nao deveriamos resolver os problemas
+  apontados pelo gemini antes de fazer outras coisas? duvida honesta e aceito sua decisao"_. Recusados por ele, não se
+  constroem: o Retry como recomeço da fase (_"nao vamos fazer isso."_), o botão de salvar replay (_"nao precisa tb"_) e o
+  jogo instalado sem internet (_"nao quero..."_). Sobre o limite de 1.200 linhas: _"pode ser revisto sempre..."_; fica, e
+  arquivo no limite se reparte. Em curso no ramo `reformas/auditorias-7-e-8`, um item por vez.
 
 ## Som (palavras dele, 19/11)
 

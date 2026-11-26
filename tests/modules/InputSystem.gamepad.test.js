@@ -68,8 +68,8 @@ describe('InputSystem gamepad', () => {
     expect(frame.right).toBe(false);
     expect([frame.aimX, frame.aimY]).toEqual([0, -1]);
 
-    // The movement command carries the stick for PlayerSystem.
-    expect(input.lastMovementCommand.analog).toEqual({
+    // The ship takes the step's frame with the stick in it.
+    expect(input.takeStepFrame()).toMatchObject({
       moveX: 1,
       moveY: 0,
       aimX: 0,
@@ -94,7 +94,7 @@ describe('InputSystem gamepad', () => {
       shield: false,
     });
     expect(step({ pressed: [PAD_BUTTON.LB] }).strafeHold).toBe(true);
-    expect(input.lastMovementCommand.binary.strafeHold).toBe(true);
+    expect(input.takeStepFrame().strafeHold).toBe(true);
     expect(step({ pressed: [] }).strafeHold).toBe(false);
   });
 

@@ -25,11 +25,10 @@ describe('PlayerSystem control schemes', () => {
     const eventBus = createEventBusMock();
     const movement = { up: false, down: false, left: false, right: false };
     Object.assign(movement, held);
-    const input = { getMovementInput: vi.fn(() => ({ ...movement })) };
+    const input = { takeStepFrame: vi.fn(() => ({ ...movement })) };
     const player = new PlayerSystem({
       eventBus,
       input,
-      'command-queue': null,
     });
     // The Auto Turret taken; modern is the Flight Computer's flight.
     player.setFlightScheme(controlScheme, controlScheme === 'classic');
@@ -139,8 +138,7 @@ describe('PlayerSystem control schemes', () => {
     const eventBus = createEventBusMock();
     const player = new PlayerSystem({
       eventBus,
-      input: { getMovementInput: vi.fn(() => ({})) },
-      'command-queue': null,
+      input: { takeStepFrame: vi.fn(() => ({})) },
     });
     player.setHull(shipModels.bastion);
     player.position = { x: 400, y: 300 };
@@ -164,8 +162,7 @@ describe('PlayerSystem control schemes', () => {
     const eventBus = createEventBusMock();
     const player = new PlayerSystem({
       eventBus,
-      input: { getMovementInput: vi.fn(() => ({})) },
-      'command-queue': null,
+      input: { takeStepFrame: vi.fn(() => ({})) },
     });
     const flying = () => [
       player.controlScheme,
@@ -245,8 +242,7 @@ describe('PlayerSystem control schemes', () => {
     const eventBus = createEventBusMock();
     const player = new PlayerSystem({
       eventBus,
-      input: { getMovementInput: vi.fn(() => ({})) },
-      'command-queue': null,
+      input: { takeStepFrame: vi.fn(() => ({})) },
       settings: {
         getCategoryValues: (id) =>
           id === 'controls' ? { stickSensitivity: 'high' } : null,

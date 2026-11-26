@@ -13,16 +13,18 @@ import {
   GAMEPAD_RUMBLE,
   GAMEPAD_STICK_DEADZONE,
 } from '../data/constants/gamepad.js';
-import {
-  MOVEMENT_ACTIONS,
-  buildMovementCommandPayload,
-  enqueueActionCommand,
-} from './input/commandPayloads.js';
 import { asArray } from './upgradeCatalog.js';
 
 const CONTROLS_CATEGORY_ID = 'controls';
 export const DEFAULT_GAMEPAD_AXIS_THRESHOLD = 0.45;
 const PASSWORD_MANAGER_GUARD_CODES = new Set(['KeyS', 'ArrowDown']);
+// The move actions: their keys keep the page from scrolling.
+const MOVEMENT_ACTIONS = new Set([
+  'moveUp',
+  'moveDown',
+  'moveLeft',
+  'moveRight',
+]);
 // Gameplay presses are applied at the next fixed step (not in the DOM handler)
 // so a recorded run replays them at the same step.
 const STEP_PRESS_FIELDS = {
@@ -74,10 +76,10 @@ function clone(value) {
 class InputSystem {
   constructor(dependencies = {}) {
     this.dependencies = normalizeDependencies(dependencies);
-    this.commandQueue =
-      resolveService('command-queue', this.dependencies) || null;
     this.eventBus = resolveEventBus(this.dependencies);
-    this.lastMovementCommand = null;
+    // This step's frame (update()); the ship takes it once (takeStepFrame).
+    this.stepFrame = null;
+    this.stepFrameTaken = true;
     this.keys = {};
     this.codes = {};
     this.mousePos = { x: 0, y: 0 };
@@ -122,14 +124,6 @@ class InputSystem {
     this.startMenuPadPolling();
 
     debugLog('[InputSystem] Initialized');
-  }
-
-  resolveCommandQueue(force = false) {
-    if (force || !this.commandQueue) {
-      this.commandQueue =
-        resolveService('command-queue', this.dependencies) || this.commandQueue;
-    }
-    return this.commandQueue;
   }
 
   getEventBus() {
@@ -592,13 +586,6 @@ class InputSystem {
       return;
     }
 
-    enqueueActionCommand(
-      this.resolveCommandQueue(),
-      action,
-      'pressed',
-      source,
-      context
-    );
     this.emitActionEvent(action, 'pressed', source, context);
   }
 
@@ -627,13 +614,6 @@ class InputSystem {
       return;
     }
 
-    enqueueActionCommand(
-      this.resolveCommandQueue(),
-      action,
-      'released',
-      source,
-      context
-    );
     this.emitActionEvent(action, 'released', source, context);
   }
 
@@ -1096,47 +1076,25 @@ class InputSystem {
     };
   }
 
-  getLastMoveCommandFromQueue() {
-    const queue = this.resolveCommandQueue();
-    if (!queue) {
-      return null;
-    }
-
-    if (typeof queue.peekLast !== 'function') {
-      return this.lastMovementCommand || null;
-    }
-
-    const latestMove = queue.peekLast({ type: 'move' });
-    if (latestMove && latestMove.payload) {
-      return latestMove.payload;
-    }
-
-    return null;
+  /** The four move keys of the last step's frame (the first-visit tips). */
+  getMovementInput() {
+    const held = this.stepFrame ?? this.getMovementBinaryState();
+    return {
+      up: Boolean(held.up),
+      down: Boolean(held.down),
+      left: Boolean(held.left),
+      right: Boolean(held.right),
+    };
   }
 
-  getMovementInput() {
-    // LEGACY: This adapter reads from the command queue until Step 7 removes it.
-    const lastMove = this.getLastMoveCommandFromQueue();
-
-    if (lastMove && lastMove.binary) {
-      return {
-        up: Boolean(lastMove.binary.up),
-        down: Boolean(lastMove.binary.down),
-        left: Boolean(lastMove.binary.left),
-        right: Boolean(lastMove.binary.right),
-      };
-    }
-
-    if (this.lastMovementCommand && this.lastMovementCommand.binary) {
-      return {
-        up: Boolean(this.lastMovementCommand.binary.up),
-        down: Boolean(this.lastMovementCommand.binary.down),
-        left: Boolean(this.lastMovementCommand.binary.left),
-        right: Boolean(this.lastMovementCommand.binary.right),
-      };
-    }
-
-    return this.getMovementBinaryState();
+  /**
+   * The frame the last update() made, once: the ship flies by it
+   * (player/movementInput.js); null until the next update().
+   */
+  takeStepFrame() {
+    if (this.stepFrameTaken) return null;
+    this.stepFrameTaken = true;
+    return this.stepFrame;
   }
 
   getMousePosition() {
@@ -1161,24 +1119,8 @@ class InputSystem {
     const liveFrame = this.sampleInputFrame();
     const frame = this.inputSource?.(liveFrame) ?? liveFrame;
     this.dispatchStepPresses(frame);
-
-    const { command, metadata } = buildMovementCommandPayload(frame, {
-      activeKeyboardActions: this.activeKeyboardActions,
-      activeGamepadActions: this.activeGamepadActions,
-      keyboardActionInputs: this.keyboardActionInputs,
-    });
-    this.lastMovementCommand = command;
-
-    const queue = this.resolveCommandQueue();
-    if (!queue) {
-      return;
-    }
-
-    try {
-      queue.enqueue(command, metadata);
-    } catch (error) {
-      console.warn('[InputSystem] Failed to enqueue movement command:', error);
-    }
+    this.stepFrame = frame;
+    this.stepFrameTaken = false;
   }
 
   destroy() {

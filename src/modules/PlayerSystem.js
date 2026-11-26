@@ -62,22 +62,7 @@ class PlayerSystem extends BaseSystem {
       enableRandomManagement: false,
     });
 
-    const normalizedDependencies = this.dependencies;
-
-    if (config && typeof config === 'object' && !Array.isArray(config)) {
-      if (config['command-queue'] && !normalizedDependencies['command-queue']) {
-        normalizedDependencies['command-queue'] = config['command-queue'];
-      }
-
-      if (config.commandQueue && !normalizedDependencies['command-queue']) {
-        normalizedDependencies['command-queue'] = config.commandQueue;
-      }
-    }
-
-    this.dependencies = normalizedDependencies;
-    this.movementInput = new MovementInput({
-      dependencies: this.dependencies,
-    });
+    this.movementInput = new MovementInput();
     exposeFields(this, this.movementInput, ['cachedMovementInput']);
     const controls = resolveService(
       'settings',
@@ -460,15 +445,14 @@ class PlayerSystem extends BaseSystem {
 
   // === MÉTODO PRINCIPAL UPDATE ===
   update(deltaTime) {
-    const commandQueue = this.movementInput.getCommandQueue();
     const inputSystem = resolveService('input', this.dependencies);
 
-    if (!inputSystem && !commandQueue) {
-      console.warn('[PlayerSystem] InputSystem and CommandQueue not found');
+    if (!inputSystem) {
+      console.warn('[PlayerSystem] InputSystem not found');
       return;
     }
 
-    let movement = this.movementInput.readMovement(commandQueue, inputSystem);
+    let movement = this.movementInput.readMovement(inputSystem);
     movement.sensitivity = this.stickSensitivity;
     // In the two-stick classic the right stick turns the hull: no hand aim.
     this.aimStick =
@@ -485,7 +469,7 @@ class PlayerSystem extends BaseSystem {
       return; // Don't process input, movement, or effects when dead/retrying
     }
 
-    // Held, the input is read (so nothing queues up) and dropped.
+    // Held, the input is read (its frame taken) and dropped.
     if (this.controlHoldTimer > 0) {
       this.controlHoldTimer = Math.max(0, this.controlHoldTimer - deltaTime);
       movement = this.movementInput.getDefaultMovementBinary();
