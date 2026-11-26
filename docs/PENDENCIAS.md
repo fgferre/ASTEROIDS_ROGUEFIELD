@@ -445,6 +445,15 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   são pequenas."_). Construído no ramo `historia/final`: por toque num tablet deitado a tela é desenhada maior; a
   menor letra foi de 7 para 12 px e as frases das opções de 11 para 18 (a 1024×768), sem estourar a tela; tablets
   maiores ficam no mesmo tamanho. No computador nada mudou. Cartão `final-do-jogo-7`. Fecha quando ele aprovar vendo.
+- **(53)** A pausa de cinco centésimos de segundo logo depois da escolha do final (25/11, da lista que ele colou da
+  página de publicar: _"No final: um intervalo de cinco centésimos de segundo logo depois da escolha, que já
+  existia"_). Medida de novo e **não consertada**. Não vem do código do jogo: na escolha o jogo gasta menos de um
+  milésimo de segundo. Só apareceu com um mouse em cima da página no instante em que a tela da escolha dá lugar à
+  cena: mouse imitado clicando na opção, 8 de 8 escolhas (de cinco a nove centésimos); teclado com o mouse parado na
+  página, 2 de 3; por toque, nenhuma de 2; teclado sem mouse na página, nenhuma. Acontece uma vez por final e cai no
+  corte, onde a imagem inteira muda; consertar pediria mexer em como as telas trocam debaixo do mouse no jogo todo.
+  Não se sabe se é igual com um mouse de verdade: só foi medido com mouse imitado. Cartão `final-do-jogo-7`. Fecha
+  se ele jogar com o mouse e não sentir tranco depois de escolher; se sentir, vale ir atrás.
 - **(54)** O som das conchas do chefe nem sempre tocava na primeira cena do final (25/11, da lista que ele colou da
   página de publicar: _"No final: um intervalo de cinco centésimos de segundo logo depois da escolha, que já existia;
   e o som das conchas do chefe nem sempre toca na cena."_). A causa: o jogo não repete o mesmo som em menos de um
