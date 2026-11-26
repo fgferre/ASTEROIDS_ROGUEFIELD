@@ -121,6 +121,24 @@ class UpgradeSystem extends BaseSystem {
 
   // At run start, after the reset: the contract's starting piloting card,
   // rank 1, when the trail would offer it now; otherwise nothing.
+  // A trail step declared dead for the weapon in hand (`deadFor`: the Auto
+  // Turret for weapons that never aim) is never offered: on the trail's turn
+  // it goes in as the starting card does, and the same offer shows the next
+  // step (the coordinator's ruling, 26/11, on Felipe's rule that no card is
+  // offered where it does nothing).
+  installDeadTrailSteps() {
+    const dead = (id) => {
+      const definition = this.upgradeLookup.get(id);
+      return (
+        this.isDeadForWeapon(definition) && this.isUpgradeSelectable(definition)
+      );
+    };
+    let step = this.trailSlotIds().find(dead);
+    while (step && this.applyUpgrade(step)) {
+      step = this.trailSlotIds().find(dead);
+    }
+  }
+
   applyStartingCard() {
     const id = this.startingCard;
     if (
@@ -182,6 +200,10 @@ class UpgradeSystem extends BaseSystem {
     { exclude = [], level = this.level } = {}
   ) {
     this.offerLevel = level;
+    const trailTurn =
+      !UPGRADE_WEAPON_OFFER_LEVELS.includes(level) &&
+      level % UPGRADE_PILOT_OFFER_EVERY === 0;
+    if (trailTurn) this.installDeadTrailSteps();
     const eligible = this.getEligibleUpgradeDefinitions();
     const kept = this.takeHeldCard(eligible, level);
 
@@ -219,7 +241,7 @@ class UpgradeSystem extends BaseSystem {
     );
     const slotIds = UPGRADE_WEAPON_OFFER_LEVELS.includes(level)
       ? WEAPON_CARD_IDS
-      : level % UPGRADE_PILOT_OFFER_EVERY === 0
+      : trailTurn
         ? this.trailSlotIds()
         : [];
     const slotted = preferred.filter(
@@ -391,13 +413,12 @@ class UpgradeSystem extends BaseSystem {
     return weaponCard?.weaponId ?? DEFAULT_WEAPON_ID;
   }
 
-  // The new flight's draw leaves out a card that does nothing for the weapon
-  // in hand (never the piloting trail).
-  isDeadForWeapon({ id, deadFor }) {
+  // A card declared to do nothing for the weapon in hand (`deadFor`), read
+  // again at every offer: never drawn in the new flight; a trail step of it
+  // is installed instead (installDeadTrailSteps).
+  isDeadForWeapon({ deadFor }) {
     return (
-      this.pilotCardIds.length > 0 &&
-      !this.pilotCardIds.includes(id) &&
-      deadFor.includes(this.currentWeaponId())
+      this.pilotCardIds.length > 0 && deadFor.includes(this.currentWeaponId())
     );
   }
 

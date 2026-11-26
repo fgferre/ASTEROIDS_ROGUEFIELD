@@ -28,6 +28,7 @@ export const NEXT = {
     'Sovereign, beaten, no longer breaks into pieces: it stays whole for the ending (with reduced motion it burns away where it fell).', // not confirmed
   ],
   fixed: [
+    'With the Shard Halo or the Furnace Corona, the piloting trail no longer offers the Auto Turret, which does nothing for weapons that never aim: it goes in on its own when its turn comes and the same level-up already offers the next step, so the way to the Targeting Matrix and the Flight Computer stays open and takes one pick less.', // not confirmed
     'Card texts no longer promise what a weapon cannot get: the Afterburn Lance sells the Shard Halo and the Furnace Corona no lock-on range (they never aim), and the Heat Sink, the Overclocked Core, Gyro Servos and the Targeting Matrix tell the Halo what its speed-up really is: the blades may cut the same enemy again sooner.', // not confirmed
     "The turret no longer turns a Scatter Coil or an Arc Caster toward a target past their reach while one they can hit is in front: with the Targeting Matrix, the Afterburn Lance's longer lock could swing the weapon to a volatile rock far away, and the rock right ahead took no damage at all.", // not confirmed
     'With every card slot full and the hull whole, a level-up no longer offers a Hull Patch that would mend nothing: the Salvage Cache comes alone (with a hurt hull, both come, the patch first).', // not confirmed

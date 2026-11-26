@@ -32,6 +32,28 @@ export default {
       },
     ],
   },
+  // With a weapon that never aims it goes in on its own (deadFor): what it is
+  // there, where the build shows it.
+  weaponText: {
+    'shard-halo': {
+      levels: [
+        {
+          description:
+            'The Halo needs no aim: the turret only opens the way to the Targeting Matrix and the Flight Computer.',
+          highlights: ['Installed on its own: it takes no pick.'],
+        },
+      ],
+    },
+    'furnace-corona': {
+      levels: [
+        {
+          description:
+            'The Corona needs no aim: the turret only opens the way to the Targeting Matrix and the Flight Computer.',
+          highlights: ['Installed on its own: it takes no pick.'],
+        },
+      ],
+    },
+  },
   levels: [
     {
       rank: 1,

@@ -377,11 +377,30 @@ describe('level-up offers', () => {
       expect(progression.isDeadForWeapon(synthetic)).toBe(false);
     });
 
-    it('the trail still offers auto_aim with Furnace Corona held', () => {
-      const progression = createProgression(9);
-      progression.appliedUpgrades.set(furnaceCard, 1);
+    // The Auto Turret does nothing for a weapon that never aims, yet it was
+    // the only step the trail offered there (the card matrix's check, 25/11).
+    it.each(['furnace-corona', 'shard-halo'])(
+      'with the %s, the trail installs the Auto Turret and offers the step after it',
+      (weaponId) => {
+        const progression = createProgression(10);
+        const weapon = listContent('weapons').find((w) => w.id === weaponId);
+        progression.appliedUpgrades.set(weapon.card.id, 1);
+        progression.appliedUpgrades.set('propulsors', 1);
+        expect(eligibleIds(progression)).not.toContain('auto_aim');
+        const ids = offerIds(progression, 10);
+        expect(progression.getUpgradeCount('auto_aim')).toBe(1);
+        expect(ids).not.toContain('auto_aim');
+        expect(
+          ids.filter((id) => progression.pilotCardIds.includes(id))
+        ).toHaveLength(1);
+      }
+    );
+
+    it('with an aimed weapon, the trail still offers the Auto Turret', () => {
+      const progression = createProgression(10);
       progression.appliedUpgrades.set('propulsors', 1);
-      expect(eligibleIds(progression)).toContain('auto_aim');
+      expect(offerIds(progression, 10)).toContain('auto_aim');
+      expect(progression.getUpgradeCount('auto_aim')).toBe(0);
     });
 
     it('the old flight keeps a dead card eligible', () => {
