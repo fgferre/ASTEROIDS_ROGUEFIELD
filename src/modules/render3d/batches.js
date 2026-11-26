@@ -165,8 +165,8 @@ export class PointBatch {
     this.material.uniforms.uScale.value = pointScale;
     for (let i = 0; i < this.attributes.length; i += 1) {
       const attribute = this.attributes[i];
-      attribute.updateRange.offset = 0;
-      attribute.updateRange.count = this.count * attribute.itemSize;
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0, this.count * attribute.itemSize);
       attribute.needsUpdate = true;
     }
     this.geometry.setDrawRange(0, this.count);
@@ -525,8 +525,8 @@ export class RibbonBatch {
   end() {
     for (let i = 0; i < this.attributes.length; i += 1) {
       const attribute = this.attributes[i];
-      attribute.updateRange.offset = 0;
-      attribute.updateRange.count = this.verts * attribute.itemSize;
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0, this.verts * attribute.itemSize);
       attribute.needsUpdate = true;
     }
     this.geometry.setDrawRange(0, (this.verts / 4) * 6);
@@ -787,11 +787,11 @@ export class CapsuleBatch {
     this.mesh.count = this.count;
     if (this.count === 0) return;
     const matrices = this.mesh.instanceMatrix;
-    matrices.updateRange.offset = 0;
-    matrices.updateRange.count = this.count * 16;
+    matrices.clearUpdateRanges();
+    matrices.addUpdateRange(0, this.count * 16);
     matrices.needsUpdate = true;
-    this.tint.updateRange.offset = 0;
-    this.tint.updateRange.count = this.count * 4;
+    this.tint.clearUpdateRanges();
+    this.tint.addUpdateRange(0, this.count * 4);
     this.tint.needsUpdate = true;
   }
 }

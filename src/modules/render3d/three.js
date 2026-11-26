@@ -53,6 +53,16 @@ core.ShaderChunk.lights_pars_begin = legacyLights(
   core.ShaderChunk.lights_pars_begin
 );
 
+// Since r163 a material's envMapIntensity scales only its own envMap, and
+// the scene's sky (Scene.environment) takes Scene.environmentIntensity. The
+// game's materials set their own strength against the scene's sky, as r128
+// read it: each hands it to the scene as it is drawn (three reads it then).
+core.MeshStandardMaterial.prototype.onBeforeRender = function (_r, scene) {
+  if (this.envMap === null && scene.isScene) {
+    scene.environmentIntensity = this.envMapIntensity;
+  }
+};
+
 // Since r154 three tone-maps only what it draws to the screen (or to a WebXR
 // target). The composers draw the scene into their targets and its materials
 // expect ACES there, as r128 gave it, a glow with toneMapped false left out
