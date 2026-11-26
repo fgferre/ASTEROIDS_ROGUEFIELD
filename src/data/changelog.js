@@ -30,7 +30,7 @@ export const NEXT = {
   fixed: [
     "On a phone held sideways, the ending's choice now fits the screen: both options show every line, with no scrolling.", // not confirmed
     "On a tablet, the ending's choice is drawn at a readable size: its smallest letters were about half as tall.", // not confirmed
-    "With a sector already won, the scenes before a run (the story, the journey, the descent) no longer sit under a gold tint: the head start's level-up flash stayed lit over them until the run began.", // not confirmed
+    "Launching from the map a sector that begins with a head start (every sector after the first), the scenes before the run (the story, the journey, the descent) no longer sit under a gold tint: the head start's level-up flash stayed lit over them until the run began.", // not confirmed
   ],
   unseen: [
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",
