@@ -86,6 +86,8 @@ const DESCENT = Object.freeze({
   writesTodaysRecord: false,
   /** The mode a recording of the run keeps (src/core/replay.js). */
   replayMode: 'normal',
+  /** Where the remote link into the run says it goes. */
+  linkPlace: 'THE DESCENT',
 });
 
 const DAILY = Object.freeze({
@@ -95,6 +97,7 @@ const DAILY = Object.freeze({
   forcedDifficulty: DAILY_DIFFICULTY,
   writesTodaysRecord: true,
   replayMode: 'daily',
+  linkPlace: 'DAILY FIELD',
 });
 
 const BOSS_RUSH = Object.freeze({
@@ -117,6 +120,7 @@ const BOSS_RUSH = Object.freeze({
   winCountsAsFirstVictory: false,
   winClimbsPressure: false,
   replayMode: 'bossRush',
+  linkPlace: 'BOSS RUSH',
 });
 
 function sectorMode(sector) {
@@ -137,6 +141,7 @@ function sectorMode(sector) {
     writesLayerRecord: false,
     writesSectorRecord: true,
     winCountsForChallengeMedals: false,
+    linkPlace: sector.name ?? '',
   });
 }
 

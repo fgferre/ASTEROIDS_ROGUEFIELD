@@ -57,6 +57,7 @@ describe('the kind of run', () => {
       'forcedDifficulty',
       'writesTodaysRecord',
       'replayMode',
+      'linkPlace',
     ];
     const daily = runModeFor({ daily: true });
     const descent = runModeFor({ daily: false, bossRush: false });

@@ -7,7 +7,6 @@
 // (ui/skipHold.js); any other press only shows how. Styles: style.css
 // .remote-link.
 
-import { sectorById } from '../../data/sectors.js';
 import { listenForHold } from './skipHold.js';
 
 const LINE_STEP_MS = 250;
@@ -36,16 +35,15 @@ function noise() {
   return noiseUrl;
 }
 
-/** The link's lines for a run from the menu, flown by the hull `hullName`. */
-export function remoteLinkLines({ sector, daily, bossRush }, hullName = '') {
-  let place = 'THE DESCENT';
-  if (sector) place = sectorById(sector)?.name ?? '';
-  else if (daily) place = 'DAILY FIELD';
-  else if (bossRush) place = 'BOSS RUSH';
+/**
+ * The link's lines for a run from the menu in `mode` (src/core/runMode.js),
+ * flown by the hull `hullName`.
+ */
+export function remoteLinkLines(mode, hullName = '') {
   return [
     ['WAKE · REMOTE LINK'],
     ['HULL', hullName.toUpperCase()],
-    ['SECTOR', place],
+    ['SECTOR', mode.linkPlace],
     ['SIGNAL', 'CLEAN'],
   ];
 }
