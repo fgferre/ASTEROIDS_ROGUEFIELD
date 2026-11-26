@@ -865,6 +865,11 @@ export default class GameSessionService {
 
     try {
       this.resetSystems({ manageRandom: false });
+      // The field's pickups, chests and Overcharge go with the run (outside
+      // audit 8, verdict A5); not in resetSystems, whose reset at every run
+      // start would add an event the recorded runs do not have ('game-started'
+      // resets them there).
+      this.resolveServiceInstance('pickups').reset();
     } catch (error) {
       console.error(
         '[GameSessionService] Failed to reset systems during exit:',
