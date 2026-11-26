@@ -13,6 +13,23 @@ import {
   validateSnapshot,
 } from '../../../utils/StateManager.js';
 
+// A behavior's `kept` fields, copied (lists are lists of numbers or names).
+const keptCopy = (state = {}) =>
+  Object.fromEntries(
+    Object.entries(state).map(([name, value]) => [
+      name,
+      Array.isArray(value) ? [...value] : value,
+    ])
+  );
+
+function keptState(enemy) {
+  const state = {};
+  for (const [behavior] of enemy.steps ?? []) {
+    for (const name of behavior.kept ?? []) state[name] = enemy[name];
+  }
+  return keptCopy(state);
+}
+
 export class EnemySnapshots {
   /**
    * @param {object} kit What a snapshot reads and restores on EnemySystem:
@@ -262,6 +279,9 @@ export class EnemySnapshots {
         ? enemy.shieldHealth
         : null,
       shieldBroken: Boolean(enemy.shieldBroken),
+      // What its behaviors keep (a behavior's `kept`): a Leech's meal, a
+      // Shade's phase (outside audit 8, verdict A8).
+      kept: keptState(enemy),
     };
   }
 
@@ -584,6 +604,7 @@ export class EnemySnapshots {
       enemy.shieldHealth = snapshot.shieldHealth;
       enemy.shieldBroken = Boolean(snapshot.shieldBroken);
     }
+    Object.assign(enemy, keptCopy(snapshot.kept));
     if (snapshot.spawnedBy !== undefined) {
       enemy.spawnedBy = snapshot.spawnedBy;
     }
