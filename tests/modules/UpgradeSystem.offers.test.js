@@ -465,7 +465,7 @@ describe('level-up offers', () => {
         '+10% damage to elites, heralds and bosses'
       );
       expect(shown('targeting_suite', 'shard-halo', 2).description).toBe(
-        'Fire rate +9%. The cuts keep their +20% on elites, heralds and bosses.'
+        'The blades may cut the same enemy again 9% sooner. The cuts keep their +20% on elites, heralds and bosses.'
       );
       expect(shown('targeting_suite', 'lance', 2).description).toBe(
         'Locks one threat per shot of the volley, up to four, and fires at all of them. Fire rate +9%.'

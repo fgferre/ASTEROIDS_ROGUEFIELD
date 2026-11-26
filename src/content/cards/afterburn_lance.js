@@ -55,14 +55,15 @@ export default {
         description: `Jumps deal +${bonus}% damage per 100 px between the ship and the enemy: the far end of the chain strikes harder. Lock-on range +${LOCK_RANGE[rank]}%.`,
       })),
     },
+    // The Halo and the Furnace never aim: no lock-on range to sell them.
     'shard-halo': {
-      levels: BONUS.map((bonus, rank) => ({
-        description: `Cuts deal +${bonus}% damage per 100 px between the ship and the enemy: the far edge of the halo cuts deeper. Lock-on range +${LOCK_RANGE[rank]}%.`,
+      levels: BONUS.map((bonus) => ({
+        description: `Cuts deal +${bonus}% damage per 100 px between the ship and the enemy: the far edge of the halo cuts deeper.`,
       })),
     },
     'furnace-corona': {
-      levels: BONUS.map((bonus, rank) => ({
-        description: `Pulses deal +${bonus}% damage per 100 px between the ship and the enemy: the ring's edge burns hotter. Lock-on range +${LOCK_RANGE[rank]}%.`,
+      levels: BONUS.map((bonus) => ({
+        description: `Pulses deal +${bonus}% damage per 100 px between the ship and the enemy: the ring's edge burns hotter.`,
       })),
     },
     scatter: {

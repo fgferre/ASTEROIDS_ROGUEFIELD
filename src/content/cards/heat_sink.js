@@ -33,6 +33,16 @@ export default {
       },
     ],
   },
+  // The Halo fires nothing: its "fire rate" is how soon a blade may cut the
+  // same enemy again, and a blade cuts only while it touches (measured
+  // 25/11: +3% to +23% more cuts by the enemy's size, not +11% to +37%).
+  weaponText: {
+    'shard-halo': {
+      levels: [11, 23, 37].map((gain) => ({
+        description: `The blades may cut the same enemy again ${gain}% sooner: big, slow enemies feel it most.`,
+      })),
+    },
+  },
   levels: [
     {
       rank: 1,

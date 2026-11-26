@@ -31,6 +31,22 @@ export default {
       },
     ],
   },
+  // The Halo fires nothing: what a dash speeds is how soon a blade may cut
+  // the same enemy again (see heat_sink.js).
+  weaponText: {
+    'shard-halo': {
+      levels: [
+        {
+          description:
+            'After each dash, the blades may cut the same enemy again 40% sooner for 1 s.',
+        },
+        {
+          description:
+            'After each dash, the blades may cut the same enemy again 80% sooner for 1.5 s.',
+        },
+      ],
+    },
+  },
   levels: [
     {
       rank: 1,
