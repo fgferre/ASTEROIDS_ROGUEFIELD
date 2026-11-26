@@ -308,16 +308,34 @@ function checkUpgrades(upgrades) {
   if (!wellFormed) fail('upgrades');
 }
 
+// A run's Hangar setup (HangarService.getRunSetup): every key it writes and
+// no other, its numbers within what owning every item can give, with room to
+// spare (tests/core/replay.test.js checks that room against the items). A
+// link must not fly a ship with a hull of 100,000 or a magnet of 4,400 px.
+const isMultiplier = (value) =>
+  Number.isFinite(value) && value >= 0.25 && value <= 4;
+const isCount = (value) => Number.isInteger(value) && value >= 0 && value <= 20;
+const isTextList = (value) =>
+  Array.isArray(value) && value.every((item) => isText(item));
+const HANGAR_FIELDS = {
+  hullMultiplier: isMultiplier,
+  dashCooldownMultiplier: isMultiplier,
+  pickupRadiusMultiplier: isMultiplier,
+  extraRerolls: isCount,
+  extraBanishes: isCount,
+  holds: isCount,
+  openCards: isTextList,
+  sealed: isTextList,
+  startingCard: (value) => value === null || isText(value),
+};
+
 function checkHangar(hangar) {
   const wellFormed =
     isObject(hangar) &&
-    Object.entries(hangar).every(([key, value]) => {
-      if (key === 'openCards' || key === 'sealed') {
-        return Array.isArray(value) && value.every((item) => isText(item));
-      }
-      if (key === 'startingCard') return value === null || isText(value);
-      return Number.isFinite(value);
-    });
+    Object.keys(hangar).length === Object.keys(HANGAR_FIELDS).length &&
+    Object.entries(HANGAR_FIELDS).every(
+      ([key, valid]) => key in hangar && valid(hangar[key])
+    );
   if (!wellFormed) fail('hangar');
 }
 
