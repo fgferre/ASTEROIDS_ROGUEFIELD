@@ -295,7 +295,9 @@ export function setupThree(seeded) {
   composer.addPass(outputPass);
   foldBloom(bloomPass, [impactPass, outputPass]);
   const smaaPass = new THREE.SMAAPass();
-  // its weights read only the edges' red and green: two bytes a pixel, not four
+  // its weights read only the edges' red and green: two bytes a pixel, not
+  // four (8-bit as in r128; three makes the target half-float since r158)
+  smaaPass._edgesRT.texture.type = THREE.UnsignedByteType;
   smaaPass._edgesRT.texture.format = THREE.RGFormat;
   smaaPass._edgesRT.texture.internalFormat = 'RG8';
   composer.addPass(smaaPass);
