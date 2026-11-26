@@ -529,7 +529,7 @@ describe('WaveManager Boss Rush', () => {
     expect(manager.currentWave).toBe(5);
     expect(emits).toContainEqual({
       event: 'wave-started',
-      payload: expect.objectContaining({ wave: 5, bossRush: true }),
+      payload: expect.objectContaining({ wave: 5, mode: manager.mode }),
     });
     clearLayer();
     expect(manager.waveInProgress).toBe(false);

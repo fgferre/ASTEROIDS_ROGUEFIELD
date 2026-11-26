@@ -559,8 +559,6 @@ export class WaveManager {
       compatibilityMode: true,
       managerTotals: { ...rawManagerTotals },
       mode: this.mode,
-      // Until the medals and the interface read `mode` (item 8, this branch).
-      bossRush: this.mode.kind === 'bossRush',
     };
 
     this.eventBus.emit('wave-started', waveEventPayload);

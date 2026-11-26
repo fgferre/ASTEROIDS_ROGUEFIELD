@@ -560,11 +560,11 @@ export default class GameSessionService {
    * with `replay: true` on 'game-started': a replayed run has no side effects
    * on the viewer's save (Salvage) or pad (rumble).
    */
-  startNewRun({ source = 'unknown', daily, bossRush, sector, carry } = {}) {
+  startNewRun({ source = 'unknown', carry, ...picked } = {}) {
     const replay = Boolean(this.replayStart);
     let hullId;
     if (replay) {
-      ({ daily, bossRush, sector, hull: hullId } = this.replayStart);
+      ({ hull: hullId, ...picked } = this.replayStart);
       this.replayStart = null;
     } else resolveService('hangar', this.services).useReplaySetup(null);
     // The run's kind is settled here, once (src/core/runMode.js). How it was
@@ -572,7 +572,7 @@ export default class GameSessionService {
     // and the journey only from the map or Next Sector (runCinematics.js),
     // New Mission keeping the last mode (the undefined options, read against
     // the last mode), an armed replay winning over the mode picked (above).
-    this.runEnd.mode = runModeFor({ daily, bossRush, sector }, this.mode);
+    this.runEnd.mode = runModeFor(picked, this.mode);
     const difficulty = resolveService('difficulty', this.services);
     const seed = difficulty.beginRun({ mode: this.mode });
     if (this.gameState) {
@@ -669,8 +669,10 @@ export default class GameSessionService {
     this.emitGameStarted({
       source,
       timestamp: Date.now(),
-      bossRush: this.bossRush,
-      sector: this.sector?.id ?? null,
+      // runCinematics reads the kind from these two until it asks the mode
+      // (this branch's last commit); the music starts the sector's score.
+      bossRush: this.mode.kind === 'bossRush',
+      sector: this.mode.sector?.id ?? null,
       mode: this.mode,
       replay,
       carried: Boolean(build),
@@ -1065,15 +1067,6 @@ export default class GameSessionService {
   /** The kind of run being played (src/core/runMode.js). */
   get mode() {
     return this.runEnd.mode;
-  }
-
-  // Until the run's other parts ask `mode` (item 8, this branch).
-  get bossRush() {
-    return this.mode.kind === 'bossRush';
-  }
-
-  get sector() {
-    return this.mode.sector;
   }
 
   static deriveInitialSeed() {

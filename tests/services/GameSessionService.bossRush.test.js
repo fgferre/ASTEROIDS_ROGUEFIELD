@@ -161,14 +161,14 @@ describe('Boss Rush', () => {
     click(game, 'boss-rush-btn');
     expect(enemies.waveManager.currentWave).toBe(5);
     click(game, 'restart-game-btn');
-    expect(game.session.bossRush).toBe(true);
+    expect(game.session.mode.kind).toBe('bossRush');
     expect(enemies.waveManager.currentWave).toBe(5);
     click(game, 'start-game-btn');
-    expect(game.session.bossRush).toBe(false);
+    expect(game.session.mode.kind).not.toBe('bossRush');
     expect(enemies.waveManager.currentWave).toBe(1);
     click(game, 'boss-rush-btn');
     click(game, 'daily-field-btn');
-    expect(game.session.bossRush).toBe(false);
+    expect(game.session.mode.kind).not.toBe('bossRush');
     expect(game.session.mode.kind).toBe('daily');
   });
 });
