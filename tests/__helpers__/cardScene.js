@@ -25,6 +25,7 @@ import {
   STEP_SECONDS,
 } from '../__helpers__/headlessGame.js';
 import { installDomStubs } from './domStubs.js';
+import { resolveService } from '../../src/core/serviceUtils.js';
 
 export { STEP_SECONDS };
 export const CARDS = new Map(UPGRADE_LIBRARY.map((card) => [card.id, card]));
@@ -122,8 +123,8 @@ export function createScene({
   const game = createHeadlessGame();
   const { services, eventBus, session } = game;
   const { player, enemies, progression, combat } = services;
-  session.resolveServiceInstance('difficulty').runSeed = seed;
-  hangar?.(session.resolveServiceInstance('hangar'), game);
+  resolveService('difficulty', session.services).runSeed = seed;
+  hangar?.(resolveService('hangar', session.services), game);
   session.startNewRun({ source: 'test', sector: SECTORS[0].id });
   progression.experienceToNext = NO_LEVEL_UP_XP;
   enemies.releaseAllAsteroidsToPool();

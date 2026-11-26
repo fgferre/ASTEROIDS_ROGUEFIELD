@@ -8,6 +8,7 @@ import { ACHIEVEMENTS_STORAGE_KEY } from '../../src/services/AchievementService.
 import { deserialize, serialize } from '../../src/core/replay.js';
 import { chooseSlot, resolveActiveSlot } from '../../src/core/storage.js';
 import { BASTION_HULL_ID } from '../../src/data/shipModels.js';
+import { resolveService } from '../../src/core/serviceUtils.js';
 
 let restoreDom;
 
@@ -46,7 +47,7 @@ describe('runs that keep no progress', () => {
 
   it('saves a Hangar purchase made after a replay', () => {
     const game = playReplay();
-    const hangar = game.session.resolveServiceInstance('hangar');
+    const hangar = resolveService('hangar', game.session.services);
     game.session.exitToMenu({ source: 'test' });
     hangar.salvage = 400;
 
@@ -72,7 +73,7 @@ describe('runs that keep no progress', () => {
       JSON.stringify({ unlocked: {}, progress: { survivor: 9 } })
     );
     const game = createHeadlessGame({ seedSource: 'profile-harness' });
-    const hangar = game.session.resolveServiceInstance('hangar');
+    const hangar = resolveService('hangar', game.session.services);
     const codex = new CodexService({ eventBus: game.eventBus });
     const salvage = hangar.salvage;
     const setItem = vi.spyOn(window.localStorage, 'setItem');

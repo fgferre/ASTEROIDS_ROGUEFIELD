@@ -35,6 +35,7 @@ import {
 import { trailSteps } from '../../src/data/upgrades/index.js';
 import { PROBES } from '../__helpers__/cardProbes.js';
 import { verdict } from '../__helpers__/cardVerdict.js';
+import { resolveService } from '../../src/core/serviceUtils.js';
 
 const CARDS_FULL = process.env.CARTAS_COMPLETA === '1';
 const FLIGHTS = ['classic', 'modern'];
@@ -227,7 +228,7 @@ function measureFallback(id) {
       e: scene.player.maxHealth * 0.25,
     };
   }
-  const hangar = scene.game.session.resolveServiceInstance('hangar');
+  const hangar = resolveService('hangar', scene.game.session.services);
   const before = hangar.cacheSalvage;
   scene.progression.level = 99;
   scene.progression.applyUpgrade(id);

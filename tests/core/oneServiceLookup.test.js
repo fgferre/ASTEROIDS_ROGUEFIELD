@@ -1,7 +1,8 @@
 // One way to find a service: resolveService(name, dependencies) from
 // src/core/serviceUtils.js (item 8 of the audits, 26/11). The ways it replaced
-// must not come back: a getService method that only wrapped it, and reading a
-// service straight off a dependencies object by its name in brackets.
+// must not come back: a getService method that only wrapped it, the run
+// session's resolveServiceInstance with its own list of nicknames, and reading
+// a service straight off a dependencies object by its name in brackets.
 // serviceUtils.js is where the one way lives, so it may read them.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,6 +23,10 @@ const offenders = (pattern) =>
 describe('one way to find a service', () => {
   it('has no getService method or call', () => {
     expect(offenders(/\bgetService\s*\(/)).toEqual([]);
+  });
+
+  it('has no resolveServiceInstance', () => {
+    expect(offenders(/\bresolveServiceInstance\b/)).toEqual([]);
   });
 
   it("reads no service off a dependencies object as dependencies['name']", () => {

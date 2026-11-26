@@ -19,7 +19,7 @@ describe('the run recording and a Retry', () => {
     };
     const session = {
       replayRecorder: null,
-      resolveServiceInstance: (name) => services[name],
+      services,
       getConfiguredHullId: () => 'interceptor',
     };
     createReplayController({

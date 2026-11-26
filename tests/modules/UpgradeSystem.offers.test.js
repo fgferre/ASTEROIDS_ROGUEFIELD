@@ -17,6 +17,7 @@ import {
 import { FAMILY_APEX_THRESHOLD } from '../../src/data/upgrades/families.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
+import { resolveService } from '../../src/core/serviceUtils.js';
 
 // `contract`: the hangar's run contract fields (openCards, sealed, holds,
 // startingCard) over its base modifiers; none: no hangar at all.
@@ -550,7 +551,7 @@ describe('level-up offers', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
       try {
         const game = createHeadlessGame();
-        const hangar = game.session.resolveServiceInstance('hangar');
+        const hangar = resolveService('hangar', game.session.services);
         hangar.getModifiers = () => ({
           ...BASE_MODIFIERS,
           startingCard: 'propulsors',

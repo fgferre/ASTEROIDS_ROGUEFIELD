@@ -132,7 +132,7 @@ function createServiceHarness(options = {}) {
       progression,
       enemies,
       physics,
-      xpOrbs,
+      'xp-orbs': xpOrbs,
       healthHearts,
       world,
       effects,

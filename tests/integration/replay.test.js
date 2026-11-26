@@ -25,6 +25,7 @@ import { BASTION_HULL_ID, DEFAULT_HULL_ID } from '../../src/data/shipModels.js';
 import { installFakeGamepad } from '../__helpers__/fakeGamepad.js';
 import { CHEST_REVEAL_MS } from '../../src/data/pickups.js';
 import { ChestCeremony } from '../../src/modules/ui/ChestCeremony.js';
+import { resolveService } from '../../src/core/serviceUtils.js';
 
 const STEPS = 600; // 10 s at 60 Hz
 
@@ -106,7 +107,7 @@ describe('run replay', () => {
     const live = createHeadlessGame();
     live.services.settings.setSetting('gameplay', 'difficulty', difficulty);
     if (hull) {
-      live.session.resolveServiceInstance('hangar').owned[`${hull}-hull`] =
+      resolveService('hangar', live.session.services).owned[`${hull}-hull`] =
         true;
       live.services.settings.setSetting('gameplay', 'selectedHull', hull);
     }
@@ -461,7 +462,7 @@ describe('run replay', () => {
       });
       recorder.record(0, createInputFrame());
       const replay = createHeadlessGame();
-      const hangar = replay.session.resolveServiceInstance('hangar');
+      const hangar = resolveService('hangar', replay.session.services);
       const salvage = hangar.salvage;
 
       replay.controller.arm(deserialize(serialize(recorder.toJSON())));

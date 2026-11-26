@@ -29,6 +29,7 @@ import {
   STEP_SECONDS,
 } from '../__helpers__/headlessGame.js';
 import { installDomStubs } from '../__helpers__/domStubs.js';
+import { resolveService } from '../../src/core/serviceUtils.js';
 
 const SECONDS = Number(process.env.CARD_BENCH_SECONDS || 10);
 const OUT = process.env.CARD_BENCH_OUT || '';
@@ -158,7 +159,7 @@ function run({
   const game = createHeadlessGame();
   const { services, eventBus, session } = game;
   const { player, enemies, progression, combat } = services;
-  session.resolveServiceInstance('difficulty').runSeed = seed;
+  resolveService('difficulty', session.services).runSeed = seed;
   session.startNewRun({ source: 'test', sector: SECTORS[0].id });
   progression.experienceToNext = NO_LEVEL_UP_XP;
   enemies.releaseAllAsteroidsToPool();

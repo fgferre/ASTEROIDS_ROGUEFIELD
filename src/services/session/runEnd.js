@@ -10,6 +10,7 @@ import { BOSS_RUSH_LAYERS } from '../../data/layers.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
 import { nextSector } from '../../data/sectors.js';
 import { loadRecords, updateRecords } from '../runRecords.js';
+import { resolveService } from '../../core/serviceUtils.js';
 
 // The end screens wait for the transmission on air (the last words) to end,
 // up to the cap.
@@ -29,7 +30,7 @@ const SPOILS_CHECK_MS = 100;
 export class RunEnd {
   /**
    * `eventBus`: emits 'run-won' and 'run-continued'.
-   * `resolveServiceInstance(name)`: a session service by name, or null.
+   * `services`: the session's services, found with resolveService.
    * `getSessionState()` / `setSessionState(state, meta)`: the session state.
    * `setScreen(screen)` / `emitScreenChanged(screen, meta)`: the screen.
    * `getConfiguredHullId()`: the hull the player flies.
@@ -37,7 +38,7 @@ export class RunEnd {
    */
   constructor({
     eventBus,
-    resolveServiceInstance,
+    services,
     getSessionState,
     setSessionState,
     setScreen,
@@ -46,7 +47,7 @@ export class RunEnd {
     findSafeSpawnPoint,
   }) {
     this.eventBus = eventBus;
-    this.resolveServiceInstance = resolveServiceInstance;
+    this.services = services;
     this.getSessionState = getSessionState;
     this.setSessionState = setSessionState;
     this.setScreen = setScreen;
@@ -73,7 +74,7 @@ export class RunEnd {
       // the death screen).
       this.bossRushWardens += 1;
       if (this.getSessionState() === 'running') {
-        const progression = this.resolveServiceInstance('progression');
+        const progression = resolveService('progression', this.services);
         progression.emitLevelUp(progression.applyLevelUp());
         progression.emitExperienceChanged();
       }
@@ -91,17 +92,17 @@ export class RunEnd {
     if (this.bossRush) {
       this.bossRushWardens += 1;
     }
-    this.resolveServiceInstance('enemies')?.waveManager?.holdWaves(
+    resolveService('enemies', this.services)?.waveManager?.holdWaves(
       VICTORY_SPOILS_SECONDS
     );
     const { pullSpeed, pullAcceleration } = PICKUP_KINDS.magnet;
-    this.resolveServiceInstance('xpOrbs')?.startGlobalPull(
+    resolveService('xp-orbs', this.services)?.startGlobalPull(
       VICTORY_SPOILS_SECONDS,
       pullSpeed,
       pullAcceleration
     );
     this.setSessionState('victory', { reason: 'final-boss-defeated' });
-    this.resolveServiceInstance('player').guardSteadily(
+    resolveService('player', this.services).guardSteadily(
       VICTORY_SCREEN_MAX_DELAY_MS / 1000
     );
     this.eventBus.emit('run-won', {
@@ -112,7 +113,7 @@ export class RunEnd {
 
     // The clear time is the Warden's death, not the screen's opening: the
     // spoils and the last line that come between are no part of the record.
-    const world = this.resolveServiceInstance('world');
+    const world = resolveService('world', this.services);
     const clearTime = world?.runClock();
     const open = () => {
       const summary = world?.buildRunSummary() ?? {};
@@ -155,14 +156,14 @@ export class RunEnd {
     // Lost between the final Warden's death and this screen: the run is won,
     // so the ship comes back the way a Retry brings it (full hull, a safe
     // spot, a moment of invulnerability).
-    const player = this.resolveServiceInstance('player');
+    const player = resolveService('player', this.services);
     player.endSteadyGuard();
     if (player.isDead) {
       player.health = player.maxHealth;
       player.respawn(this.findSafeSpawnPoint(), 3);
-      this.resolveServiceInstance('world').reset();
+      resolveService('world', this.services).reset();
     }
-    this.resolveServiceInstance('enemies')?.waveManager?.resumeWaves();
+    resolveService('enemies', this.services)?.waveManager?.resumeWaves();
     this.setScreen('playing');
     this.emitScreenChanged('playing', { source: 'run-continued' });
     this.setSessionState('running', { reason: 'run-continued' });
@@ -224,7 +225,7 @@ export class RunEnd {
       layer: typeof wave === 'number' ? wave : wave?.current,
       time: summary.stats?.timeElapsed,
     };
-    this.resolveServiceInstance('difficulty').recordRun(reached);
+    resolveService('difficulty', this.services).recordRun(reached);
     return { bestLayer: updateRecords(reached).bestLayer };
   }
 
