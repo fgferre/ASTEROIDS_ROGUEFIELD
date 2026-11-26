@@ -7,7 +7,7 @@
 // the edge is listed below with its reason, and on any of the four systems
 // reached at all, even through a listed edge.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -122,5 +122,32 @@ describe('the headless game loads no presentation code', () => {
         `\nCut that import chain: the headless game builds createSimulationManifest, ` +
         `and only serviceManifest.js may import the four systems.`
     ).toEqual([]);
+  });
+});
+
+// The link into a run reaches the session from the page's manifest context
+// (app.js), since the session no longer imports it.
+describe('the link into a run', () => {
+  it('is the one the manifest context gives the session', async () => {
+    const { createServiceManifest } = await import(
+      '../../src/bootstrap/serviceManifest.js'
+    );
+    const playLink = vi.fn();
+    const context = { gameState: { screen: 'menu' }, playLink };
+    const entry = createServiceManifest(context).find(
+      (item) => item.name === 'game-session'
+    );
+    const session = entry.factory({
+      resolved: {
+        'event-bus': { emit() {}, on() {}, off() {} },
+        random: { fork: () => ({}) },
+      },
+      context,
+    });
+    const start = vi.fn();
+    session.menuButtons.linkIn({ daily: true }, start, null);
+    expect(playLink).toHaveBeenCalledWith(
+      expect.objectContaining({ options: { daily: true }, onConnect: start })
+    );
   });
 });
