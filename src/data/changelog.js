@@ -44,6 +44,7 @@ export const NEXT = {
     'Seeker Swarm missiles whose target is destroyed turn to the next enemy again; some flew off toward a corner of the field instead.', // not confirmed
     "The Herald of Silence's shards all turn after the ship at the same rate; now and then one turned twice as sharply and was harder to dodge.", // not confirmed
     'If part of the game fails to start, the loading screen now stays and says so, asking you to reload the page, instead of opening a menu whose Launch does nothing.', // not confirmed
+    "On a tablet, the ending's choice is drawn at a readable size: its smallest letters were about half as tall.", // not confirmed
   ],
   unseen: [
     'Development-only switches in the address (?cadencia, ?bleed, ?freio, ?matriz9) let Felipe play each option of four pending card decisions on the test server; the published game never reads them, and they go once he chooses.', // not confirmed

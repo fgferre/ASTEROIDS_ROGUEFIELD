@@ -450,6 +450,19 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   título de cada opção ficou um pouco menor (32 para 28), porque STEWARDSHIP passava da borda na tela mais estreita.
   No computador e no tablet a tela ficou igual. Num celular de 568×320 ainda não cabe. Cartão de conferência
   `final-do-jogo-6`. Fecha quando ele aprovar vendo.
+- **(51)** A escolha do final ainda não cabia num celular muito pequeno (25/11, da lista que ele colou da página de
+  publicar ao decidir resolver tudo antes: _"Celular muito pequeno e antigo: a escolha do final ainda não cabe."_).
+  Construído no ramo `historia/final`: a 568×320, por toque, as duas opções aparecem inteiras, sem rolar. Só nesse
+  tamanho o título CHOOSE e os nomes das opções ficam um tamanho menor (53 para 29 e 28 para 23) e as últimas folgas
+  fecham; nada muda de 667×375 para cima. Duas alternativas foram mostradas no cartão `final-do-jogo-7` (o título ao
+  lado de SOVEREIGN DOWN, que cabe mas desloca o cabeçalho; os rótulos em cima do texto, que não cabe). Fecha quando
+  ele aprovar vendo.
+- **(52)** No tablet, as letras da tela da escolha do final são pequenas (25/11, ao decidir resolver os defeitos
+  conhecidos antes de publicar: _"vamos resolver antes de publicar entao, nao tem porque... a nao ser que me convença
+  do contrario com bons argumentos..."_; da lista que ele colou da página de publicar: _"Tablet: as letras dessa tela
+  são pequenas."_). Construído no ramo `historia/final`: por toque num tablet deitado a tela é desenhada maior; a
+  menor letra foi de 7 para 12 px e as frases das opções de 11 para 18 (a 1024×768), sem estourar a tela; tablets
+  maiores ficam no mesmo tamanho. No computador nada mudou. Cartão `final-do-jogo-7`. Fecha quando ele aprovar vendo.
 
 ## Cenário (palavras dele, 19/11, na conferência)
 
