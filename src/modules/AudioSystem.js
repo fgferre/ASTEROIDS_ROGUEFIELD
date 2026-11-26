@@ -67,7 +67,6 @@ class AudioSystem extends BaseSystem {
     this.settings = resolveService('settings', this.dependencies);
     this.random =
       resolveService('random', this.dependencies) ||
-      (this.dependencies && this.dependencies.random) ||
       new RandomService('audio-system:fallback');
     this.randomScopes = {
       ...createRandomScopes(this.random),

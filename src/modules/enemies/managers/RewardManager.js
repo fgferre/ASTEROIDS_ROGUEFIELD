@@ -102,17 +102,13 @@ export class RewardManager {
 
     this.enemySystem =
       this.dependencies.enemySystem ||
-      this.dependencies.enemies ||
       resolveService('enemies', this.dependencies);
 
     this.xpOrbSystem =
       this.dependencies.xpOrbSystem ||
-      this.dependencies['xp-orbs'] ||
       resolveService('xp-orbs', this.dependencies);
 
-    this.healthHeartSystem =
-      this.dependencies.healthHearts ||
-      resolveService('healthHearts', this.dependencies);
+    this.healthHeartSystem = resolveService('healthHearts', this.dependencies);
 
     this.random =
       this.dependencies.random ||
@@ -725,7 +721,6 @@ export class RewardManager {
     if (!this.xpOrbSystem) {
       this.xpOrbSystem =
         this.dependencies.xpOrbSystem ||
-        this.dependencies['xp-orbs'] ||
         resolveService('xp-orbs', this.dependencies);
     }
 
@@ -734,9 +729,10 @@ export class RewardManager {
 
   getHealthHeartSystem() {
     if (!this.healthHeartSystem) {
-      this.healthHeartSystem =
-        this.dependencies.healthHearts ||
-        resolveService('healthHearts', this.dependencies);
+      this.healthHeartSystem = resolveService(
+        'healthHearts',
+        this.dependencies
+      );
     }
 
     return this.healthHeartSystem;
@@ -746,7 +742,6 @@ export class RewardManager {
     if (!this.enemySystem) {
       this.enemySystem =
         this.dependencies.enemySystem ||
-        this.dependencies.enemies ||
         resolveService('enemies', this.dependencies);
     }
 
