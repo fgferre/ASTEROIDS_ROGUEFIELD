@@ -84,20 +84,22 @@ class UISystem extends BaseSystem {
     this.lastTransmission = null;
     this.cinematics = new RunCinematics({
       eventBus: this.eventBus,
-      renderer: () => this.getService('renderer'),
+      renderer: () => resolveService('renderer', this.dependencies),
       hud: () => this.tacticalHud.layout,
       // The session's pause flag alone: no pause screen, no fixed steps.
-      holdSim: (held) => this.getService('game-state')?.setPaused(held),
+      holdSim: (held) =>
+        resolveService('game-state', this.dependencies)?.setPaused(held),
       // A head start holds the first layer: its title card waits for it.
       onIntroEnd: () =>
-        this.getService('enemies')?.waveManager.waveInProgress &&
+        resolveService('enemies', this.dependencies)?.waveManager
+          .waveInProgress &&
         this.handleLayerStarted({ wave: this.transmissionLayer }),
       speak: (entry) => this.queueTransmission(entry),
       hush: () => this.transmissions?.clear(),
       nextLine: () => this.transmissions?.next() ?? false,
     });
     // The skip key's Start is read on the pad the game reads.
-    setSkipPad(() => this.getService('input')?.gamepad);
+    setSkipPad(() => resolveService('input', this.dependencies)?.gamepad);
     this.onboarding = new Onboarding(
       {
         showTip: (id) => this.showOnboardingTip(id),
@@ -122,16 +124,19 @@ class UISystem extends BaseSystem {
     });
     this.tacticalHud = new TacticalHud({
       refs: { gameField: this.domRefs.gameField, gameUi: this.domRefs.gameUi },
-      player: () => this.getService('player'),
-      enemies: () => this.getService('enemies'),
-      progression: () => this.getService('progression'),
-      combat: () => this.getService('combat'),
-      pickups: () => this.getService('pickups'),
-      xpOrbs: () => this.getService('xp-orbs'),
-      renderer: () => this.getService('renderer'),
+      player: () => resolveService('player', this.dependencies),
+      enemies: () => resolveService('enemies', this.dependencies),
+      progression: () => resolveService('progression', this.dependencies),
+      combat: () => resolveService('combat', this.dependencies),
+      pickups: () => resolveService('pickups', this.dependencies),
+      xpOrbs: () => resolveService('xp-orbs', this.dependencies),
+      renderer: () => resolveService('renderer', this.dependencies),
       sector: () => this.sector,
       shieldKey: () => {
-        const device = this.getService('input').getActiveDevice();
+        const device = resolveService(
+          'input',
+          this.dependencies
+        ).getActiveDevice();
         if (device === 'touch') return ''; // SHIELD is on screen
         return this.settingsPanel.formatBindingLabel(
           this.settings?.getSetting('controls', 'activateShield')?.[
@@ -148,7 +153,8 @@ class UISystem extends BaseSystem {
       refresh: () => this.tacticalHud.refreshHudFromServices(true),
       wardenLive: () =>
         Boolean(this.tacticalHud.layout?.slotState('warden')?.active),
-      device: () => this.getService('input').getActiveDevice(),
+      device: () =>
+        resolveService('input', this.dependencies).getActiveDevice(),
     });
     this.settingsPanel = new SettingsPanel({
       refs: this.domRefs.settings,
@@ -161,13 +167,14 @@ class UISystem extends BaseSystem {
       setHudBaseScale: (scale) => this.viewport.setHudBaseScale(scale),
       livePreset: () => this.liveQualityPreset,
       openHudEditor: () => this.openHudEditor(),
-      getService: (name) => this.getService(name),
+      dependencies: this.dependencies,
     });
     this.levelUpScreen = new LevelUpScreen({
       refs: this.domRefs.levelUp,
-      progression: () => this.getService('progression'),
-      headStart: () => this.getService('game-session').headStart,
-      combat: () => this.getService('combat'),
+      progression: () => resolveService('progression', this.dependencies),
+      headStart: () =>
+        resolveService('game-session', this.dependencies).headStart,
+      combat: () => resolveService('combat', this.dependencies),
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       showScreen: (name, options) => this.showScreen(name, options),
       showGameUI: () => this.showGameUI(),
@@ -177,8 +184,8 @@ class UISystem extends BaseSystem {
     });
     this.chestCeremony = new ChestCeremony({
       refs: this.domRefs.chest,
-      progression: () => this.getService('progression'),
-      combat: () => this.getService('combat'),
+      progression: () => resolveService('progression', this.dependencies),
+      combat: () => resolveService('combat', this.dependencies),
       showScreen: (name, options) => this.showScreen(name, options),
       showGameUI: () => this.showGameUI(),
       cardChoiceOpen: () => this.levelUpScreen.levelUpState.isVisible,
@@ -190,9 +197,9 @@ class UISystem extends BaseSystem {
       gameOverQuitBtn: this.domRefs.gameOver.quitBtn,
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
       showScreen: (name, options) => this.showScreen(name, options),
-      progression: () => this.getService('progression'),
-      combat: () => this.getService('combat'),
-      difficulty: () => this.getService('difficulty'),
+      progression: () => resolveService('progression', this.dependencies),
+      combat: () => resolveService('combat', this.dependencies),
+      difficulty: () => resolveService('difficulty', this.dependencies),
       layer: () => this.transmissionLayer,
       sector: () => this.sector,
       settingsOpenHere: () => this.settingsPanel.isOpenFrom('pause'),
@@ -202,10 +209,10 @@ class UISystem extends BaseSystem {
     this.runEndScreens = new RunEndScreens({
       refs: this.domRefs,
       showScreen: (name, options) => this.showScreen(name, options),
-      progression: () => this.getService('progression'),
-      combat: () => this.getService('combat'),
-      difficulty: () => this.getService('difficulty'),
-      hangar: () => this.getService('hangar'),
+      progression: () => resolveService('progression', this.dependencies),
+      combat: () => resolveService('combat', this.dependencies),
+      difficulty: () => resolveService('difficulty', this.dependencies),
+      hangar: () => resolveService('hangar', this.dependencies),
       lastTransmission: () => this.lastTransmission,
       cinematics: this.cinematics,
       announceOverlay: (...args) => this.emitOverlayVisibilityChanged(...args),
@@ -229,11 +236,11 @@ class UISystem extends BaseSystem {
       refs: this.domRefs.menu,
       settings: this.settings,
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
-      hangar: () => this.getService('hangar'),
-      codex: () => this.getService('codex'),
-      achievements: () => this.getService('achievements'),
-      difficulty: () => this.getService('difficulty'),
-      player: () => this.getService('player'),
+      hangar: () => resolveService('hangar', this.dependencies),
+      codex: () => resolveService('codex', this.dependencies),
+      achievements: () => resolveService('achievements', this.dependencies),
+      difficulty: () => resolveService('difficulty', this.dependencies),
+      player: () => resolveService('player', this.dependencies),
       livePreset: () => this.liveQualityPreset,
     });
     this.padNav = new GamepadMenuNav(this);
@@ -246,7 +253,7 @@ class UISystem extends BaseSystem {
       showScreen: (name, options) => this.showScreen(name, options),
       announceVisibility: (isOpen, payload) =>
         this.emitOverlayVisibilityChanged('hangar', isOpen, payload),
-      hangar: () => this.getService('hangar'),
+      hangar: () => resolveService('hangar', this.dependencies),
       selectedHullId: () => this.mainMenu.getSelectedHullId(),
       hullName: (hull) => this.mainMenu.getHullDisplayName(hull),
       refreshShipSelector: () => this.mainMenu.requestMenuShipSelectorRefresh(),
@@ -261,12 +268,15 @@ class UISystem extends BaseSystem {
       showScreen: (name, options) => this.showScreen(name, options),
       announceVisibility: (isOpen, payload) =>
         this.emitOverlayVisibilityChanged('codex', isOpen, payload),
-      codex: () => this.getService('codex'),
-      achievements: () => this.getService('achievements'),
+      codex: () => resolveService('codex', this.dependencies),
+      achievements: () => resolveService('achievements', this.dependencies),
     });
     // The static keyboard hints show the scheme the ship flies (style.css):
     // the player's, which every run starts classic.
-    document.body.dataset.controls = this.getService('player').controlScheme;
+    document.body.dataset.controls = resolveService(
+      'player',
+      this.dependencies
+    ).controlScheme;
 
     // Direct AAA HUD Activation, in the HUD Layout setting's layout
     this.followHudLayout(
@@ -307,10 +317,6 @@ class UISystem extends BaseSystem {
     this.viewport.initializeViewportScaling();
   }
 
-  getService(name) {
-    return resolveService(name, this.dependencies);
-  }
-
   /** The HUD Layout setting's layout on the HUD; the editor owns it while open. */
   followHudLayout(video) {
     if (!this.hudEditor.isOpen) {
@@ -329,7 +335,7 @@ class UISystem extends BaseSystem {
     }
     const { settingsState } = this.settingsPanel;
     const settingsFrom = settingsState.isOpen ? settingsState.source : null;
-    const screen = this.getService('game-state').getScreen();
+    const screen = resolveService('game-state', this.dependencies).getScreen();
     const inRun = ['playing', 'levelup', 'chest'].includes(screen);
     const coveredScreen = ['levelup', 'chest'].includes(screen)
       ? document.getElementById(`${screen}-screen`)
@@ -362,7 +368,7 @@ class UISystem extends BaseSystem {
   }
 
   resolveSettingsService() {
-    return this.getService('settings');
+    return resolveService('settings', this.dependencies);
   }
 
   /** EnemySystem pushes the boss bar's state to the ui service. */
@@ -377,7 +383,8 @@ class UISystem extends BaseSystem {
     }
     const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
     this.transmissionLayer = layer;
-    const sector = this.getService('game-session')?.sector ?? null;
+    const sector =
+      resolveService('game-session', this.dependencies)?.sector ?? null;
     this.sector = sector;
     this.cinematics.prepareLayer(layer, sector, this.bossRush);
     // The intro's end shows this layer's title card.
@@ -643,8 +650,8 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('toggle-pause', () => {
       if (
-        this.getService('game-state')?.getRawState?.()?.sessionState ===
-        'quitting'
+        resolveService('game-state', this.dependencies)?.getRawState?.()
+          ?.sessionState === 'quitting'
       ) {
         return;
       }
@@ -652,7 +659,7 @@ class UISystem extends BaseSystem {
       if (this.hudEditor.isOpen) {
         return;
       }
-      const appState = this.getService('game-state');
+      const appState = resolveService('game-state', this.dependencies);
       if (appState && typeof appState.isPaused === 'function') {
         this.pauseScreen.updatePauseScreen(Boolean(appState.isPaused()));
       }
@@ -749,7 +756,7 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('settings-menu-requested', (payload = {}) => {
-      const appState = this.getService('game-state');
+      const appState = resolveService('game-state', this.dependencies);
       if (appState?.getRawState?.()?.sessionState === 'quitting') {
         return;
       }
@@ -906,10 +913,15 @@ class UISystem extends BaseSystem {
   update(deltaTime) {
     this.tacticalHud.update(deltaTime);
     if (this.onboarding.current) {
-      const moving = this.getService('input').getMovementInput();
+      const moving = resolveService(
+        'input',
+        this.dependencies
+      ).getMovementInput();
       this.onboarding.update(deltaTime, {
         moving: moving.up || moving.down || moving.left || moving.right,
-        shieldReady: this.getService('player').getShieldState().maxHits > 0,
+        shieldReady:
+          resolveService('player', this.dependencies).getShieldState().maxHits >
+          0,
         bannerBusy: Boolean(this.tacticalHud.layout?.isBannerBusy()),
         tipCovered: Boolean(this.tacticalHud.layout?.isNoticeShowing()),
       });
@@ -1038,7 +1050,10 @@ class UISystem extends BaseSystem {
   showGameUI(options = {}) {
     this.levelUpScreen.resetLevelUpState();
     if (!this.runWon && !this.pilotDown) {
-      if (this.getService('progression').openNextLevelUpOffer()) return;
+      if (
+        resolveService('progression', this.dependencies).openNextLevelUpOffer()
+      )
+        return;
 
       // A level-up overlay stays visible while another overlay is opened.
       if (this.chestCeremony.queue?.length) {
@@ -1081,7 +1096,7 @@ class UISystem extends BaseSystem {
   showOnboardingTip(id, toggled = null) {
     const controls =
       this.resolveSettingsService()?.getCategoryValues('controls') || {};
-    const device = this.getService('input').getActiveDevice();
+    const device = resolveService('input', this.dependencies).getActiveDevice();
     const keys = {};
     [
       'moveUp',
@@ -1100,7 +1115,7 @@ class UISystem extends BaseSystem {
     });
     const prompt = onboardingPrompts(
       keys,
-      this.getService('player')?.controlScheme,
+      resolveService('player', this.dependencies)?.controlScheme,
       device,
       toggled
     )[id];
@@ -1110,7 +1125,7 @@ class UISystem extends BaseSystem {
 
   /** The cards tip in the level-up footer, on the first level-up only. */
   showOnboardingCardsTip(headStart) {
-    const device = this.getService('input').getActiveDevice();
+    const device = resolveService('input', this.dependencies).getActiveDevice();
     const text = this.onboarding.cardsTip(device, headStart);
     const content = document.querySelector('#levelup-screen .levelup-content');
     if (!text || !content || content.querySelector('.onboarding-cards-tip')) {
@@ -1136,7 +1151,7 @@ class UISystem extends BaseSystem {
   refreshMenuTips(hangarOpen = this.hangarScreen.hangarState.isOpen) {
     const on = this.isOnboardingEnabled();
     const { bought = true, affordable = false } =
-      this.getService('hangar')?.purchaseState() ?? {};
+      resolveService('hangar', this.dependencies)?.purchaseState() ?? {};
     const tip = (id, ready) => this.onboarding.menuTip(id, on && ready);
     const launch = tip('menu', !this.onboarding.flown);
     const salvage = tip(

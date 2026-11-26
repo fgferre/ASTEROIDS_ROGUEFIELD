@@ -619,7 +619,7 @@ export function createSimulationManifest(context = {}, presentation) {
             progression: resolved['progression'],
             enemies: resolved['enemies'],
             physics: resolved['physics'],
-            xpOrbs: resolved['xp-orbs'],
+            'xp-orbs': resolved['xp-orbs'],
             healthHearts: resolved['healthHearts'],
             pickups: resolved['pickups'],
             world: resolved['world'],

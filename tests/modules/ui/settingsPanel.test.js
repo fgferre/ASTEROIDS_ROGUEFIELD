@@ -251,12 +251,12 @@ describe('Settings panel', () => {
     expect(
       isGreyed(
         renderSection('game', {
-          getService: () => ({ getPressure: () => 0 }),
+          dependencies: { difficulty: { getPressure: () => 0 } },
         }).row('difficulty')
       )
     ).toBe(false);
     const { row } = renderSection('game', {
-      getService: () => ({ getPressure: () => 1 }),
+      dependencies: { difficulty: { getPressure: () => 1 } },
     });
     expect(isGreyed(row('difficulty'))).toBe(true);
     expect(reasonOf(row('difficulty'))).toMatch(/^Pressure I is on/);

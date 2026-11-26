@@ -7,6 +7,7 @@
 // left in one go, by `chooseHeadStartCard`.
 
 import { UPGRADE_FAMILIES } from '../../data/upgrades/families.js';
+import { resolveService } from '../../core/serviceUtils.js';
 
 const CATEGORY_RANK = { offense: 2, defense: 1 };
 
@@ -43,10 +44,10 @@ export function chooseHeadStartCard(options = [], familyCounts = {}) {
 export class HeadStart {
   /**
    * `eventBus`: listens to 'upgrade-applied' (a pick).
-   * `resolveServiceInstance(name)`: a session service by name, or null.
+   * `services`: the session's services, found with resolveService.
    */
-  constructor({ eventBus, resolveServiceInstance }) {
-    this.resolveServiceInstance = resolveServiceInstance;
+  constructor({ eventBus, services }) {
+    this.services = services;
     this.pending = false;
     this.total = 0;
     this.made = 0;
@@ -64,8 +65,8 @@ export class HeadStart {
     this.total = picks + owed.length;
     this.made = 0;
     if (!this.pending) return;
-    this.resolveServiceInstance('enemies').waveManager.holdWaves();
-    const progression = this.resolveServiceInstance('progression');
+    resolveService('enemies', this.services).waveManager.holdWaves();
+    const progression = resolveService('progression', this.services);
     progression.queueLevelUpOffers(owed);
     const levels = Array.from({ length: picks }, () =>
       progression.applyLevelUp()
@@ -87,7 +88,7 @@ export class HeadStart {
    */
   equipRest() {
     if (!this.pending) return [];
-    const progression = this.resolveServiceInstance('progression');
+    const progression = resolveService('progression', this.services);
     let options = progression.pendingUpgradeOptions;
     while (this.pending) {
       const id = chooseHeadStartCard(options, progression.getFamilyCounts());
@@ -110,14 +111,14 @@ export class HeadStart {
   handlePick() {
     if (!this.pending) return;
     this.made += 1;
-    const progression = this.resolveServiceInstance('progression');
+    const progression = resolveService('progression', this.services);
     if (progression.pendingLevelUpScreens.length > 0) return;
     this.finish();
   }
 
   finish() {
     this.pending = false;
-    const enemies = this.resolveServiceInstance('enemies');
+    const enemies = resolveService('enemies', this.services);
     enemies.waveManager.resumeWaves();
     if (!enemies.waveManager.waveInProgress) enemies.startNextWave();
   }

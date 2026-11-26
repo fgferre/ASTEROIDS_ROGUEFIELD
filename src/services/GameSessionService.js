@@ -15,6 +15,7 @@ import { RunEnd } from './session/runEnd.js';
 import { HeadStart } from './session/headStart.js';
 import { RetryCountdown } from './session/retryCountdown.js';
 import { MenuButtons } from './session/menuButtons.js';
+import { resolveService } from '../core/serviceUtils.js';
 
 /**
  * GameSessionService orchestrates lifecycle state for a single game run.
@@ -120,14 +121,14 @@ export default class GameSessionService {
       currentRandomSnapshot: () => this.randomScopes.currentRandomSnapshot,
       prepareRandomForScope: (scope, options) =>
         this.prepareRandomForScope(scope, options),
-      resolveServiceInstance: (name) => this.resolveServiceInstance(name),
+      services: this.services,
       getConfiguredHullId: () => this.getConfiguredHullId(),
       applyConfiguredPlayerHull: (options) =>
         this.applyConfiguredPlayerHull(options),
     });
     this.runEnd = new RunEnd({
       eventBus: this.eventBus,
-      resolveServiceInstance: (name) => this.resolveServiceInstance(name),
+      services: this.services,
       getSessionState: () => this.getSessionState(),
       setSessionState: (state, meta) => this.setSessionState(state, meta),
       setScreen: (screen) => this.setScreen(screen),
@@ -137,13 +138,13 @@ export default class GameSessionService {
     });
     this.headStart = new HeadStart({
       eventBus: this.eventBus,
-      resolveServiceInstance: (name) => this.resolveServiceInstance(name),
+      services: this.services,
     });
     this.retry = new RetryCountdown({
       eventBus: this.eventBus,
       gameState: this.gameState,
       canvas: () => this.canvas,
-      resolveServiceInstance: (name) => this.resolveServiceInstance(name),
+      services: this.services,
       hasDeathSnapshot: () => this.snapshots.hasDeathSnapshot(),
       getDeathSnapshot: () => this.snapshots.getDeathSnapshot(),
       restoreFromSnapshot: (options) =>
@@ -497,7 +498,7 @@ export default class GameSessionService {
       return;
     }
 
-    const player = this.resolveServiceInstance('player');
+    const player = resolveService('player', this.services);
     if (player && typeof player.activateShield === 'function') {
       try {
         player.activateShield();
@@ -519,7 +520,7 @@ export default class GameSessionService {
       return false;
     }
 
-    const enemies = this.resolveServiceInstance('enemies');
+    const enemies = resolveService('enemies', this.services);
     if (!enemies || typeof enemies.startNextWave !== 'function') {
       return false;
     }
@@ -565,13 +566,13 @@ export default class GameSessionService {
     if (replay) {
       ({ daily, bossRush, sector, hull: hullId } = this.replayStart);
       this.replayStart = null;
-    } else this.resolveServiceInstance('hangar').useReplaySetup(null);
+    } else resolveService('hangar', this.services).useReplaySetup(null);
     if (sector !== undefined || daily !== undefined || bossRush !== undefined) {
       this.sector = sectorById(sector ?? null);
     }
     if (this.sector) [daily, bossRush] = [false, false];
     if (bossRush !== undefined) this.bossRush = bossRush;
-    const difficulty = this.resolveServiceInstance('difficulty');
+    const difficulty = resolveService('difficulty', this.services);
     const seed = difficulty.beginRun({ daily });
     if (this.gameState) {
       this.gameState.randomSeed = seed;
@@ -604,7 +605,7 @@ export default class GameSessionService {
     // `carry` (the victory screen's next sector): the ship keeps its build.
     const build = carry && !replay ? this.snapshots.captureBuild() : null;
     // Before the reset: the first layer's rock count already follows it.
-    const waveManager = this.resolveServiceInstance('enemies')?.waveManager;
+    const waveManager = resolveService('enemies', this.services)?.waveManager;
     if (waveManager) {
       waveManager.bossRush = this.bossRush;
       waveManager.sector = this.sector;
@@ -622,13 +623,13 @@ export default class GameSessionService {
     this.applyConfiguredPlayerHull({ hullId });
     // A carried build already holds its starting card.
     if (build) this.snapshots.restoreBuild(build);
-    else this.resolveServiceInstance('progression').applyStartingCard();
+    else resolveService('progression', this.services).applyStartingCard();
     this._suppressWaveKickoff = false;
 
     // A head start holds the first layer until its picks are made; a carried
     // build only takes the picks it is short of.
     const levelsCarried = build
-      ? this.resolveServiceInstance('progression').level - 1
+      ? resolveService('progression', this.services).level - 1
       : 0;
     const headStart = Math.max(
       0,
@@ -639,7 +640,7 @@ export default class GameSessionService {
       this.ensureWaveKickoff({ reason: 'session-start' });
     }
 
-    const ui = this.resolveServiceInstance('ui');
+    const ui = resolveService('ui', this.services);
     if (ui && typeof ui.showGameUI === 'function') {
       try {
         ui.showGameUI({ emitEvent: false });
@@ -648,7 +649,7 @@ export default class GameSessionService {
       }
     }
 
-    const audio = this.audioService || this.resolveServiceInstance('audio');
+    const audio = this.audioService || resolveService('audio', this.services);
     if (!this.audioService && audio) {
       this.audioService = audio;
     }
@@ -790,15 +791,15 @@ export default class GameSessionService {
           '[GameSessionService] Quit from pause - triggering epic explosion...'
         );
 
-        const player = this.resolveServiceInstance('player');
-        const effects = this.resolveServiceInstance('effects');
-        const ui = this.resolveServiceInstance('ui');
+        const player = resolveService('player', this.services);
+        const effects = resolveService('effects', this.services);
+        const ui = resolveService('ui', this.services);
 
         this.setSessionState('quitting', { reason: 'exit-to-menu' });
         // Quitting pays the Salvage the run earned (HangarService).
         this.eventBus.emit(
           'run-abandoned',
-          this.resolveServiceInstance('world')?.buildRunSummary() ?? {}
+          resolveService('world', this.services)?.buildRunSummary() ?? {}
         );
         this.runEnd.clearPendingGameOverTransition();
         const wasPaused = this.isPaused();
@@ -883,7 +884,7 @@ export default class GameSessionService {
       // audit 8, verdict A5); not in resetSystems, whose reset at every run
       // start would add an event the recorded runs do not have ('game-started'
       // resets them there).
-      this.resolveServiceInstance('pickups').reset();
+      resolveService('pickups', this.services).reset();
     } catch (error) {
       console.error(
         '[GameSessionService] Failed to reset systems during exit:',
@@ -895,7 +896,7 @@ export default class GameSessionService {
 
     this.resetForMenu();
 
-    const ui = this.resolveServiceInstance('ui');
+    const ui = resolveService('ui', this.services);
     if (ui) {
       if (typeof ui.resetLevelUpState === 'function') {
         try {
@@ -930,7 +931,7 @@ export default class GameSessionService {
       this.emitPauseState({ source: 'exit-to-menu' });
     }
 
-    this.resolveServiceInstance('difficulty').endRun();
+    resolveService('difficulty', this.services).endRun();
     debugLog(`Retornando ao menu (origem: ${payload?.source ?? 'unknown'}).`);
 
     this.setSessionState('menu', {
@@ -939,48 +940,8 @@ export default class GameSessionService {
     });
   }
 
-  resolveServiceInstance(name) {
-    if (!name) {
-      return null;
-    }
-
-    const aliasMap = {
-      audio: 'audio',
-      ui: 'ui',
-      player: 'player',
-      progression: 'progression',
-      enemies: 'enemies',
-      physics: 'physics',
-      'xp-orbs': 'xpOrbs',
-      xpOrbs: 'xpOrbs',
-      healthHearts: 'healthHearts',
-      world: 'world',
-      effects: 'effects',
-      combat: 'combat',
-      renderer: 'renderer',
-    };
-
-    const directKey = aliasMap[name] || name;
-    let instance = null;
-
-    if (
-      this.services &&
-      Object.prototype.hasOwnProperty.call(this.services, directKey)
-    ) {
-      instance = this.services[directKey];
-    }
-
-    if (!instance && directKey !== name && this.services) {
-      if (Object.prototype.hasOwnProperty.call(this.services, name)) {
-        instance = this.services[name];
-      }
-    }
-
-    return instance || null;
-  }
-
   getConfiguredHullId() {
-    const settings = this.resolveServiceInstance('settings');
+    const settings = resolveService('settings', this.services);
     const gameplaySettings =
       settings && typeof settings.getCategoryValues === 'function'
         ? settings.getCategoryValues('gameplay') || null
@@ -991,7 +952,9 @@ export default class GameSessionService {
         ? gameplaySettings.selectedHull
         : DEFAULT_HULL_ID;
     // A hull locked in the Hangar flies as the default one.
-    return this.resolveServiceInstance('hangar')?.hullFor(selected) ?? selected;
+    return (
+      resolveService('hangar', this.services)?.hullFor(selected) ?? selected
+    );
   }
 
   resolveHullDefinition(hullId) {
@@ -1003,7 +966,7 @@ export default class GameSessionService {
   }
 
   applyConfiguredPlayerHull({ hullId } = {}) {
-    const player = this.resolveServiceInstance('player');
+    const player = resolveService('player', this.services);
     if (!player || typeof player.setHull !== 'function') {
       return null;
     }
@@ -1054,7 +1017,7 @@ export default class GameSessionService {
     ];
 
     servicesToReset.forEach((serviceName) => {
-      const instance = this.resolveServiceInstance(serviceName);
+      const instance = resolveService(serviceName, this.services);
       if (!instance || typeof instance.reset !== 'function') {
         return;
       }

@@ -10,8 +10,7 @@ describe('UISystem on a sector run', () => {
       tacticalHud: { layout: { showLayerBanner } },
       cinematics: { introActive: false, prepareLayer() {} },
       queueTransmission: vi.fn(),
-      getService: (name) =>
-        name === 'game-session' ? { sector: sectorById('dense-core') } : null,
+      dependencies: { 'game-session': { sector: sectorById('dense-core') } },
     };
 
     UISystem.prototype.handleLayerStarted.call(ui, { wave: 6 });
@@ -32,8 +31,7 @@ describe('UISystem on a sector run', () => {
       tacticalHud: { layout: { showLayerBanner } },
       cinematics: { introActive: false, prepareLayer() {} },
       queueTransmission: vi.fn(),
-      getService: (name) =>
-        name === 'game-session' ? { sector: sectorById('debris-wake') } : null,
+      dependencies: { 'game-session': { sector: sectorById('debris-wake') } },
     };
 
     UISystem.prototype.handleLayerStarted.call(ui, { wave: 1 });
@@ -52,8 +50,7 @@ describe('UISystem on a sector run', () => {
       tacticalHud: { layout: { showLayerBanner } },
       cinematics: { introActive: false, prepareLayer() {} },
       queueTransmission: vi.fn(),
-      getService: (name) =>
-        name === 'game-session' ? { sector: sectorById('the-crucible') } : null,
+      dependencies: { 'game-session': { sector: sectorById('the-crucible') } },
     };
 
     UISystem.prototype.handleLayerStarted.call(ui, { wave: 17 });

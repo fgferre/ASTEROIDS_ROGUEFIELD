@@ -20,6 +20,7 @@ import {
   STEP_SECONDS,
 } from '../__helpers__/headlessGame.js';
 import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
+import { resolveService } from '../../src/core/serviceUtils.js';
 
 const FIXTURE = fileURLToPath(
   new URL('../__fixtures__/golden-trace.json', import.meta.url)
@@ -165,7 +166,8 @@ function traceScenario({ layer, bossRush, cards = [], route, hull }) {
   };
 
   if (hull) {
-    game.session.resolveServiceInstance('hangar').owned[`${hull}-hull`] = true;
+    resolveService('hangar', game.session.services).owned[`${hull}-hull`] =
+      true;
     services.settings.setSetting('gameplay', 'selectedHull', hull);
   }
   game.session.startNewRun({ source: 'test', bossRush });

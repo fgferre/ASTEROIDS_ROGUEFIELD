@@ -20,6 +20,7 @@
 
 import { createPlayer, createRecorder, deserialize } from '../core/replay.js';
 import { CHEST_REVEAL_MS } from '../data/pickups.js';
+import { resolveService } from '../core/serviceUtils.js';
 
 /** `?replay=<url>` value, or null. */
 export function getReplayUrl() {
@@ -109,9 +110,9 @@ export function createReplayController({
   let chestDoneAt = null;
   // The viewer's own Stick Sensitivity while a replay flies the recorded one.
   let viewerStick = null;
-  const difficulty = session.resolveServiceInstance('difficulty');
-  const playerService = session.resolveServiceInstance('player');
-  const hangar = session.resolveServiceInstance('hangar');
+  const difficulty = resolveService('difficulty', session.services);
+  const playerService = resolveService('player', session.services);
+  const hangar = resolveService('hangar', session.services);
 
   const runStep = () => getStep() - runStartStep;
 

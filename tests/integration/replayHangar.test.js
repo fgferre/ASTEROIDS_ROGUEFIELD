@@ -4,6 +4,7 @@ import { createHeadlessGame } from '../__helpers__/headlessGame.js';
 import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 import { deserialize, serialize } from '../../src/core/replay.js';
 import { STARTING_DRAW } from '../../src/data/hangar.js';
+import { resolveService } from '../../src/core/serviceUtils.js';
 
 const STEPS = 600;
 const SCRIPT = [
@@ -49,7 +50,7 @@ afterEach(() => {
 });
 
 function profileA(game) {
-  const h = game.session.resolveServiceInstance('hangar');
+  const h = resolveService('hangar', game.session.services);
   for (const id of [
     'reinforced-plating',
     'spare-capacitor',
@@ -145,7 +146,7 @@ describe('replay Hangar setup', () => {
     };
     let viewerHangar;
     const [b0, bEnd] = run('B(empty)', (g) => {
-      viewerHangar = g.session.resolveServiceInstance('hangar');
+      viewerHangar = resolveService('hangar', g.session.services);
     });
     expect(viewerHangar.owned['reinforced-plating']).toBeFalsy();
     expect(viewerHangar.sealed).toEqual([]);
@@ -158,7 +159,8 @@ describe('replay Hangar setup', () => {
   it("starts a recorded hull on the recorder's setup when the viewer flies another", () => {
     const live = createHeadlessGame();
     profileA(live);
-    live.session.resolveServiceInstance('hangar').owned['bastion-hull'] = true;
+    resolveService('hangar', live.session.services).owned['bastion-hull'] =
+      true;
     live.services.settings.setSetting('gameplay', 'selectedHull', 'bastion');
     live.session.startNewRun({ source: 'test' });
     live.services.progression.levelCost = () => 10;
@@ -186,7 +188,7 @@ describe('replay Hangar setup', () => {
 
     expect(viewer.session.getConfiguredHullId()).not.toBe('bastion');
     expect(
-      viewer.session.resolveServiceInstance('hangar').owned[
+      resolveService('hangar', viewer.session.services).owned[
         'reinforced-plating'
       ]
     ).toBeFalsy();
@@ -198,7 +200,7 @@ describe('replay Hangar setup', () => {
 
   it("retries a replay's death on the recorder's setup, not the viewer's", () => {
     const live = createHeadlessGame();
-    const hangar = live.session.resolveServiceInstance('hangar');
+    const hangar = resolveService('hangar', live.session.services);
     hangar.owned['dash-coils'] = true;
     hangar.owned['salvage-magnet'] = true;
     live.session.startNewRun({ source: 'test' });

@@ -22,6 +22,7 @@ import {
   splitFieldRef,
 } from './settings/settingsGroups.js';
 import { asArray } from '../upgradeCatalog.js';
+import { resolveService } from '../../core/serviceUtils.js';
 
 export class SettingsPanel {
   /**
@@ -34,8 +35,9 @@ export class SettingsPanel {
    * `setHudBaseScale(scale)`: the HUD scale setting; HUD and viewport follow.
    * `livePreset()`: the preset Auto quality runs now (Graphics preview).
    * `openHudEditor()`: HUD & text → Edit HUD Layout.
-   * `getService(name)`: the live 'difficulty' (Pressure rung, greys Difficulty)
-   *   and 'player' (cannon on the nose, greys the aim-mode key).
+   * `dependencies`: UISystem's, for the live 'difficulty' (Pressure rung,
+   *   greys Difficulty) and 'player' (cannon on the nose, greys the aim-mode
+   *   key).
    */
   constructor({
     refs,
@@ -47,7 +49,7 @@ export class SettingsPanel {
     setHudBaseScale,
     livePreset,
     openHudEditor,
-    getService,
+    dependencies,
   }) {
     this.refs = refs;
     this.pauseSettingsBtn = pauseSettingsBtn;
@@ -58,7 +60,7 @@ export class SettingsPanel {
     this.setHudBaseScale = setHudBaseScale;
     this.livePreset = livePreset;
     this.openHudEditor = openHudEditor;
-    this.getService = getService;
+    this.dependencies = dependencies;
     this.settingsSchema = [];
     this.schemaByCategory = new Map();
     this.settingsState = {
@@ -719,11 +721,12 @@ export class SettingsPanel {
   inactiveState(valuesByCategory) {
     return {
       value: (categoryId, key) => valuesByCategory[categoryId]?.[key],
-      pressureRung: this.getService?.('difficulty')?.getPressure() ?? 0,
+      pressureRung:
+        resolveService('difficulty', this.dependencies)?.getPressure() ?? 0,
       // Out of a run (opened from the menu) there is no cannon: counts as nose.
       aimByNose:
         this.settingsState.source === 'menu' ||
-        (this.getService?.('player')?.noseAim ?? true),
+        (resolveService('player', this.dependencies)?.noseAim ?? true),
     };
   }
 

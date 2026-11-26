@@ -286,17 +286,13 @@ class MenuBackgroundSystem extends BaseSystem {
     this.restoreOriginalThreeUuidGenerator();
   }
 
-  getService(name) {
-    return resolveService(name, this.dependencies);
-  }
-
   getSettingsService({ refresh = false } = {}) {
     if (refresh) {
       this.settingsService = null;
     }
 
     if (!this.settingsService) {
-      this.settingsService = this.getService('settings');
+      this.settingsService = resolveService('settings', this.dependencies);
     }
 
     return this.settingsService;
@@ -458,7 +454,9 @@ class MenuBackgroundSystem extends BaseSystem {
     // New meshes draw Three's UUIDs: from the seeded stream.
     this.withSeededMathRandom(() =>
       this.hullPreview.setHull(
-        silhouette ? hull : this.getService('hangar').hullFor(hull),
+        silhouette
+          ? hull
+          : resolveService('hangar', this.dependencies).hullFor(hull),
         silhouette
       )
     );
@@ -643,7 +641,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
   getCurrentScreen() {
     try {
-      const state = this.getService('game-state');
+      const state = resolveService('game-state', this.dependencies);
       if (state && typeof state.getScreen === 'function') {
         return state.getScreen();
       }

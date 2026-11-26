@@ -10,13 +10,14 @@ import {
   GAME_WIDTH,
   PLAYER_SAFE_SPAWN_DISTANCE,
 } from '../../core/GameConstants.js';
+import { resolveService } from '../../core/serviceUtils.js';
 
 export class RetryCountdown {
   /**
    * `eventBus`: emits 'session-retry-countdown'.
    * `gameState`: the raw game state (its canvas, before the session's).
    * `canvas()`: the session's canvas, once initialized.
-   * `resolveServiceInstance(name)`: a session service by name, or null.
+   * `services`: the session's services, found with resolveService.
    * `hasDeathSnapshot()` / `getDeathSnapshot()`: what the retry restores.
    * `restoreFromSnapshot({ snapshot })`: restores it; false on failure.
    * `prepareRandomForScope(scope, options)`: resets or restores the RNG.
@@ -28,7 +29,7 @@ export class RetryCountdown {
     eventBus,
     gameState,
     canvas,
-    resolveServiceInstance,
+    services,
     hasDeathSnapshot,
     getDeathSnapshot,
     restoreFromSnapshot,
@@ -41,7 +42,7 @@ export class RetryCountdown {
     this.eventBus = eventBus;
     this.gameState = gameState;
     this.canvas = canvas;
-    this.resolveServiceInstance = resolveServiceInstance;
+    this.services = services;
     this.hasDeathSnapshot = hasDeathSnapshot;
     this.getDeathSnapshot = getDeathSnapshot;
     this.restoreFromSnapshot = restoreFromSnapshot;
@@ -146,7 +147,7 @@ export class RetryCountdown {
       gameUI.classList.remove('hidden');
     }
 
-    const player = this.resolveServiceInstance('player');
+    const player = resolveService('player', this.services);
     if (player) {
       player.isRetrying = true;
     }
@@ -186,8 +187,8 @@ export class RetryCountdown {
     this.clearPendingGameOverTransition();
     this.isRetryCountdownActive = false;
 
-    const player = this.resolveServiceInstance('player');
-    const world = this.resolveServiceInstance('world');
+    const player = resolveService('player', this.services);
+    const world = resolveService('world', this.services);
     const snapshot = this.getDeathSnapshot();
 
     if (!snapshot) {
@@ -254,7 +255,7 @@ export class RetryCountdown {
     // world-reset reseed them): the layer's draws go on from the death
     // (outside audit 8, verdict A9).
     if (snapshot.enemies?.random) {
-      this.resolveServiceInstance('enemies').restoreRandomStreams(
+      resolveService('enemies', this.services).restoreRandomStreams(
         snapshot.enemies.random
       );
     }
@@ -386,7 +387,7 @@ export class RetryCountdown {
       y: GAME_HEIGHT / 2,
     };
 
-    const enemies = this.resolveServiceInstance('enemies');
+    const enemies = resolveService('enemies', this.services);
     const canvas = this.canvas() || this.gameState?.canvas || null;
 
     if (!enemies || !canvas) {
