@@ -19,6 +19,7 @@
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { DAILY_DIFFICULTY } from '../data/difficulty.js';
 import {
+  BOSS_RUSH_LAYERS,
   bossRushDirectorFor,
   directorFor,
   nextBossRushLayer,
@@ -29,6 +30,8 @@ const DESCENT = Object.freeze({
   kind: 'descent',
   /** The campaign sector played (src/data/sectors.js), or null. */
   sector: null,
+  /** The run's first layer. */
+  firstLayer: 1,
   /** Levels taken before the first layer (a late sector's head start). */
   headStart: 0,
   /** The layer whose Warden wins the run. */
@@ -58,6 +61,8 @@ const DESCENT = Object.freeze({
   usesTodaysSeed: false,
   /** The preset every run of this kind flies, whatever was chosen, or null. */
   forcedDifficulty: null,
+  /** A won run counts on the Hangar's Pressure ladder. */
+  winClimbsPressure: true,
   /** The run's end writes today's Daily Field record. */
   writesTodaysRecord: false,
   /** The mode a recording of the run keeps (src/core/replay.js). */
@@ -76,6 +81,7 @@ const DAILY = Object.freeze({
 const BOSS_RUSH = Object.freeze({
   ...DESCENT,
   kind: 'bossRush',
+  firstLayer: BOSS_RUSH_LAYERS[0],
   nextLayer: (layer) => nextBossRushLayer(layer),
   layerPlan: (layer) => bossRushDirectorFor(layer),
   breatherTo: (layer) => nextBossRushLayer(layer),
@@ -84,6 +90,7 @@ const BOSS_RUSH = Object.freeze({
   goesOnAfterVictory: false,
   writesLayerRecord: false,
   writesRushRecord: true,
+  winClimbsPressure: false,
   replayMode: 'bossRush',
 });
 
@@ -92,6 +99,7 @@ function sectorMode(sector) {
     ...DESCENT,
     kind: 'sector',
     sector,
+    firstLayer: sector.layers[0],
     headStart: sector.headStart ?? 0,
     lastLayer: sector.layers[1],
     nextLayer: (layer) => Math.max(layer + 1, sector.layers[0]),

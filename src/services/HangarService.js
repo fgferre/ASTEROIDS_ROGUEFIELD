@@ -14,7 +14,7 @@ import {
 } from '../data/hangar.js';
 import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
-import { sectorById } from '../data/sectors.js';
+import { FIRST_RUN_MODE } from '../core/runMode.js';
 import { DEFAULT_HULL_ID } from '../data/shipModels.js';
 import {
   isPilotStale,
@@ -123,7 +123,7 @@ export default class HangarService {
 
     eventBus.on('game-started', (payload = {}) => this.startRun(payload));
     eventBus.on('boss-defeated', () => {
-      if (this.bossRush) this.bossRushWardens += 1;
+      if (this.mode.scoredByWardens) this.bossRushWardens += 1;
     });
     eventBus.on('run-won', () => {
       this.won = true;
@@ -151,10 +151,9 @@ export default class HangarService {
     });
   }
 
-  startRun({ bossRush = false, sector = null } = {}) {
+  startRun({ mode = FIRST_RUN_MODE } = {}) {
     this.won = false;
-    this.bossRush = bossRush;
-    this.sector = sectorById(sector);
+    this.mode = mode;
     this.bossRushWardens = 0;
     this.cacheSalvage = 0;
     this.runAwarded = 0;
@@ -183,7 +182,7 @@ export default class HangarService {
    */
   climbPressure() {
     const rung = this.difficulty.getPressure();
-    if (isProgressHeld() || this.bossRush || rung === 0) return;
+    if (isProgressHeld() || !this.mode.winClimbsPressure || rung === 0) return;
     if (rung > this.pressure.open) return;
     this.pressure.best = Math.max(this.pressure.best, rung);
     if (rung === this.pressure.open) {
@@ -234,8 +233,10 @@ export default class HangarService {
         layer: quit ? layer - 1 : layer,
         kills: runSummary.stats?.totalKills ?? runSummary.stats?.kills,
         won: this.won,
-        bossRushWardens: this.bossRush ? this.bossRushWardens : null,
-        firstLayer: this.sector?.layers[0] ?? 1,
+        bossRushWardens: this.mode.scoredByWardens
+          ? this.bossRushWardens
+          : null,
+        firstLayer: this.mode.firstLayer,
       }) +
         this.cacheSalvage) *
         multiplier
