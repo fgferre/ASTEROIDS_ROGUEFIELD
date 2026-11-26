@@ -164,7 +164,6 @@ export function createAsteroidGeometry(THREE, detailSeed, { detail = 5 } = {}) {
   // Triplanar shading does not need UVs; remove them and weld duplicated
   // vertices (UV seams) to avoid visible faceting/hard edges.
   if (geometry.getAttribute('uv')) geometry.deleteAttribute('uv');
-  if (geometry.getAttribute('uv2')) geometry.deleteAttribute('uv2');
   geometry = weldGeometryPositions(THREE, geometry, 1e-4);
   geometry.computeVertexNormals();
   if (typeof geometry.normalizeNormals === 'function') {

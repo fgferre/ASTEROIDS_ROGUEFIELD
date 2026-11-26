@@ -204,7 +204,7 @@ varying float vAcross;
 void main() {
   float a = min(1.0, abs(vAcross));
   gl_FragColor = vec4(vColor * (1.0 - a * a), 1.0);
-  #include <encodings_fragment>
+  #include <colorspace_fragment>
 }`;
 
 const MAX_POLYLINE = 64;
@@ -587,7 +587,7 @@ void main() {
   gl_FragColor = vHeat < 0.0
     ? vec4(vColor * (0.25 + 0.75 * facing), 1.0)
     : vec4(mix(vColor * 0.7, vec3(hot), core), 1.0);
-  #include <encodings_fragment>
+  #include <colorspace_fragment>
 }`;
 
 /** The shapes' triangles: { position, normal, part } flat arrays. */

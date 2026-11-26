@@ -80,7 +80,7 @@ void main() {
 ${SCENE_READ}
 varying vec2 vUv;
 void main() {
-  gl_FragColor = LinearTosRGB(vec4(sceneAt(vUv), 1.0));
+  gl_FragColor = sRGBTransferOETF(vec4(sceneAt(vUv), 1.0));
 }`,
 };
 
@@ -154,7 +154,7 @@ function skipDarkPointLights(THREE) {
 // 0a.8). The bloom's copy draw is hidden; `passes` add its result on frames
 // it ran.
 function foldBloom(bloomPass, passes) {
-  bloomPass.materialCopy.visible = false;
+  bloomPass.blendMaterial.visible = false;
   passes.forEach(({ uniforms }) => {
     uniforms.tBloom.value = bloomPass.renderTargetsHorizontal[0].texture;
     Object.defineProperty(uniforms.uBloom, 'value', {
@@ -207,7 +207,7 @@ export function setupThree(seeded) {
     powerPreference: 'high-performance',
   });
   renderer.setPixelRatio(1);
-  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = EXPOSURE;
   renderer.setClearColor(colorOf(THREE, PALETTE.background), 1);

@@ -97,7 +97,7 @@ void main() {
   color += uRim * edge * mix(0.03, 1.0, toward * toward);
   gl_FragColor = vec4(mix(color, uHaze, ${LOOK.haze.toFixed(2)}), uOpacity);
   #include <tonemapping_fragment>
-  #include <encodings_fragment>
+  #include <colorspace_fragment>
 }`;
 // The air outside the limb: a back-face shell, brightest toward the sun.
 const AIR = `
@@ -115,7 +115,7 @@ void main() {
   gl_FragColor = vec4(uRim * ${LOOK.air.toFixed(2)} * k
     * mix(0.04, 1.0, toward * toward) * uOpacity, 1.0);
   #include <tonemapping_fragment>
-  #include <encodings_fragment>
+  #include <colorspace_fragment>
 }`;
 
 // A shader material the set fades like its others (PlaceSets.apply sets

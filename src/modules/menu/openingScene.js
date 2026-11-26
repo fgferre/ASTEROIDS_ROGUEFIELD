@@ -104,7 +104,7 @@ void main() {
   vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
   float edge = smoothstep(0.35, 1.1, length(p));
   vec3 color = texture2D(tDiffuse, vUv).rgb * (1.0 - uVignette * edge);
-  gl_FragColor = LinearTosRGB(vec4(color, 1.0));
+  gl_FragColor = sRGBTransferOETF(vec4(color, 1.0));
 }`,
 };
 

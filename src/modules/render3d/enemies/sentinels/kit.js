@@ -143,7 +143,7 @@ export function createSentinelKit(kit, recipeViews) {
     [soot, SHINE.worn],
   ]);
   function merge(parts) {
-    const geometry = mergeStatic(
+    return mergeStatic(
       THREE,
       parts.map((part) => ({
         flat: true,
@@ -151,8 +151,6 @@ export function createSentinelKit(kit, recipeViews) {
         ...part,
       }))
     );
-    geometry.setAttribute('uv2', geometry.getAttribute('uv'));
-    return geometry;
   }
   const both = (part) => [
     part,

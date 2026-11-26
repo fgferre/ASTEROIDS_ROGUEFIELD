@@ -301,9 +301,8 @@ describe('an enemy’s 3D look from its content file alone', () => {
     expect(body.material.normalMap).toBeTruthy();
     expect(body.material.vertexColors).toBe(true);
     // the turned part and the light's socket get a UV map too
-    const { uv, uv2, position } = body.geometry.attributes;
+    const { uv, position } = body.geometry.attributes;
     expect(uv.count).toBe(position.count);
-    expect(uv2).toBe(uv);
     expect(() => recipeViews.lookOf({ finish: 'gloss' })).toThrow(
       "no finish 'gloss'"
     );

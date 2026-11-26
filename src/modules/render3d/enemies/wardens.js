@@ -222,11 +222,9 @@ export function createWardenViews(kit) {
       points.map(([x, y, z]) => v3(x, y, z))
     ).getPoints(steps);
 
-  // Parts merged into one geometry with uv2 for the aoMap.
+  // Parts merged into one geometry (the aoMap reads its uv).
   function merge(parts) {
-    const geometry = mergeStatic(THREE, parts);
-    geometry.setAttribute('uv2', geometry.getAttribute('uv'));
-    return geometry;
+    return mergeStatic(THREE, parts);
   }
 
   // The hot core of Prime and the Choir: an orb with a belt and two grooves,

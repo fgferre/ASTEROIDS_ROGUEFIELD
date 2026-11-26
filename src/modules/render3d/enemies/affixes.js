@@ -161,7 +161,7 @@ export function createAffixViews(kit) {
       ctx.translate(BADGE_TEXTURE / 2, BADGE_TEXTURE / 2);
       drawAffixBadge(ctx, ELITE_AFFIXES[id], BADGE_TEXTURE * 0.44, 5);
       const texture = new THREE.CanvasTexture(canvas);
-      texture.encoding = THREE.sRGBEncoding;
+      texture.colorSpace = THREE.SRGBColorSpace;
       badges[id] = new THREE.SpriteMaterial({
         map: texture,
         transparent: true,
