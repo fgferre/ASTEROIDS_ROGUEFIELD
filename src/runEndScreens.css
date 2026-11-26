@@ -873,24 +873,48 @@ body.touch-play[data-input-device='touch'] .end-screen kbd {
     margin: var(--space-2) 0 var(--space-1);
   }
 
+  /* The choice fits the height whole: the gaps tighten, not the text. */
   body.touch-play .end-screen--choice .ending-content {
     width: 100%;
-    padding: var(--space-2) 0;
+    padding: var(--space-1) 0;
+  }
+
+  body.touch-play .end-screen--choice :is(.end-title, .ending-line) {
+    margin-top: var(--space-1);
   }
 
   body.touch-play .end-screen--choice .ending-options {
     grid-template-columns: 1fr 1fr;
     gap: var(--space-3);
-    margin-top: var(--space-3);
+    margin-top: var(--space-2);
   }
 
   body.touch-play .end-screen--choice .ending-option {
     min-height: 0;
-    padding: var(--space-3);
+    gap: 6px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  body.touch-play .end-screen--choice .ending-option__title {
+    font-size: calc(35 * var(--fs));
+  }
+
+  body.touch-play .end-screen--choice .ending-option__text {
+    line-height: 1.3;
+  }
+
+  body.touch-play .end-screen--choice .ending-stakes {
+    gap: var(--space-1);
+    margin-top: 0;
+    padding-top: var(--space-2);
   }
 
   body.touch-play .ending-stake {
     grid-template-columns: calc(120 * var(--u)) 1fr;
     gap: var(--space-2);
+  }
+
+  body.touch-play .end-screen--choice .ending-stake__what {
+    line-height: 1.25;
   }
 }

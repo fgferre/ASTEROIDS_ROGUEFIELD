@@ -424,6 +424,14 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   como com movimento reduzido, queima no lugar). Toda vitória no Crisol toca o final, também para quem já venceu.
   Cartão de conferência `final-do-jogo-5` (25/11) com os dois finais filmados pelo jogo; à pergunta "o final está
   como queria?", depois de ver o cartão: _"Está bom"_. Ele não disse que jogou. Fecha quando ele aprovar jogando.
+- **(50)** A escolha do final cortada no celular (25/11, num recado à coordenadora, ao saber pelo cartão do final que
+  por toque as últimas linhas de cada opção ficavam fora da tela): _"se a escolha do final está cortando texto no
+  celular, quero ver isso antes de publicar — não quero estrear o final novo cortado no celular."_ Construído no ramo
+  `historia/final`: no celular deitado, por toque, a tela da escolha cabe inteira na altura, as duas opções com todas
+  as linhas, sem rolar, a 844×390 e a 667×375 (também a 932×430). Só os espaços apertaram; o texto não mudou, e o
+  título de cada opção ficou um pouco menor (32 para 28), porque STEWARDSHIP passava da borda na tela mais estreita.
+  No computador e no tablet a tela ficou igual. Num celular de 568×320 ainda não cabe. Cartão de conferência
+  `final-do-jogo-6`. Fecha quando ele aprovar vendo.
 
 ## Cenário (palavras dele, 19/11, na conferência)
 
