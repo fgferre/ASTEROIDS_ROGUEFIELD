@@ -234,6 +234,16 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   setupEventListeners() {
+    // A cinematic that holds the run (the story, the journey, the intro)
+    // freezes the effects, a flash lit at the launch (a head start's
+    // level-ups) with them: the view keeps it off the screen until the run
+    // goes on (fieldMirrors.js).
+    this.registerEventListener('cinematic-started', ({ holdsRun } = {}) => {
+      this.flashHeld = Boolean(holdsRun);
+    });
+    this.registerEventListener('cinematic-ended', () => {
+      this.flashHeld = false;
+    });
     const registerBossEvent = (eventName, handler) => {
       if (typeof handler !== 'function') {
         return;

@@ -445,6 +445,16 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   são pequenas."_). Construído no ramo `historia/final`: por toque num tablet deitado a tela é desenhada maior; a
   menor letra foi de 7 para 12 px e as frases das opções de 11 para 18 (a 1024×768), sem estourar a tela; tablets
   maiores ficam no mesmo tamanho. No computador nada mudou. Cartão `final-do-jogo-7`. Fecha quando ele aprovar vendo.
+- **(56)** O clarão dourado preso na abertura (25/11, ao saber que o defeito é real e está também na 0.8.1
+  publicada: _"vamos resolver tudo antes de publicar,,,"_). Quem já venceu algum setor via as cenas de antes da partida
+  (a história da Wake, a viagem, a descida) tingidas de âmbar; quem começava do zero via roxo e laranja. A causa: o
+  piloto com progresso começa a partida já com níveis, o jogo acende o clarão dourado de subir de nível no lançamento,
+  e essas cenas seguram a partida parada, então o clarão não se apagava. Construído no ramo `historia/final`:
+  enquanto uma dessas cenas segura a partida o clarão não é desenhado; ele aparece como sempre no instante em que a
+  partida começa e a cada nível ganho jogando. Medido em três lançamentos com os nove setores vencidos: aceso a
+  abertura inteira antes, apagado em todas as amostras depois; do começo da partida em diante, igual. **Muda o que ele
+  vê há tempos:** as cenas de abertura dele deixam de ser âmbar. Cartão `final-do-jogo-7`, com o antes e depois.
+  Fecha quando ele aprovar vendo.
 
 ## Cenário (palavras dele, 19/11, na conferência)
 

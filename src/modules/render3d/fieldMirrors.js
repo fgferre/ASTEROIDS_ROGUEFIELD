@@ -268,7 +268,8 @@ export function mirrorEffects(t, effects, impact) {
     );
   }
 
-  const screenFlash = effects.screenFlash;
+  // a flash frozen with the run under a cinematic's hold is not shown
+  const screenFlash = effects.flashHeld ? null : effects.screenFlash;
   const alpha =
     screenFlash && screenFlash.timer > 0 && screenFlash.duration > 0
       ? (screenFlash.timer / screenFlash.duration) * screenFlash.intensity
