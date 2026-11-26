@@ -549,6 +549,9 @@ class MenuBackgroundSystem extends BaseSystem {
 
     this.isActive = false;
     this.opening?.release();
+    // Its drawing buffer too (about 300 MB at 2560×1600 with antialiasing,
+    // held the whole run): start() gives it its size back.
+    this.renderer.setSize(1, 1, false);
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
       this.animationFrame = null;

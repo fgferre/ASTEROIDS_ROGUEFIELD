@@ -53,6 +53,7 @@ export const NEXT = {
     'The run session no longer forwards about twenty calls to its own parts; the tests reach the part directly, so the file stays under its size limit and the game plays the same.', // not confirmed
     'A shield blast, a mine blast or the Reactive Brake no longer nudges a phased Shade when nothing else is in range (it already ignored it when another enemy was near); the Shade is invisible then and steers itself again the next frame, so nobody sees it.', // not confirmed
     'The garbage-collection manager is gone: the pools already trim themselves on the same schedule, so nothing in the game changes.', // not confirmed
+    'While a run plays, the menu behind it no longer keeps its full-size picture in the graphics card: about 380 MB freed on a 2560×1600 screen (less on a phone), and the menu is back as before when the run ends; nobody sees it, the game just holds less memory.', // not confirmed
   ],
 };
 
