@@ -172,12 +172,6 @@ export class WaveManager {
 
   // The schedule, its clock, the modifier and the random scopes live in their
   // modules; these keep the names EnemySystem, the session and tests use.
-  // Renderer3D reads the sector here until its own step (item 8, this
-  // branch's last commit).
-  get sector() {
-    return this.mode.sector;
-  }
-
   get layerSchedule() {
     return this.schedule.layerSchedule;
   }

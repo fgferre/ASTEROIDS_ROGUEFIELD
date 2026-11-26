@@ -8,6 +8,7 @@ import {
   endingBeats,
 } from '../../../src/core/cinematics.js';
 import UISystem from '../../../src/modules/UISystem.js';
+import { runModeFor } from '../../../src/core/runMode.js';
 import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
 import { RunEndScreens } from '../../../src/modules/ui/RunEndScreens.js';
 import {
@@ -544,25 +545,30 @@ describe('RunCinematics', () => {
     expect(keys()).toEqual([
       ...travelTransmissions('debris-wake').map((entry) => entry.key),
       ...prologueTransmissions().map((entry) => entry.key),
-      ...runVoiceLines(launch).map((entry) => entry.key),
+      ...runVoiceLines(runModeFor(launch)).map((entry) => entry.key),
     ]);
     expect(keys()).toContain('chapter:debris-wake');
     expect(keys()).toContain('boss:quarry-maw:warning');
 
     // The run starts without its journey (a sector already won): its
     // fight's lines alone, from the start.
-    cinematics.armTravel({ sector: 'debris-wake', source: 'start-game-btn' });
+    cinematics.armTravel({
+      sector: 'debris-wake',
+      source: 'start-game-btn',
+      mode: runModeFor({ sector: 'debris-wake' }),
+    });
     expect(keys()).toEqual(
-      runVoiceLines({ sector: 'debris-wake' }).map((e) => e.key)
+      runVoiceLines(runModeFor({ sector: 'debris-wake' })).map((e) => e.key)
     );
 
     // A Descent readies the stretch ahead as each layer starts; a sector
     // run or a Boss Rush keeps what its start readied.
     emit.mockClear();
-    cinematics.prepareLayer(4, null, false);
-    expect(keys()).toEqual(runVoiceLines({}, 4).map((entry) => entry.key));
-    cinematics.prepareLayer(3, { id: 'debris-wake' }, false);
-    cinematics.prepareLayer(5, null, true);
+    const descent = runModeFor({});
+    cinematics.prepareLayer(4, descent);
+    expect(keys()).toEqual(runVoiceLines(descent, 4).map((entry) => entry.key));
+    cinematics.prepareLayer(3, runModeFor({ sector: 'debris-wake' }));
+    cinematics.prepareLayer(5, runModeFor({ bossRush: true }));
     expect(emit).toHaveBeenCalledTimes(1);
 
     cinematics.prepareEnding();

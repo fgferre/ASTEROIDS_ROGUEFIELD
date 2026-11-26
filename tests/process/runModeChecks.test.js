@@ -8,11 +8,6 @@
 // Allowed for good: runMode.js itself, the recording's file format
 // (core/replay.js), the menu's launch options (menuButtons.js, the object's
 // inputs) and the story's Boss Rush line (content).
-//
-// Allowed until this branch's last commit, which waits for the coordinator's
-// word (the ending's screens and the 3D files are another conversation's):
-// the files listed in PENDING and the lines in PENDING_LINES. The last commit
-// empties both; a pending entry that no longer matches anything fails here.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -36,36 +31,6 @@ const ALLOWED_LINES = [
   ['src/data/story.js', 'bossRush:'],
   ['src/modules/ui/transmissions.js', 'text: STORY.bossRush,'],
 ];
-const PENDING = [
-  'src/modules/ui/RunEndScreens.js',
-  'src/modules/ui/runTimeline.js',
-  'src/modules/ui/runCinematics.js',
-  'src/modules/render3d/Renderer3D.js',
-];
-const PENDING_LINES = [
-  [
-    'src/modules/ui/transmissions.js',
-    'function layerLines(layer, sector, bossRush) {',
-  ],
-  ['src/modules/ui/transmissions.js', 'const director = bossRush'],
-  [
-    'src/modules/ui/transmissions.js',
-    'bossRush && layer === BOSS_RUSH_LAYERS[0] && bossRushTransmission(),',
-  ],
-  [
-    'src/modules/ui/transmissions.js',
-    'export function runVoiceLines({ sector: id, bossRush } = {}, layer = 1) {',
-  ],
-  [
-    'src/modules/ui/transmissions.js',
-    'const rush = Boolean(bossRush) && !sector;',
-  ],
-  ['src/services/session/runEnd.js', 'bossRush: {'],
-  [
-    'src/services/GameSessionService.js',
-    "bossRush: this.mode.kind === 'bossRush',",
-  ],
-];
 
 const CHECKS = [
   ['a bossRush flag', /\bbossRush\b/],
@@ -85,7 +50,7 @@ const sources = files('src')
   .map((f) => f.replaceAll('\\', '/'))
   .filter((f) => !f.startsWith('src/exported-assets/'))
   .filter((f) => !f.startsWith('src/public/libs/'))
-  .filter((f) => !ALLOWED.includes(f) && !PENDING.includes(f));
+  .filter((f) => !ALLOWED.includes(f));
 
 const codeLines = (f) =>
   readFileSync(f, 'utf8')
@@ -94,9 +59,7 @@ const codeLines = (f) =>
     .filter(({ text }) => !/^(\/\/|\/\*|\*)/.test(text));
 
 const excused = ({ f, text }) =>
-  [...ALLOWED_LINES, ...PENDING_LINES].some(
-    ([file, line]) => file === f && text === line
-  );
+  ALLOWED_LINES.some(([file, line]) => file === f && text === line);
 
 describe('one kind of run, asked of one object', () => {
   it.each(CHECKS)('no %s outside runMode.js', (_, pattern) => {
@@ -106,17 +69,5 @@ describe('one kind of run, asked of one object', () => {
       .filter((line) => !excused(line))
       .map(({ f, line, text }) => `${f}:${line}: ${text}`);
     expect(offenders).toEqual([]);
-  });
-
-  it('every pending exception still has something to excuse', () => {
-    const stale = [
-      ...PENDING.filter(
-        (f) => !CHECKS.some(([, p]) => p.test(readFileSync(f, 'utf8')))
-      ),
-      ...PENDING_LINES.filter(
-        ([f, line]) => !codeLines(f).some(({ text }) => text === line)
-      ).map(([f, line]) => `${f}: ${line}`),
-    ];
-    expect(stale).toEqual([]);
   });
 });

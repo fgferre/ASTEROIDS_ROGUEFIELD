@@ -17,6 +17,7 @@
 // menuButtons.js, GameSessionService.startNewRun).
 
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
+import { biomeForLayer } from '../data/biomes.js';
 import { DAILY_DIFFICULTY } from '../data/difficulty.js';
 import {
   BOSS_RUSH_LAYERS,
@@ -58,6 +59,14 @@ const DESCENT = Object.freeze({
   warningShowsRushBanner: false,
   /** The voices are readied layer by layer, not all at the start. */
   voicesByLayer: true,
+  /**
+   * The layers whose lines a run readies from `layer`: a Descent's to the end
+   * of its chapter and one layer on, a sector's or a Boss Rush's all of them.
+   */
+  voiceLayers: (layer) => {
+    const last = Math.max(layer, biomeForLayer(layer).layers[1]) + 1;
+    return Array.from({ length: last - layer + 1 }, (_, i) => layer + i);
+  },
   /** A Warden before the last one gives a card pick. */
   wardensGivePicks: false,
   /** The run is scored by the Wardens it kills (record, Salvage). */
@@ -111,6 +120,7 @@ const BOSS_RUSH = Object.freeze({
   layerBannerTitle: 'BOSS RUSH',
   warningShowsRushBanner: true,
   voicesByLayer: false,
+  voiceLayers: () => BOSS_RUSH_LAYERS,
   wardensGivePicks: true,
   scoredByWardens: true,
   goesOnAfterVictory: false,
@@ -137,6 +147,10 @@ function sectorMode(sector) {
     deepFieldAt: () => false,
     shownLayer: (layer) => Math.max(1, localLayer(sector, layer)),
     voicesByLayer: false,
+    voiceLayers: () => {
+      const [first, last] = sector.layers;
+      return Array.from({ length: last - first + 1 }, (_, i) => first + i);
+    },
     goesOnAfterVictory: false,
     writesLayerRecord: false,
     writesSectorRecord: true,

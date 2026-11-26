@@ -13,7 +13,7 @@ function clearIn(seconds) {
   const runEnd = new RunEnd({});
   runEnd.mode = runModeFor({ bossRush: true });
   runEnd.bossRushWardens = 3;
-  return runEnd.recordRunReached({}, { won: true, clearTime: seconds }).bossRush
+  return runEnd.recordRunReached({}, { won: true, clearTime: seconds }).rush
     .newBest;
 }
 

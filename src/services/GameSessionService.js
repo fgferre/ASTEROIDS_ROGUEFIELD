@@ -669,9 +669,7 @@ export default class GameSessionService {
     this.emitGameStarted({
       source,
       timestamp: Date.now(),
-      // runCinematics reads the kind from these two until it asks the mode
-      // (this branch's last commit); the music starts the sector's score.
-      bossRush: this.mode.kind === 'bossRush',
+      // The music starts the sector's score from its id.
       sector: this.mode.sector?.id ?? null,
       mode: this.mode,
       replay,
@@ -715,6 +713,8 @@ export default class GameSessionService {
     this.runEnd.scheduleGameOverScreenTransition({
       ...data,
       ...this.runEnd.recordRunReached(data),
+      // The end screens ask the run's kind (src/core/runMode.js).
+      mode: this.mode,
     });
 
     const retriesRemaining = this.retry.getRetryCount();

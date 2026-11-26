@@ -7,6 +7,7 @@ import {
 import { SCREEN_INPUT_LOCKOUT_MS } from '../../../src/modules/ui/LevelUpScreen.js';
 import { STORY } from '../../../src/data/story.js';
 import { loadRecords } from '../../../src/services/runRecords.js';
+import { runModeFor } from '../../../src/core/runMode.js';
 
 describe('Run end screens', () => {
   let restoreDom;
@@ -182,6 +183,7 @@ describe('Run end screens', () => {
           wave: { current: 10 },
           stats: { timeElapsed: 512, timeline: [] },
           sector,
+          mode: runModeFor({ sector: sector?.id ?? null }),
         },
       });
     const show = (data) => screens.showVictoryScreen({ data });
@@ -315,7 +317,8 @@ describe('Run end screens', () => {
     show({
       wave: { current: 15 },
       stats: { timeElapsed: 126, timeline: [] },
-      bossRush: { stage: 3, bestStage: 3, bestTime: 120, newBest: true },
+      rush: { stage: 3, bestStage: 3, bestTime: 120, newBest: true },
+      mode: runModeFor({ bossRush: true }),
     });
     expect(victory.body.innerHTML).toContain('New best');
   });

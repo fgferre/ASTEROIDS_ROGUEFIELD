@@ -44,6 +44,7 @@ import {
   endingBeats,
 } from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
+import { runModeFor } from '../../core/runMode.js';
 import { SECTORS, sectorById } from '../../data/sectors.js';
 import { STORY } from '../../data/story.js';
 import {
@@ -191,7 +192,7 @@ export class RunCinematics {
     this.travelTo = travelDestination(start, freeze);
     this.tellsStory = tellsStory(start, this.travelTo, freeze);
     this.cards = this.travelTo ? [] : null;
-    this.readyVoices(start, this.travelTo);
+    this.readyVoices(start, this.travelTo, start.mode);
   }
 
   /**
@@ -202,29 +203,29 @@ export class RunCinematics {
     // The sector's music is fetched meanwhile (audio/SectorScore.js).
     if (start.sector)
       this.eventBus.emit('sector-picked', { sector: start.sector });
-    this.readyVoices(start, travelDestination(start));
+    this.readyVoices(start, travelDestination(start), runModeFor(start));
   }
 
   /**
    * The recordings (audio/voiceLines.js) of the journey to `to` (none: null)
-   * and of every line run `start` can say in its fight load now, in place of
-   * the ones loaded before, so each line speaks as it shows.
+   * and of every line a run in `mode` can say in its fight load now, in place
+   * of the ones loaded before, so each line speaks as it shows.
    */
-  readyVoices(start, to) {
+  readyVoices(start, to, mode) {
     const entries = to ? travelTransmissions(to) : [];
     if (tellsStory(start, to)) entries.push(...prologueTransmissions());
-    entries.push(...runVoiceLines(start));
+    entries.push(...runVoiceLines(mode));
     this.eventBus.emit('voice-lines-coming', { entries });
   }
 
   /**
-   * Layer `layer` of a run in `sector` (or null) starts: a Descent readies
-   * the voices of the stretch ahead (runVoiceLines), a sector run or a Boss
-   * Rush has all of its own since its start.
+   * Layer `layer` of a run in `mode` starts: a Descent readies the voices of
+   * the stretch ahead (runVoiceLines), a sector run or a Boss Rush has all of
+   * its own since its start.
    */
-  prepareLayer(layer, sector, bossRush) {
-    if (sector || bossRush) return;
-    const entries = runVoiceLines({}, layer);
+  prepareLayer(layer, mode) {
+    if (!mode.voicesByLayer) return;
+    const entries = runVoiceLines(mode, layer);
     this.eventBus.emit('voice-lines-coming', { entries });
   }
 

@@ -118,6 +118,8 @@ export class RunEnd {
       const data = {
         ...summary,
         ...this.recordRunReached(summary, { won: true, clearTime }),
+        // The end screens ask the run's kind (src/core/runMode.js).
+        mode: this.mode,
       };
       this.setScreen('victory');
       this.emitScreenChanged('victory', { source: 'run-won', data });
@@ -173,7 +175,7 @@ export class RunEnd {
    * Records the layer and time in a run summary (and in today's Daily Field
    * record on a Daily Field run); returns `{ bestLayer }` for the end screen.
    * A Boss Rush records only its clear time (on a win) and returns
-   * `{ bossRush: { stage, bestStage, bestTime } }`, `stage` the Warden it
+   * `{ rush: { stage, bestStage, bestTime } }`, `stage` the Warden it
    * reached. A sector run records only its clear (`won`) and returns
    * `{ sector: { id, time, bestTime, firstClear, next } }`, `next` the next
    * sector's id on a win, else null. `clearTime` (a win): the run's time when
@@ -209,7 +211,7 @@ export class RunEnd {
       const before = loadRecords().bossRushTime;
       const records = updateRecords({ bossRushTime: time });
       return {
-        bossRush: {
+        rush: {
           stage: Math.min(this.bossRushWardens + 1, BOSS_RUSH_LAYERS.length),
           bestStage: records.bossRushStage,
           bestTime: records.bossRushTime,

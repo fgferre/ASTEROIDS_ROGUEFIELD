@@ -384,9 +384,7 @@ class UISystem extends BaseSystem {
     this.transmissionLayer = layer;
     const mode = runModeOf(this);
     const { sector } = mode;
-    // runCinematics' third argument holds back the layer-by-layer voices
-    // until it asks the mode itself (this branch's last commit).
-    this.cinematics.prepareLayer(layer, sector, !mode.voicesByLayer);
+    this.cinematics.prepareLayer(layer, mode);
     // The intro's end shows this layer's title card.
     if (this.cinematics.introActive) return;
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
@@ -672,8 +670,8 @@ class UISystem extends BaseSystem {
       }
     });
 
-    // The ending's flow: it asks the mode in this branch's last commit, with
-    // the ending's screens.
+    // The won sector's id rides on the event: the ending's choice and the
+    // win's lines are about that sector.
     this.registerEventListener('run-won', ({ wave, sector } = {}) => {
       this.runWon = true;
       this.chestCeremony.clear();
