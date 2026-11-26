@@ -9,6 +9,7 @@
 // targeting and before the shots fly; the card tuning lives in CardEffects
 // and the hit path in HitResolution.
 
+import { devChoice } from '../../core/devChoice.js';
 import { TRAIL_LENGTH } from '../../core/GameConstants.js';
 import {
   COMBAT_SHOOT_COOLDOWN,
@@ -34,6 +35,19 @@ import {
 } from './volleyLanes.js';
 
 // Plan 01.07: validate spread mode mutations to prevent T-07-02 tampering.
+// Dev-only `?cadencia=B`: the cooldown today's clock really takes, the steps
+// of 1/60 s that float-add up to `base`, times 1/60.
+const STEP = 1 / 60;
+function todaysCooldown(base) {
+  let clock = 0;
+  let steps = 0;
+  while (clock < base && steps < 100000) {
+    clock += STEP;
+    steps += 1;
+  }
+  return steps * STEP;
+}
+
 const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
 // Trail alpha ramp, tail → head (precomputed: one string per step).
 const lanceTrailStyles = (color) =>
@@ -93,6 +107,13 @@ export class Weapons {
       ? Math.max(0, COMBAT_SHOOT_COOLDOWN)
       : 0.3;
     this.baseShootCooldown = this.shootCooldown;
+    // Dev-only `?cadencia=A|B` (card decision, finding 6): carry the clock's
+    // remainder; B also rounds the base cooldown to today's step count.
+    this.clockMode = devChoice('cadencia');
+    if (this.clockMode === 'B') {
+      this.baseShootCooldown = todaysCooldown(this.baseShootCooldown);
+      this.shootCooldown = this.baseShootCooldown;
+    }
 
     // Plan 01.07 FIX-05 — spread mode state (the aim mode lives in Targeting).
     // Default = concentrated + auto so the centerline fix lands silently for
@@ -384,7 +405,7 @@ export class Weapons {
     }
     this._concentratedLanes = null;
 
-    this.lastShotTime = 0;
+    this.restartClock();
 
     if (firedTargets.length) {
       const firstTarget = firedTargets[0]?.position || null;
@@ -430,10 +451,25 @@ export class Weapons {
     }
   }
 
+  // A shot was fired: the clock waits one cooldown plus `extra` s. Today it
+  // resets to -extra; with `?cadencia` it keeps the remainder (at most 0.05 s).
+  restartClock(extra = 0) {
+    if (!this.clockMode) {
+      this.lastShotTime = 0 - extra;
+      return;
+    }
+    const carry = Math.min(
+      0.05,
+      Math.max(0, this.lastShotTime - this.shootCooldown)
+    );
+    this.lastShotTime = carry - extra;
+  }
+
   canShoot() {
     // [SMART AUTO-FIRE] Allow firing if cooldown is ready.
     // We no longer require a forced target lock.
-    return this.lastShotTime >= this.shootCooldown;
+    const slack = this.clockMode ? 1e-9 : 0;
+    return this.lastShotTime >= this.shootCooldown - slack;
   }
 
   // [SMART AUTO-FIRE] Helper: Fire forward relative to ship rotation
@@ -500,7 +536,7 @@ export class Weapons {
       });
     }
 
-    this.lastShotTime = 0;
+    this.restartClock();
 
     if (firedTargets.length) {
       // Plan 01.07 Task 2: centerline = the on-axis aim point at fixed range

@@ -1,4 +1,5 @@
 // src/modules/PlayerSystem.js
+import { devChoice } from '../core/devChoice.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../core/GameConstants.js';
 import shipModels from '../data/shipModels.js';
@@ -143,6 +144,7 @@ class PlayerSystem extends BaseSystem {
     // No thrust key held and no dash this step (updateMovement): Reactor
     // Bleed and Grav Anchor read it.
     this.enginesIdle = true;
+    this.bleedChoice = devChoice('bleed');
     this.currentHull = null;
     this._currentHullMetrics = {
       outline: [],
@@ -541,7 +543,9 @@ class PlayerSystem extends BaseSystem {
     this.enginesIdle =
       !thrust.isMainManual &&
       !thrust.isAuxManual &&
-      !(this.maneuvers.dashTimer > 0);
+      !(this.maneuvers.dashTimer > 0) &&
+      // dev-only `?bleed=B`: turning and strafing also cancel the bonus
+      !(this.bleedChoice === 'B' && thrust.isSideManual);
     this.updateTurret(deltaTime);
     this.thrusters.emitThrusterEffects(thrust);
   }

@@ -11,6 +11,7 @@
 // weapon evolves on itself brings none of its lance evolution here (the
 // Harmonic's lances keep it: its own forms are its beam's).
 
+import { devChoice } from '../../core/devChoice.js';
 import { GameDebugLogger } from '../../utils/dev/GameDebugLogger.js';
 import {
   KNOCKBACK_BASE,
@@ -45,6 +46,8 @@ export class HitResolution {
     this.weapons = weapons;
     this.cards = cards;
     this.emit = emit;
+    // dev-only `?matriz9=A`: Targeting Matrix 2 gives the Scatter its threat focus
+    this.matrixScatter = devChoice('matriz9') === 'A';
 
     this.resetProspectorCarry();
   }
@@ -116,6 +119,15 @@ export class HitResolution {
       enemy.health < enemy.maxHealth * execute.threshold
     ) {
       requestedDamage *= execute.damageMultiplier;
+    }
+    const focus = cards.cardEffects.threatFocus;
+    if (
+      this.matrixScatter &&
+      weapons.weaponId === 'scatter' &&
+      focus?.damageMultiplier >= 1.2 &&
+      (enemy.elite || enemy.type === 'herald' || enemy.type === 'boss')
+    ) {
+      requestedDamage *= focus.damageMultiplier;
     }
     // A beam's `extraFragments`: a large/medium rock it kills splits once
     // more per fragment, along the same seams (generateFragments is seeded by
