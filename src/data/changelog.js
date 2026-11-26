@@ -45,7 +45,6 @@ export const NEXT = {
     "Settings (F10, or View on a pad) no longer open over the level-up cards, a chest's cards or the ending's choice: under Settings, Enter, Space, 1 to 3 or A picked a card, closed the chest or chose and saved an ending without you seeing it, and the run went on with an invisible Settings still open. They open again as soon as the choice is made.", // not confirmed
     "On a tablet, the ending's choice is drawn at a readable size: its smallest letters were about half as tall.", // not confirmed
     'Card texts no longer promise what a weapon cannot get: the Afterburn Lance sells no lock-on range to weapons that never aim or cannot reach that far (the Shard Halo, the Furnace Corona, the Arc Caster and the Scatter Coil), and the Heat Sink, the Overclocked Core, Gyro Servos and the Targeting Matrix tell the Halo what its speed-up really is: the blades may cut the same enemy again sooner.', // not confirmed
-    "With a sector already won, the scenes before a run (the story, the journey, the descent) no longer sit under a gold tint: the head start's level-up flash stayed lit over them until the run began.", // not confirmed
     "Launching from the map a sector that begins with a head start (every sector after the first), the scenes before the run (the story, the journey, the descent) no longer sit under a gold tint: the head start's level-up flash stayed lit over them until the run began.", // not confirmed
   ],
   unseen: [
