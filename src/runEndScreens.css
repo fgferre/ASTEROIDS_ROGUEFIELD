@@ -918,3 +918,22 @@ body.touch-play[data-input-device='touch'] .end-screen kbd {
     line-height: 1.25;
   }
 }
+
+/* The choice by touch on a tablet: the 1920 layout scaled to the window drew
+   its text at 7 to 10 px; a floor on the unit and the type, labels 12 px. */
+@media (min-height: 501px) {
+  body.touch-play .end-screen--choice {
+    --u: max(
+      min(calc(100vw / 1920), calc(100vh / 1080)),
+      min(0.85px, calc(100vw / 1150))
+    );
+    --fs: calc(
+      max(min(calc(100vw / 1920), calc(100vh / 1080)), 0.9px) *
+        var(--text-scale)
+    );
+  }
+
+  body.touch-play .end-screen--choice :is(.end-kicker, .ending-stake__who) {
+    font-size: max(var(--text-xs), calc(13 * var(--fs)));
+  }
+}

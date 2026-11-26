@@ -432,6 +432,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   título de cada opção ficou um pouco menor (32 para 28), porque STEWARDSHIP passava da borda na tela mais estreita.
   No computador e no tablet a tela ficou igual. Num celular de 568×320 ainda não cabe. Cartão de conferência
   `final-do-jogo-6`. Fecha quando ele aprovar vendo.
+- **(52)** No tablet, as letras da tela da escolha do final são pequenas (25/11, ao decidir resolver os defeitos
+  conhecidos antes de publicar: _"vamos resolver antes de publicar entao, nao tem porque... a nao ser que me convença
+  do contrario com bons argumentos..."_; da lista que ele colou da página de publicar: _"Tablet: as letras dessa tela
+  são pequenas."_). Construído no ramo `historia/final`: por toque num tablet deitado a tela é desenhada maior; a
+  menor letra foi de 7 para 12 px e as frases das opções de 11 para 18 (a 1024×768), sem estourar a tela; tablets
+  maiores ficam no mesmo tamanho. No computador nada mudou. Cartão `final-do-jogo-7`. Fecha quando ele aprovar vendo.
 
 ## Cenário (palavras dele, 19/11, na conferência)
 
