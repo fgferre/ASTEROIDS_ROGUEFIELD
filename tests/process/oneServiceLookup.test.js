@@ -4,7 +4,8 @@
 // session's resolveServiceInstance with its own list of nicknames, and reading
 // a service straight off a dependencies object by its name in brackets.
 // serviceUtils.js is where the one way lives, so it may read them; the
-// gitignored exported-assets/ (the owner's board) is not the game.
+// gitignored exported-assets/ (the owner's board) is not the game, and
+// public/libs/ holds other people's minified code.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,7 +23,8 @@ const files = (dir) =>
 const sources = files('src')
   .map((f) => f.replaceAll('\\', '/'))
   .filter((f) => f !== 'src/core/serviceUtils.js')
-  .filter((f) => !f.startsWith('src/exported-assets/'));
+  .filter((f) => !f.startsWith('src/exported-assets/'))
+  .filter((f) => !f.startsWith('src/public/libs/'));
 
 // Every line that matches, as "file:line: text".
 const offenders = (pattern) =>

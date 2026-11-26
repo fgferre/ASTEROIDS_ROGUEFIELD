@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { WaveManager } from '../../src/modules/enemies/managers/WaveManager.js';
+import { runModeFor } from '../../src/core/runMode.js';
 import {
   BOSS_RUSH_BREATHER_SECONDS,
   LAYER_MODIFIERS,
@@ -517,7 +518,7 @@ describe('WaveManager Boss Rush', () => {
   it('plays only the Warden layers, a breather and a warning between them', () => {
     const field = createField();
     const { manager, active, emits } = field;
-    manager.bossRush = true;
+    manager.mode = runModeFor({ bossRush: true });
     const clearLayer = () => {
       manager.update(60);
       field.clearRocks();
@@ -528,7 +529,7 @@ describe('WaveManager Boss Rush', () => {
     expect(manager.currentWave).toBe(5);
     expect(emits).toContainEqual({
       event: 'wave-started',
-      payload: expect.objectContaining({ wave: 5, bossRush: true }),
+      payload: expect.objectContaining({ wave: 5, mode: manager.mode }),
     });
     clearLayer();
     expect(manager.waveInProgress).toBe(false);

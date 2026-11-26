@@ -1,8 +1,8 @@
 // src/services/DifficultyService.js
 
 import { holdProgress, loadJSON, saveProgress } from '../core/storage.js';
+import { FIRST_RUN_MODE } from '../core/runMode.js';
 import {
-  DAILY_DIFFICULTY,
   DEFAULT_DIFFICULTY,
   DIFFICULTY_LABELS,
   RUN_DIFFICULTIES,
@@ -114,7 +114,7 @@ export default class DifficultyService {
     this.replayDifficulty = null;
     this.replayDateKey = null;
     this.replayRun = false;
-    this.daily = false;
+    this.mode = FIRST_RUN_MODE;
     this.dateKey = null;
     this.runDifficulty = null;
     this.pressure = 0;
@@ -133,7 +133,7 @@ export default class DifficultyService {
   /** The preset the next run would fly. */
   getSelectedDifficulty() {
     if (this.replayDifficulty) return this.replayDifficulty;
-    if (this.daily) return DAILY_DIFFICULTY;
+    if (this.mode.forcedDifficulty) return this.mode.forcedDifficulty;
     return (
       this.urlDifficulty ??
       (this.pressure > 0 ? pressureId(this.pressure) : null) ??
@@ -162,19 +162,20 @@ export default class DifficultyService {
   }
 
   /**
-   * Locks the preset for a new run and returns its seed. `daily` true starts
-   * the Daily Field, false a normal run; undefined keeps the last mode (New
-   * Mission after a Daily Field flies today's field again).
+   * Locks the preset for a new run in `mode` (src/core/runMode.js; the last
+   * one when none is given) and returns its seed.
    */
-  beginRun({ daily } = {}) {
-    if (daily !== undefined) this.daily = daily;
-    this.dateKey = this.daily ? this.replayDateKey ?? this.todayKey() : null;
+  beginRun({ mode = this.mode } = {}) {
+    this.mode = mode;
+    this.dateKey = mode.usesTodaysSeed
+      ? this.replayDateKey ?? this.todayKey()
+      : null;
     this.runDifficulty = this.getSelectedDifficulty();
     this.replayRun = this.replayDifficulty !== null;
     holdProgress(this.replayRun || this.demo);
     this.replayDifficulty = null;
     this.replayDateKey = null;
-    if (!this.daily) {
+    if (!mode.usesTodaysSeed) {
       if (this.bootSeedSpent && !this.pinnedSeed) {
         this.runSeed = crypto.getRandomValues(new Uint32Array(1))[0];
       }
@@ -189,11 +190,7 @@ export default class DifficultyService {
   }
 
   getRunSeed() {
-    return this.daily ? dailySeed(this.dateKey) : this.runSeed;
-  }
-
-  isDaily() {
-    return this.daily;
+    return this.mode.usesTodaysSeed ? dailySeed(this.dateKey) : this.runSeed;
   }
 
   todayKey() {
@@ -203,7 +200,7 @@ export default class DifficultyService {
   /** 'SEED 2229850880 · VETERAN' or 'DAILY FIELD · 18 OCT · SEED 1234'. */
   runLabel() {
     const seed = `SEED ${this.getRunSeed()}`;
-    return this.daily
+    return this.mode.usesTodaysSeed
       ? `${dailyLabel(this.dateKey)} · ${seed}`
       : `${seed} · ${DIFFICULTY_LABELS[this.getDifficulty()].toUpperCase()}`;
   }
@@ -218,7 +215,7 @@ export default class DifficultyService {
    * Field may be another day's: it leaves the record alone.
    */
   recordRun({ layer, time }) {
-    if (!this.daily || this.replayRun) return null;
+    if (!this.mode.writesTodaysRecord || this.replayRun) return null;
     return updateDailyRecord({ dateKey: this.dateKey, layer, time });
   }
 

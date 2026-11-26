@@ -95,7 +95,7 @@ describe('sector runs', () => {
   it('opens on the first sector at layer 1 with no head start', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
-    expect(game.session.sector.id).toBe('debris-wake');
+    expect(game.session.mode.sector.id).toBe('debris-wake');
     expect(game.services.enemies.waveManager.currentWave).toBe(1);
     expect(game.services.progression.getLevel()).toBe(1);
   });
@@ -398,10 +398,10 @@ describe('sector runs', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test', sector: 'debris-wake' });
     game.session.startNewRun({ source: 'test' });
-    expect(game.session.sector.id).toBe('debris-wake');
+    expect(game.session.mode.sector.id).toBe('debris-wake');
 
     game.session.startNewRun({ source: 'test', daily: false, bossRush: false });
-    expect(game.session.sector).toBeNull();
+    expect(game.session.mode.sector).toBeNull();
     expect(game.services.enemies.waveManager.currentWave).toBe(1);
 
     game.session.replayStart = {
@@ -410,7 +410,7 @@ describe('sector runs', () => {
       sector: 'debris-wake',
     };
     game.session.startNewRun({ source: 'test', bossRush: true });
-    expect(game.session.sector.id).toBe('debris-wake');
-    expect(game.session.bossRush).toBe(false);
+    expect(game.session.mode.sector.id).toBe('debris-wake');
+    expect(game.session.mode.kind).toBe('sector');
   });
 });

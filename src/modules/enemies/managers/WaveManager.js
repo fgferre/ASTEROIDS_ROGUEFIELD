@@ -32,12 +32,10 @@ import {
 import { IS_DEV } from '../../../core/env.js';
 import {
   BOSS_RUSH_BREATHER_SECONDS,
-  bossRushDirectorFor,
   directorFor,
-  nextBossRushLayer,
 } from '../../../data/layers.js';
 import { scaleDirector } from '../../../data/difficulty.js';
-import { sectorStage } from '../../../data/sectors.js';
+import { FIRST_RUN_MODE } from '../../../core/runMode.js';
 import { WaveRandom } from '../waves/WaveRandom.js';
 import { WaveSpawner } from '../waves/WaveSpawner.js';
 import { LayerEvents } from '../waves/LayerEvents.js';
@@ -127,12 +125,11 @@ export class WaveManager {
 
     // Wave state
     this.currentWave = 0;
-    // Boss Rush run (set by GameSessionService before the run resets): only
-    // the Warden layers, a breather between them.
-    this.bossRush = false;
-    // Sector run (set the same way, src/data/sectors.js): the run opens on
-    // the sector's first layer and plays the sector's own stages.
-    this.sector = null;
+    // The kind of run (src/core/runMode.js), set by GameSessionService
+    // before the run resets: which layers it plays (a Boss Rush only the
+    // Warden layers, a breather between them; a sector from its first layer)
+    // and each layer's plan.
+    this.mode = FIRST_RUN_MODE;
     this.waveInProgress = false;
     this.wavePaused = false;
     this.waveStartTime = 0;
@@ -175,6 +172,12 @@ export class WaveManager {
 
   // The schedule, its clock, the modifier and the random scopes live in their
   // modules; these keep the names EnemySystem, the session and tests use.
+  // Renderer3D reads the sector here until its own step (item 8, this
+  // branch's last commit).
+  get sector() {
+    return this.mode.sector;
+  }
+
   get layerSchedule() {
     return this.schedule.layerSchedule;
   }
@@ -295,10 +298,7 @@ export class WaveManager {
       this.enemySystem.dependencies
     );
     return scaleDirector(
-      this.bossRush
-        ? bossRushDirectorFor(layer)
-        : sectorStage(this.sector, layer) ??
-            directorFor(layer, difficulty?.getRunSeed() ?? 0),
+      this.mode.layerPlan(layer, difficulty?.getRunSeed() ?? 0),
       difficulty?.getModifiers().spawnCount ?? 1
     );
   }
@@ -497,9 +497,7 @@ export class WaveManager {
       return false;
     }
 
-    this.currentWave = this.bossRush
-      ? nextBossRushLayer(this.currentWave)
-      : Math.max(this.currentWave + 1, this.sector?.layers[0] ?? 1);
+    this.currentWave = this.mode.nextLayer(this.currentWave);
     this.waveInProgress = true;
     this.waveStartTime = this.getSimulationTimeMs();
     this.enemiesSpawnedThisWave = 0;
@@ -560,7 +558,7 @@ export class WaveManager {
       spawnDelayMultiplier: sharedSpawnDelayMultiplier,
       compatibilityMode: true,
       managerTotals: { ...rawManagerTotals },
-      bossRush: this.bossRush,
+      mode: this.mode,
     };
 
     this.eventBus.emit('wave-started', waveEventPayload);
@@ -1008,7 +1006,7 @@ export class WaveManager {
 
     // Start countdown for next wave
     this.waveCountdown = this.waveDelay;
-    const nextWarden = this.bossRush && nextBossRushLayer(this.currentWave);
+    const nextWarden = this.mode.breatherTo(this.currentWave);
     if (nextWarden) {
       // Boss Rush: the breather, then the next Warden, announced like the
       // layer before a Warden is.

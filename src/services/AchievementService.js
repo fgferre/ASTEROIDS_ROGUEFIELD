@@ -6,6 +6,7 @@ import { BASTION_HULL_ID } from '../data/shipModels.js';
 import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 import { isProgressHeld, loadJSON, saveProgress } from '../core/storage.js';
 import { loadRecords } from './runRecords.js';
+import { FIRST_RUN_MODE } from '../core/runMode.js';
 
 export const ACHIEVEMENTS_STORAGE_KEY = 'roguefield:achievements:v1';
 
@@ -49,7 +50,7 @@ export default class AchievementService {
     this.heraldsFelled = stored.heraldsFelled ?? [];
     this.hullClean = true;
     this.cursedHeld = false;
-    this.bossRush = false;
+    this.mode = FIRST_RUN_MODE;
     this.grantPastVictory();
 
     eventBus.on('game-started', () => {
@@ -59,13 +60,16 @@ export default class AchievementService {
     eventBus.on('wave-started', (payload = {}) => {
       this.hullClean = true;
       // Boss Rush starts at layer 5, 10 and 15: those are not layers reached.
-      this.bossRush = Boolean(payload.bossRush);
-      if (!this.bossRush && Number(payload.wave) >= DEEP_FIELD_LAYER) {
+      this.mode = payload.mode ?? FIRST_RUN_MODE;
+      if (
+        this.mode.layersCountForMedals &&
+        Number(payload.wave) >= DEEP_FIELD_LAYER
+      ) {
         this.unlock('deep-field');
       }
     });
     eventBus.on('wave-complete', (payload = {}) => {
-      if (!this.bossRush && Number(payload.wave) >= 1) {
+      if (this.mode.layersCountForMedals && Number(payload.wave) >= 1) {
         this.unlock('first-light');
       }
     });
@@ -86,8 +90,8 @@ export default class AchievementService {
     // Winning the descent: a sector run wins only its chapter (Null's own
     // achievement still comes from its death, on 'boss-defeated').
     eventBus.on('run-won', (payload = {}) => {
-      if (!this.bossRush) this.unlock('first-victory');
-      if (payload.sector) return;
+      if (this.mode.winCountsAsFirstVictory) this.unlock('first-victory');
+      if (!this.mode.winCountsForChallengeMedals) return;
       this.unlock('null-and-void');
       if (this.cursedHeld) this.unlock('cursed-run');
       if (payload.hullId === BASTION_HULL_ID) this.unlock('iron-escort');

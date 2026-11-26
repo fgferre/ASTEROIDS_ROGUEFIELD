@@ -22,8 +22,7 @@ import {
 import { WEAPON_APEX } from '../../data/weapons.js';
 import { ORB_VALUE } from '../../data/enemies/asteroid-configs.js';
 import { Chests } from './chests.js';
-import { BOSS_RUSH_LAYERS } from '../../data/layers.js';
-import { sectorById } from '../../data/sectors.js';
+import { FIRST_RUN_MODE } from '../../core/runMode.js';
 
 const TWO_PI = Math.PI * 2;
 // Salts for the pickup and chest streams: a numeric fork leaves the root
@@ -121,12 +120,13 @@ export class PickupSystem extends BaseSystem {
     // start's picks hold back: the Boss Rush's first Warden, a sector's first
     // layer, else 1 (outside audit 8, verdict A5: a plain 1 was wrong in the
     // Boss Rush).
-    this.registerEventListener('game-started', ({ bossRush, sector } = {}) => {
-      this.reset();
-      this.layer = bossRush
-        ? BOSS_RUSH_LAYERS[0]
-        : sectorById(sector)?.layers[0] ?? 1;
-    });
+    this.registerEventListener(
+      'game-started',
+      ({ mode = FIRST_RUN_MODE } = {}) => {
+        this.reset();
+        this.layer = mode.firstLayer;
+      }
+    );
   }
 
   // Motherlode (an Apex whose `eliteAlwaysDrops` is set) while the lance

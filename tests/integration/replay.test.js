@@ -424,8 +424,8 @@ describe('run replay', () => {
       daily: false,
       bossRush: false,
     });
-    expect(replay.session.bossRush).toBe(true);
-    expect(replay.services.enemies.waveManager.bossRush).toBe(true);
+    expect(replay.session.mode.kind).toBe('bossRush');
+    expect(replay.services.enemies.waveManager.mode.kind).toBe('bossRush');
     expect(replay.services.player.currentHull.id).toBe(BASTION_HULL_ID);
     expect(replay.snapshot()).toEqual(recorded);
   });
@@ -447,7 +447,7 @@ describe('run replay', () => {
       daily: false,
       bossRush: false,
     });
-    expect(replay.services.difficulty.isDaily()).toBe(true);
+    expect(replay.session.mode.kind).toBe('daily');
     expect(replay.services.difficulty.getRunSeed()).toBe(recording.seed);
   });
 

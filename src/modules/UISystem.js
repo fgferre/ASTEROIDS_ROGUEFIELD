@@ -1,18 +1,14 @@
 // src/modules/UISystem.js
 
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
-import {
-  bossRushStage,
-  bossRushStageTitle,
-  directorFor,
-} from '../data/layers.js';
+import { bossRushStageTitle, directorFor } from '../data/layers.js';
 import { HERALD_KINDS } from '../data/enemies/herald.js';
-import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
 import { localLayer, sectorById, sectorTitle } from '../data/sectors.js';
 import { STORY } from '../data/story.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
+import { FIRST_RUN_MODE } from '../core/runMode.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
@@ -53,6 +49,10 @@ import { setSkipPad } from './ui/skipHold.js';
 // The overlays that pause a run over its HUD: cards, chest, flight briefing.
 const CARD_OVERLAYS = ['levelup', 'chest', 'flight'];
 
+/** The kind of run being played (src/core/runMode.js): the session's. */
+const runModeOf = (ui) =>
+  resolveService('game-session', ui.dependencies)?.mode ?? FIRST_RUN_MODE;
+
 class UISystem extends BaseSystem {
   constructor(dependencies = {}) {
     super(dependencies, {
@@ -79,7 +79,6 @@ class UISystem extends BaseSystem {
     this.transmissions = null;
     this.transmissionRaf = null;
     this.transmissionLayer = 1;
-    this.sector = null;
     // The line shown since the death or the win, quoted on the end screen.
     this.lastTransmission = null;
     this.cinematics = new RunCinematics({
@@ -131,7 +130,7 @@ class UISystem extends BaseSystem {
       pickups: () => resolveService('pickups', this.dependencies),
       xpOrbs: () => resolveService('xp-orbs', this.dependencies),
       renderer: () => resolveService('renderer', this.dependencies),
-      sector: () => this.sector,
+      mode: () => runModeOf(this),
       shieldKey: () => {
         const device = resolveService(
           'input',
@@ -201,7 +200,7 @@ class UISystem extends BaseSystem {
       combat: () => resolveService('combat', this.dependencies),
       difficulty: () => resolveService('difficulty', this.dependencies),
       layer: () => this.transmissionLayer,
-      sector: () => this.sector,
+      mode: () => runModeOf(this),
       settingsOpenHere: () => this.settingsPanel.isOpenFrom('pause'),
       closeSettings: () => this.settingsPanel.closeSettingsPanel(),
       openHudEditor: () => this.openHudEditor(),
@@ -383,33 +382,34 @@ class UISystem extends BaseSystem {
     }
     const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
     this.transmissionLayer = layer;
-    const sector =
-      resolveService('game-session', this.dependencies)?.sector ?? null;
-    this.sector = sector;
-    this.cinematics.prepareLayer(layer, sector, this.bossRush);
+    const mode = runModeOf(this);
+    const { sector } = mode;
+    // runCinematics' third argument holds back the layer-by-layer voices
+    // until it asks the mode itself (this branch's last commit).
+    this.cinematics.prepareLayer(layer, sector, !mode.voicesByLayer);
     // The intro's end shows this layer's title card.
     if (this.cinematics.introActive) return;
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
     const biome = biomeForLayer(layer, sector);
     const firstOfBiome = biome.layers[0] === layer;
-    const stage = this.bossRush ? bossRushStage(layer) : 0;
+    const stage = mode.rushStage(layer);
     const chapter = stage
       ? bossRushStageTitle(stage)
       : firstOfBiome
         ? sectorTitle(sector, biome.title)
-        : layer > RUN_FINAL_LAYER && !sector
+        : mode.deepFieldAt(layer)
           ? 'DEEP FIELD'
           : '';
     // A sector run counts its layers from its own first one.
-    hud.showLayerBanner(sector ? localLayer(sector, layer) : layer, {
+    hud.showLayerBanner(mode.shownLayer(layer), {
       boss,
       sentinel: Boolean(sector?.boss),
-      bossRush: this.bossRush,
+      title: mode.layerBannerTitle,
       chapter,
       context: sector && !stage && firstOfBiome ? STORY.context[sector.id] : '',
     });
     if (firstOfBiome) {
-      this.queueTransmission(chapterTransmission(biome.id, this.sector?.id));
+      this.queueTransmission(chapterTransmission(biome.id, sector?.id));
     }
     const said =
       sector && stageTransmission(sector.id, localLayer(sector, layer));
@@ -467,22 +467,21 @@ class UISystem extends BaseSystem {
     ].forEach(registerBossEvent);
 
     this.registerEventListener('wave-started', (payload = {}) => {
-      // The run's mode rides on every layer start (the intro's end reads it).
-      this.bossRush = Boolean(payload.bossRush);
       this.handleLayerStarted(payload);
     });
 
     this.registerEventListener('boss-warning', (payload = {}) => {
       // Boss Rush: the breather names the next Warden.
-      if (this.bossRush) {
+      const mode = runModeOf(this);
+      if (mode.warningShowsRushBanner) {
         this.tacticalHud.layout?.showLayerBanner(payload.nextBossWave, {
           boss: true,
-          bossRush: true,
-          chapter: bossRushStageTitle(bossRushStage(payload.nextBossWave)),
+          title: mode.layerBannerTitle,
+          chapter: bossRushStageTitle(mode.rushStage(payload.nextBossWave)),
         });
       }
       this.queueTransmission(
-        wardenTransmission(payload.nextBossWave, 'warning', this.sector?.boss)
+        wardenTransmission(payload.nextBossWave, 'warning', mode.sector?.boss)
       );
     });
 
@@ -520,7 +519,7 @@ class UISystem extends BaseSystem {
         deathTransmission(
           this.getRandomFork('base'),
           this.transmissionLayer,
-          this.sector
+          runModeOf(this).sector
         ),
         { interrupt: true }
       );
@@ -571,12 +570,10 @@ class UISystem extends BaseSystem {
       }
       this.queueTransmission(sightingTransmission(type));
     });
-    this.registerEventListener('game-started', (payload = {}) => {
-      // The sector run's sector (src/data/sectors.js), or null: the HUD and
-      // the pause panel count its layers from its own first one.
-      this.sector = sectorById(payload.sector);
+    this.registerEventListener('game-started', () => {
+      // A sector run returns to the campaign map when it ends.
       this.tacticalHud.onGameStarted();
-      this.campaignMap.noteRunStart(payload.sector);
+      this.campaignMap.noteRunStart(runModeOf(this).sector?.id);
     });
     this.registerEventListener('aim-stick-changed', (payload) => {
       this.tacticalHud.onAimStickChanged(payload);
@@ -675,6 +672,8 @@ class UISystem extends BaseSystem {
       }
     });
 
+    // The ending's flow: it asks the mode in this branch's last commit, with
+    // the ending's screens.
     this.registerEventListener('run-won', ({ wave, sector } = {}) => {
       this.runWon = true;
       this.chestCeremony.clear();

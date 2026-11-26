@@ -11,6 +11,7 @@ import { PICKUP_KINDS } from '../../data/pickups.js';
 import { nextSector } from '../../data/sectors.js';
 import { loadRecords, updateRecords } from '../runRecords.js';
 import { resolveService } from '../../core/serviceUtils.js';
+import { FIRST_RUN_MODE } from '../../core/runMode.js';
 
 // The end screens wait for the transmission on air (the last words) to end,
 // up to the cap.
@@ -60,16 +61,14 @@ export class RunEnd {
     this.transmissionOnAir = false;
     // True once the player continues past the final Warden (endless run).
     this.endless = false;
-    // Boss Rush run: the three Wardens back to back (startNewRun); the
-    // Wardens killed so far.
-    this.bossRush = false;
+    // The kind of run (src/core/runMode.js), set by startNewRun; the
+    // Wardens a run scored by Wardens (the Boss Rush) has killed so far.
+    this.mode = FIRST_RUN_MODE;
     this.bossRushWardens = 0;
-    // Sector run (src/data/sectors.js): the sector played, or null.
-    this.sector = null;
   }
 
   handleBossDefeatedEvent(payload = {}) {
-    if (this.bossRush && payload?.wave !== RUN_FINAL_LAYER) {
+    if (this.mode.wardensGivePicks && payload?.wave !== this.mode.lastLayer) {
       // Boss Rush: a card pick for each Warden before the last (not over
       // the death screen).
       this.bossRushWardens += 1;
@@ -80,16 +79,15 @@ export class RunEnd {
       }
       return;
     }
-    const finalLayer = this.sector ? this.sector.layers[1] : RUN_FINAL_LAYER;
     if (
-      payload?.wave !== finalLayer ||
+      payload?.wave !== this.mode.lastLayer ||
       this.endless ||
       this.getSessionState() === 'victory'
     ) {
       return;
     }
 
-    if (this.bossRush) {
+    if (this.mode.scoredByWardens) {
       this.bossRushWardens += 1;
     }
     resolveService('enemies', this.services)?.waveManager?.holdWaves(
@@ -108,7 +106,7 @@ export class RunEnd {
     this.eventBus.emit('run-won', {
       wave: payload.wave,
       hullId: this.getConfiguredHullId(),
-      ...(this.sector && { sector: this.sector.id }),
+      ...(this.mode.sector && { sector: this.mode.sector.id }),
     });
 
     // The clear time is the Warden's death, not the screen's opening: the
@@ -147,7 +145,7 @@ export class RunEnd {
    * after a Boss Rush or a sector run.
    */
   continueBeyondVictory() {
-    if (this.getSessionState() !== 'victory' || this.bossRush || this.sector) {
+    if (this.getSessionState() !== 'victory' || !this.mode.goesOnAfterVictory) {
       return false;
     }
 
@@ -183,8 +181,9 @@ export class RunEnd {
    */
   recordRunReached(summary = {}, { won = false, clearTime } = {}) {
     const runTime = clearTime ?? summary.stats?.timeElapsed;
-    if (this.sector) {
-      const { id } = this.sector;
+    if (this.mode.writesSectorRecord) {
+      const { sector } = this.mode;
+      const { id } = sector;
       const time = Math.floor(runTime ?? 0);
       const before = loadRecords();
       const firstClear = won && !before.sectorsWon.includes(id);
@@ -200,11 +199,11 @@ export class RunEnd {
           firstClear,
           // The Boss Rush's rule: faster than the record before; a tie is not.
           newBest: won && time > 0 && (beforeTime === 0 || time < beforeTime),
-          next: won ? nextSector(this.sector)?.id ?? null : null,
+          next: won ? nextSector(sector)?.id ?? null : null,
         },
       };
     }
-    if (this.bossRush) {
+    if (this.mode.writesRushRecord) {
       const cleared = this.bossRushWardens === BOSS_RUSH_LAYERS.length;
       const time = cleared ? Math.floor(runTime ?? 0) : 0;
       const before = loadRecords().bossRushTime;

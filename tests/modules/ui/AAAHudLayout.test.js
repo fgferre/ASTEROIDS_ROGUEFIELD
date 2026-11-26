@@ -308,7 +308,7 @@ describe('AAAHudLayout layer modifier', () => {
     };
     hud.showLayerBanner(5, {
       boss: true,
-      bossRush: true,
+      title: 'BOSS RUSH',
       chapter: bossRushStageTitle(1),
     });
     vi.advanceTimersByTime(0);
