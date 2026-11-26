@@ -244,10 +244,10 @@ class Renderer3D extends BaseSystem {
       }
     });
     this.registerEventListener('wave-started', (payload = {}) => {
-      // A sector run shows its sector's look (WaveManager holds the sector).
+      // A sector run shows its sector's look (the run's mode).
       this.biome.enterLayer(
         payload.wave,
-        this.cachedEnemies?.waveManager?.sector
+        this.cachedEnemies?.waveManager?.mode.sector
       );
       this.camera.trigger('waveStart');
     });
@@ -521,7 +521,7 @@ class Renderer3D extends BaseSystem {
   endTravel() {
     if (!this.travel?.active) return;
     this.travel.stop();
-    const sector = this.cachedEnemies?.waveManager?.sector;
+    const sector = this.cachedEnemies?.waveManager?.mode.sector;
     if (sector) this.biome.enterLayer(sector.layers[0], sector);
   }
 

@@ -8,11 +8,6 @@
 // Allowed for good: runMode.js itself, the recording's file format
 // (core/replay.js), the menu's launch options (menuButtons.js, the object's
 // inputs) and the story's Boss Rush line (content).
-//
-// Allowed until the 3D files are this work's to change (the 3D engine's sweep
-// holds them, 26/11): the files listed in PENDING and the lines in
-// PENDING_LINES, emptied then; a pending entry that no longer matches
-// anything fails here.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -36,8 +31,6 @@ const ALLOWED_LINES = [
   ['src/data/story.js', 'bossRush:'],
   ['src/modules/ui/transmissions.js', 'text: STORY.bossRush,'],
 ];
-const PENDING = ['src/modules/render3d/Renderer3D.js'];
-const PENDING_LINES = [];
 
 const CHECKS = [
   ['a bossRush flag', /\bbossRush\b/],
@@ -57,7 +50,7 @@ const sources = files('src')
   .map((f) => f.replaceAll('\\', '/'))
   .filter((f) => !f.startsWith('src/exported-assets/'))
   .filter((f) => !f.startsWith('src/public/libs/'))
-  .filter((f) => !ALLOWED.includes(f) && !PENDING.includes(f));
+  .filter((f) => !ALLOWED.includes(f));
 
 const codeLines = (f) =>
   readFileSync(f, 'utf8')
@@ -66,9 +59,7 @@ const codeLines = (f) =>
     .filter(({ text }) => !/^(\/\/|\/\*|\*)/.test(text));
 
 const excused = ({ f, text }) =>
-  [...ALLOWED_LINES, ...PENDING_LINES].some(
-    ([file, line]) => file === f && text === line
-  );
+  ALLOWED_LINES.some(([file, line]) => file === f && text === line);
 
 describe('one kind of run, asked of one object', () => {
   it.each(CHECKS)('no %s outside runMode.js', (_, pattern) => {
@@ -78,17 +69,5 @@ describe('one kind of run, asked of one object', () => {
       .filter((line) => !excused(line))
       .map(({ f, line, text }) => `${f}:${line}: ${text}`);
     expect(offenders).toEqual([]);
-  });
-
-  it('every pending exception still has something to excuse', () => {
-    const stale = [
-      ...PENDING.filter(
-        (f) => !CHECKS.some(([, p]) => p.test(readFileSync(f, 'utf8')))
-      ),
-      ...PENDING_LINES.filter(
-        ([f, line]) => !codeLines(f).some(({ text }) => text === line)
-      ).map(([f, line]) => `${f}: ${line}`),
-    ];
-    expect(stale).toEqual([]);
   });
 });
