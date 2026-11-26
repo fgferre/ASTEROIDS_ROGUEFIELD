@@ -1,0 +1,95 @@
+// src/core/runMode.js
+//
+// The kind of run being played, settled once when the run starts
+// (GameSessionService.startNewRun): the Descent, the Daily Field, the Boss
+// Rush or a sector of the campaign. Whoever kept a copy of bossRush, sector
+// or daily asks this object instead (item 8 of the audits, 26/11). Each
+// answer is named after the question it settles; where the game answers two
+// questions differently, they keep two names even where they agree.
+//
+// The Daily Field is the Descent with today's seed: it is built from the
+// Descent's answers and changes only the ones listed where it is made.
+//
+// Not here: how a run was launched. The story only from the campaign map's
+// launch button, the journey only from the map or the victory's Next
+// Sector, New Mission keeping the last mode, an armed replay winning over
+// the mode picked: those are rules of the launch (runCinematics.js,
+// menuButtons.js, GameSessionService.startNewRun).
+
+import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
+import { sectorById } from '../data/sectors.js';
+
+const DESCENT = Object.freeze({
+  kind: 'descent',
+  /** The campaign sector played (src/data/sectors.js), or null. */
+  sector: null,
+  /** Levels taken before the first layer (a late sector's head start). */
+  headStart: 0,
+  /** The layer whose Warden wins the run. */
+  lastLayer: RUN_FINAL_LAYER,
+  /** A Warden before the last one gives a card pick. */
+  wardensGivePicks: false,
+  /** The run is scored by the Wardens it kills (record, Salvage). */
+  scoredByWardens: false,
+  /** Won, the run can go on past its last Warden (the Deep Field). */
+  goesOnAfterVictory: true,
+  /** Each layer start and the run's end write the deepest-layer record. */
+  writesLayerRecord: true,
+  /** Each layer start writes the Boss Rush stage, a clear its time. */
+  writesRushRecord: false,
+  /** A clear writes the sector won and its time. */
+  writesSectorRecord: false,
+  /** The run flies today's seed. */
+  usesTodaysSeed: false,
+});
+
+const DAILY = Object.freeze({
+  ...DESCENT,
+  kind: 'daily',
+  usesTodaysSeed: true,
+});
+
+const BOSS_RUSH = Object.freeze({
+  ...DESCENT,
+  kind: 'bossRush',
+  wardensGivePicks: true,
+  scoredByWardens: true,
+  goesOnAfterVictory: false,
+  writesLayerRecord: false,
+  writesRushRecord: true,
+});
+
+function sectorMode(sector) {
+  return Object.freeze({
+    ...DESCENT,
+    kind: 'sector',
+    sector,
+    headStart: sector.headStart ?? 0,
+    lastLayer: sector.layers[1],
+    goesOnAfterVictory: false,
+    writesLayerRecord: false,
+    writesSectorRecord: true,
+  });
+}
+
+/**
+ * The mode a run starts in. `sector` (an id) starts that sector, never daily
+ * nor Boss Rush; `bossRush` and `daily` true pick those. Left undefined, each
+ * keeps what `previous` had (New Mission), except that a sector is dropped
+ * once `daily` or `bossRush` is given (a mode picked without a sector).
+ */
+export function runModeFor(
+  { daily, bossRush, sector } = {},
+  previous = DESCENT
+) {
+  const picked =
+    sector !== undefined || daily !== undefined || bossRush !== undefined;
+  const place = picked ? sectorById(sector ?? null) : previous.sector;
+  if (place) return sectorMode(place);
+  if (bossRush ?? previous.kind === 'bossRush') return BOSS_RUSH;
+  if (daily ?? previous.kind === 'daily') return DAILY;
+  return DESCENT;
+}
+
+/** The mode before any run is played. */
+export const FIRST_RUN_MODE = DESCENT;

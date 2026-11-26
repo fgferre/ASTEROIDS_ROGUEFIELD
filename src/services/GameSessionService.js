@@ -2,7 +2,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { debugLog } from '../core/debugLogging.js';
 import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
 import { bossRushStage } from '../data/layers.js';
-import { sectorById } from '../data/sectors.js';
+import { runModeFor } from '../core/runMode.js';
 import { updateRecords } from './runRecords.js';
 import {
   RandomScopes,
@@ -89,13 +89,13 @@ export default class GameSessionService {
       progressionReset: (payload) => this.handleProgressionResetEvent(payload),
       bossDefeated: (payload) => this.runEnd.handleBossDefeatedEvent(payload),
       // A sector run is not a deep run: it raises no layer record.
-      waveStarted: (payload) =>
-        this.sector ||
-        updateRecords(
-          this.bossRush
-            ? { bossRushStage: bossRushStage(payload?.wave) }
-            : { layer: payload?.wave }
-        ),
+      waveStarted: (payload) => {
+        if (this.mode.writesRushRecord) {
+          updateRecords({ bossRushStage: bossRushStage(payload?.wave) });
+        } else if (this.mode.writesLayerRecord) {
+          updateRecords({ layer: payload?.wave });
+        }
+      },
       transmissionShown: () => {
         this.runEnd.transmissionOnAir = true;
       },
@@ -567,13 +567,14 @@ export default class GameSessionService {
       ({ daily, bossRush, sector, hull: hullId } = this.replayStart);
       this.replayStart = null;
     } else resolveService('hangar', this.services).useReplaySetup(null);
-    if (sector !== undefined || daily !== undefined || bossRush !== undefined) {
-      this.sector = sectorById(sector ?? null);
-    }
-    if (this.sector) [daily, bossRush] = [false, false];
-    if (bossRush !== undefined) this.bossRush = bossRush;
+    // The run's kind is settled here, once (src/core/runMode.js). How it was
+    // launched stays out of it: the story only from the map's launch button
+    // and the journey only from the map or Next Sector (runCinematics.js),
+    // New Mission keeping the last mode (the undefined options, read against
+    // the last mode), an armed replay winning over the mode picked (above).
+    this.runEnd.mode = runModeFor({ daily, bossRush, sector }, this.mode);
     const difficulty = resolveService('difficulty', this.services);
-    const seed = difficulty.beginRun({ daily });
+    const seed = difficulty.beginRun({ daily: this.mode.usesTodaysSeed });
     if (this.gameState) {
       this.gameState.randomSeed = seed;
     }
@@ -631,10 +632,7 @@ export default class GameSessionService {
     const levelsCarried = build
       ? resolveService('progression', this.services).level - 1
       : 0;
-    const headStart = Math.max(
-      0,
-      (this.sector?.headStart ?? 0) - levelsCarried
-    );
+    const headStart = Math.max(0, this.mode.headStart - levelsCarried);
     const owed = build?.owed ?? [];
     if (!headStart && owed.length === 0) {
       this.ensureWaveKickoff({ reason: 'session-start' });
@@ -674,10 +672,11 @@ export default class GameSessionService {
       timestamp: Date.now(),
       bossRush: this.bossRush,
       sector: this.sector?.id ?? null,
+      mode: this.mode,
       replay,
       carried: Boolean(build),
     });
-    if (difficulty.isDaily()) {
+    if (this.mode.usesTodaysSeed) {
       this.eventBus.emit('daily-started', { seed });
     }
 
@@ -1064,21 +1063,18 @@ export default class GameSessionService {
     return this.randomScopes.prepareRandomForScope(scope, options);
   }
 
+  /** The kind of run being played (src/core/runMode.js). */
+  get mode() {
+    return this.runEnd.mode;
+  }
+
+  // Until the run's other parts ask `mode` (item 8, this branch).
   get bossRush() {
-    return this.runEnd.bossRush;
+    return this.mode.kind === 'bossRush';
   }
 
-  set bossRush(value) {
-    this.runEnd.bossRush = value;
-  }
-
-  /** The sector run's sector (src/data/sectors.js), or null. */
   get sector() {
-    return this.runEnd.sector;
-  }
-
-  set sector(value) {
-    this.runEnd.sector = value;
+    return this.mode.sector;
   }
 
   static deriveInitialSeed() {
