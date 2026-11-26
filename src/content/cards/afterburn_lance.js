@@ -51,11 +51,13 @@ export default {
   weaponText: {
     // proposta 17/11
     'arc-caster': {
-      levels: BONUS.map((bonus, rank) => ({
-        description: `Jumps deal +${bonus}% damage per 100 px between the ship and the enemy: the far end of the chain strikes harder. Lock-on range +${LOCK_RANGE[rank]}%.`,
+      levels: BONUS.map((bonus) => ({
+        description: `Jumps deal +${bonus}% damage per 100 px between the ship and the enemy: the far end of the chain strikes harder.`,
       })),
     },
-    // The Halo and the Furnace never aim: no lock-on range to sell them.
+    // The Halo and the Furnace never aim, and the Arc Caster and the Scatter
+    // Coil cannot reach what a longer lock-on finds: no lock-on range to sell
+    // any of them (the lock keeps to what the weapon reaches).
     'shard-halo': {
       levels: BONUS.map((bonus) => ({
         description: `Cuts deal +${bonus}% damage per 100 px between the ship and the enemy: the far edge of the halo cuts deeper.`,
@@ -67,8 +69,8 @@ export default {
       })),
     },
     scatter: {
-      levels: BONUS.map((bonus, rank) => ({
-        description: `Flak bolts deal +${bonus}% damage per 100 px flown: they burst by ${BOLT_RANGE} px, so up to +${Math.round((bonus * BOLT_RANGE) / 100)}%. Lock-on range +${LOCK_RANGE[rank]}%.`,
+      levels: BONUS.map((bonus) => ({
+        description: `Flak bolts deal +${bonus}% damage per 100 px flown: they burst by ${BOLT_RANGE} px, so up to +${Math.round((bonus * BOLT_RANGE) / 100)}%.`,
         highlights: ['Only the bolt’s own hit: its shrapnel gains nothing.'],
       })),
     },
