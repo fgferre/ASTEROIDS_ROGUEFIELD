@@ -267,11 +267,14 @@ export function buildTheCrucible(THREE, kit) {
     ending(on) {
       held = on;
     },
-    /** The last image's slip, built on its arc on the first call. */
-    slip() {
+    /**
+     * The last image's slip, built on its arc on the first call, its twin
+     * drawn from `wake` (the opening's, buildWake's).
+     */
+    slip(wake) {
       if (!slip) {
         const spec = ARCS[SLIP_ARC];
-        slip = buildSlip(THREE, kit, spec);
+        slip = buildSlip(THREE, kit, spec, wake);
         groups[spec.group].add(slip.object);
       }
       return slip;

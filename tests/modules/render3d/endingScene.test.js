@@ -100,7 +100,13 @@ function kit() {
     scene,
     enemies,
     camera: new THREE.PerspectiveCamera(20, 16 / 9, 10, 20000),
-    renderer: { toneMappingExposure: 1, compile: vi.fn() },
+    renderer: {
+      toneMappingExposure: 1,
+      compile: vi.fn(),
+      setRenderTarget: vi.fn(),
+      render: vi.fn(),
+    },
+    composer: { readBuffer: {} },
     backdrop: {
       ring,
       places,
@@ -402,14 +408,25 @@ describe("the ending's act 1", () => {
     expect(t.camera.fov).toBe(20);
   });
 
-  it('builds the last image on the loading screen, shown only while its programs compile', () => {
-    const { t, crucible, slip } = kit();
-    const ending = new EndingScene(t, { on: () => {} });
+  it("builds the last image on the loading screen on the opening's Wake, compiled and drawn once unculled, then hidden", () => {
+    const { t, crucible, slip, rock, story } = kit();
+    const ending = new EndingScene(t, { on: () => {} }, story);
     const shown = [];
-    ending.warm(() => shown.push(slip.object.visible));
+    const drawn = [];
+    t.renderer.render.mockImplementation(() =>
+      drawn.push([slip.object.visible, rock.visible, slip.frame.frustumCulled])
+    );
+    ending.warm(() => shown.push(slip.object.visible), true);
+    expect(crucible.slip).toHaveBeenLastCalledWith(story.wake);
     expect(shown).toEqual([true]);
+    // the scene as it stands, the slip unculled, into the composer's target
+    expect(drawn).toEqual([[true, true, false]]);
+    expect(t.renderer.setRenderTarget).toHaveBeenCalledWith(
+      t.composer.readBuffer
+    );
     expect(slip.object.visible).toBe(false);
-    expect(crucible.slip).toHaveBeenCalled();
+    expect(rock.visible).toBe(true);
+    expect(slip.frame.frustumCulled).toBe(true);
   });
 
   it('goes on from what the answer left: Severance dark, its lamps out from the farthest and the window last; Stewardship lit to the cut', () => {

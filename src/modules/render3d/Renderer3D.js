@@ -787,12 +787,15 @@ class Renderer3D extends BaseSystem {
       () => this.three.player.warm(this.cachedPlayer, compile),
       ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
       () => this.three.enemies.kit.warmLooks(compile),
-      // The ending's last image: its slip and twin Wake (seeded: three
-      // names programs with Math.random).
-      () => this.seeded(() => this.ending.warm(compile)),
       () => this.drawEverything(),
       // The story's freighter (seconds): every campaign launch tells it.
       () => this.warmStory(),
+      // The ending's last image, on the story's Wake (seeded: three names
+      // programs with Math.random).
+      () =>
+        this.seeded(() =>
+          this.ending.warm(compile, this.graphics.postProcessing)
+        ),
       // The ending's beats at home, in the story's scene.
       () => this.seeded(() => this.ending.warmHome(this.three.camera)),
     ];

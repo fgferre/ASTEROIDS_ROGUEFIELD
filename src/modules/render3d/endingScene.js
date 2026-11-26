@@ -124,7 +124,7 @@ export class EndingScene {
     // The ending picked (act 2), the last image (endingTwin.js), and
     // whether the picture is black.
     this.ending = null;
-    this.last = new LastImage(t);
+    this.last = new LastImage(t, story);
     this.home = new EndingHome(t, story);
     this.black = false;
     this.blank = new THREE.Scene();
@@ -259,9 +259,12 @@ export class EndingScene {
     this.hold(last, 1, 1);
   }
 
-  /** Loading screen: the last image's slip built and compiled (LastImage). */
-  warm(compile) {
-    this.last.warm(compile);
+  /**
+   * Loading screen, after the opening's: the last image's slip built on its
+   * Wake, compiled and uploaded (LastImage; `post`: the composer draws).
+   */
+  warm(compile, post) {
+    this.last.warm(compile, post);
   }
 
   /** Loading screen, after the opening's: the beats at home drawn once. */
