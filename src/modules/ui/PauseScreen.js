@@ -7,6 +7,7 @@
 
 import { collectBuild, endBuildMarkup, runLocationLine } from './runRecap.js';
 import { runTrayMarkup } from './upgradeCard.js';
+import { FIRST_RUN_MODE } from '../../core/runMode.js';
 
 export class PauseScreen {
   /**
@@ -32,7 +33,7 @@ export class PauseScreen {
     combat,
     difficulty,
     layer,
-    sector = () => null,
+    mode = () => FIRST_RUN_MODE,
     settingsOpenHere,
     closeSettings,
     openHudEditor,
@@ -45,7 +46,7 @@ export class PauseScreen {
     this.combat = combat;
     this.difficulty = difficulty;
     this.layer = layer;
-    this.sector = sector;
+    this.mode = mode;
     this.settingsOpenHere = settingsOpenHere;
     this.closeSettings = closeSettings;
     this.openHudEditor = openHudEditor;
@@ -217,7 +218,7 @@ export class PauseScreen {
       this.layer(),
       null,
       null,
-      this.sector()
+      this.mode().sector
     );
     refs.tools.textContent = `Rerolls ${progression.rerollsLeft} · Banishes ${progression.banishesLeft}`;
     refs.seed.textContent = this.difficulty().runLabel();

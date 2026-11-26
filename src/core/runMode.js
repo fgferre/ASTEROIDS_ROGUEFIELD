@@ -21,10 +21,11 @@ import { DAILY_DIFFICULTY } from '../data/difficulty.js';
 import {
   BOSS_RUSH_LAYERS,
   bossRushDirectorFor,
+  bossRushStage,
   directorFor,
   nextBossRushLayer,
 } from '../data/layers.js';
-import { sectorById, sectorStage } from '../data/sectors.js';
+import { localLayer, sectorById, sectorStage } from '../data/sectors.js';
 
 const DESCENT = Object.freeze({
   kind: 'descent',
@@ -45,6 +46,18 @@ const DESCENT = Object.freeze({
   layerPlan: (layer, seed) => directorFor(layer, seed),
   /** After `layer`, the Warden a breather leads to, or none. */
   breatherTo: () => null,
+  /** `layer`'s Boss Rush stage (1 to 3), or 0. */
+  rushStage: () => 0,
+  /** `layer` is past the last Warden, in the Deep Field. */
+  deepFieldAt: (layer) => layer > RUN_FINAL_LAYER,
+  /** The layer number the HUD shows for `layer` (a sector counts its own). */
+  shownLayer: (layer) => layer,
+  /** The layer banner's title over every layer, or null for "LAYER n". */
+  layerBannerTitle: null,
+  /** The warning before a Warden shows the Boss Rush's banner. */
+  warningShowsRushBanner: false,
+  /** The voices are readied layer by layer, not all at the start. */
+  voicesByLayer: true,
   /** A Warden before the last one gives a card pick. */
   wardensGivePicks: false,
   /** The run is scored by the Wardens it kills (record, Salvage). */
@@ -91,6 +104,10 @@ const BOSS_RUSH = Object.freeze({
   nextLayer: (layer) => nextBossRushLayer(layer),
   layerPlan: (layer) => bossRushDirectorFor(layer),
   breatherTo: (layer) => nextBossRushLayer(layer),
+  rushStage: (layer) => bossRushStage(layer),
+  layerBannerTitle: 'BOSS RUSH',
+  warningShowsRushBanner: true,
+  voicesByLayer: false,
   wardensGivePicks: true,
   scoredByWardens: true,
   goesOnAfterVictory: false,
@@ -113,6 +130,9 @@ function sectorMode(sector) {
     nextLayer: (layer) => Math.max(layer + 1, sector.layers[0]),
     layerPlan: (layer, seed) =>
       sectorStage(sector, layer) ?? directorFor(layer, seed),
+    deepFieldAt: () => false,
+    shownLayer: (layer) => Math.max(1, localLayer(sector, layer)),
+    voicesByLayer: false,
     goesOnAfterVictory: false,
     writesLayerRecord: false,
     writesSectorRecord: true,
