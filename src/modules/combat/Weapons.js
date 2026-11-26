@@ -580,6 +580,19 @@ export class Weapons {
     this.refreshLanceLook();
   }
 
+  /**
+   * How far the weapon in hand strikes, px from the muzzle: its fire's range,
+   * or where its bolts burst plus the burst; Infinity when its shots fly on.
+   */
+  get reach() {
+    const { fire, projectile } = this.weapon;
+    const reaches = [
+      ...fire.map(({ range }) => range),
+      projectile?.range + (projectile?.burst?.radius ?? 0),
+    ].filter(Number.isFinite);
+    return reaches.length > 0 ? Math.max(...reaches) : Infinity;
+  }
+
   /** The weapon the ship carries, in its own form once its family evolved. */
   get weapon() {
     const forms = WEAPON_FORMS[this.weaponId];

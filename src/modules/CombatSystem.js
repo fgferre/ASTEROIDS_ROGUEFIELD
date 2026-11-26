@@ -63,6 +63,7 @@ class CombatSystem extends BaseSystem {
       bulletSpeed: () => this.weapons.bulletSpeed,
       spreadMode: () => this.weapons.spreadMode,
       computeParallelOffset,
+      weaponReach: () => this.weapons.reach,
     });
     this.projectiles = new Projectiles({
       physics: () => this.cachedPhysics,
