@@ -1597,6 +1597,16 @@ select {
   transition: opacity 0.5s ease-out;
 }
 
+/* A service failed to start (loadingScreen.js): the jet goes out, the line
+   says so in red. */
+.loading-screen--failed .opening__jet {
+  opacity: 0;
+}
+
+.loading-screen--failed .opening__line {
+  color: var(--danger);
+}
+
 /* Loaded (loadingScreen.js): the ship has arrived, the line asks to go on. */
 .loading-screen--ready .opening__end {
   border-color: var(--accent);

@@ -37,6 +37,7 @@ export const NEXT = {
     'A Tether that blows up later in a run flashes, shakes the screen and gives its brief stop again, like the first ones; some went off without any of it.', // not confirmed
     'Seeker Swarm missiles whose target is destroyed turn to the next enemy again; some flew off toward a corner of the field instead.', // not confirmed
     "The Herald of Silence's shards all turn after the ship at the same rate; now and then one turned twice as sharply and was harder to dodge.", // not confirmed
+    'If part of the game fails to start, the loading screen now stays and says so, asking you to reload the page, instead of opening a menu whose Launch does nothing.', // not confirmed
   ],
   unseen: [
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",

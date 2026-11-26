@@ -27,7 +27,11 @@ describe('MenuBackgroundSystem behind the loading screen', () => {
       system.opening.render = vi.fn(() => order.push('render'));
       // The loading screen's element: hiding it adds the `hidden` class.
       const screen = {
-        classList: { add: () => order.push('hide'), remove: () => {} },
+        classList: {
+          add: () => order.push('hide'),
+          remove: () => {},
+          contains: () => false,
+        },
         // the loading line
         querySelector: () => ({ classList: { toggle: () => {} } }),
       };

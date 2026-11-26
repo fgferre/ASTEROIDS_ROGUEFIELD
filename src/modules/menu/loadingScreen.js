@@ -41,6 +41,9 @@ const LINE_MS = 2400;
 // gate. A proposal; Felipe judges it by playing.
 export const MENU_IDLE_MS = 120000;
 const IDLE_CHECK_MS = 250;
+// A service failed to start (app.js): the opening stops on this line.
+export const START_FAILED_LINE =
+  'The game could not start. Reload the page to try again.';
 
 /**
  * Sets up the loading screen: the opening follows the preload, then a press
@@ -66,7 +69,10 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
   let step = loadingStep(0);
   let joke = Date.now() % LOADING_JOKES.length;
   let joking = false;
+  const failed = () =>
+    loadingScreen.classList.contains('loading-screen--failed');
   function drawLine() {
+    if (failed()) return;
     line.textContent = joking ? LOADING_JOKES[joke] : step;
     line.classList.toggle('is-real', !joking);
   }
@@ -88,6 +94,7 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     },
     () => {
       clearInterval(lineTimer);
+      if (failed()) return;
       if (!shouldShowGate()) {
         onLeave?.();
         finish();
@@ -329,6 +336,20 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     // and a quick tap falls between its samples.
     noteInput: input,
   };
+}
+
+/**
+ * A service failed to start: the loading screen stays, its line says so and
+ * the menu stays shut (its Launch would do nothing). The console keeps the
+ * error.
+ */
+export function showStartFailure() {
+  const loadingScreen = document.getElementById('loading-screen');
+  loadingScreen.classList.add('loading-screen--failed');
+  const line = loadingScreen.querySelector('.opening__line');
+  line.textContent = START_FAILED_LINE;
+  line.classList.remove('is-real');
+  document.getElementById('menu-screen')?.classList.add('hidden');
 }
 
 // Pad A or Start, on any pad.
