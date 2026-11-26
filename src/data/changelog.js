@@ -27,7 +27,9 @@ export const NEXT = {
   improved: [
     'Sovereign, beaten, no longer breaks into pieces: it stays whole for the ending (with reduced motion it burns away where it fell).', // not confirmed
   ],
-  fixed: [],
+  fixed: [
+    "On a phone held sideways, the ending's choice now fits the screen: both options show every line, with no scrolling.", // not confirmed
+  ],
   unseen: [
     "The ending's last image is built on the loading screen (about one second more of loading), so nothing stalls when the choice opens or at any cut.",
   ],
