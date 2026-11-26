@@ -388,6 +388,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   constroem: o Retry como recomeço da fase (_"nao vamos fazer isso."_), o botão de salvar replay (_"nao precisa tb"_) e o
   jogo instalado sem internet (_"nao quero..."_). Sobre o limite de 1.200 linhas: _"pode ser revisto sempre..."_; fica, e
   arquivo no limite se reparte. Em curso no ramo `reformas/auditorias-7-e-8`, um item por vez.
+- **(63)** As cartas fazem o que dizem (25/11): _"queria ter certeza que todos os upgrades e cartas estao funcionando e que
+  fazem real diferença no jogo e que nao sao apresentados no sorteio se nao servem mais para nada... isso deve ter uma
+  matriz de evolucao que demonstra em algum liugar no codigo para gente nao conseguir criar coisas defeituosas assim,
+  certo? fizemso algo assim? depois dos consertos grandes que fizemos nessas rodadas algo pode ter parado de funionar?"_;
+  e _"vamos resolver tudo antes de publicar,,,"_. Em curso no ramo `cartas/consertos-e-matriz`: os consertos e um teste
+  que falha quando alguém cria uma carta defeituosa. Fecha quando ele aprovar jogando.
 
 ## Som (palavras dele, 19/11)
 

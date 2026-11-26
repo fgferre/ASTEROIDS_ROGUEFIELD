@@ -278,7 +278,6 @@ describe('level-up offers', () => {
       maxOut(progression);
       const trail = progression.trailSlotIds();
       const ids = offerIds(progression, 5);
-      expect(ids).toHaveLength(3);
       // Every trail card the way allows (the rest wait on prerequisites).
       const open = progression
         .getEligibleUpgradeDefinitions()
@@ -286,32 +285,33 @@ describe('level-up offers', () => {
         .map(({ id }) => id);
       expect(open.length).toBeGreaterThan(0);
       open.forEach((id) => expect(ids).toContain(id));
-      ids
-        .filter((id) => !trail.includes(id))
-        .forEach((id) => expect(['hull_patch', 'salvage_cache']).toContain(id));
-      // No trail card left to offer: the offer is fallback cards alone.
+      // The hull whole: the Salvage Cache, never a Hull Patch.
+      expect(ids.filter((id) => !trail.includes(id))).toEqual([
+        'salvage_cache',
+      ]);
+      // No trail card left to offer, the hull whole (no player stats count
+      // as whole): Salvage Cache alone, no Hull Patch that would mend nothing.
       progression.pilotCardIds.forEach((id) =>
         progression.appliedUpgrades.set(id, 3)
       );
       progression.trailSlotIds = () => [];
-      expect(offerIds(progression, 5).sort()).toEqual([
-        'hull_patch',
-        'salvage_cache',
-      ]);
+      expect(offerIds(progression, 5)).toEqual(['salvage_cache']);
     });
 
-    it('offers Hull Patch when the hull is hurt, Salvage Cache when it is full', () => {
+    // A Hull Patch on a full hull repaired nothing, yet filled a place in
+    // the offer (outside check of the card matrix, 25/11).
+    it('offers Hull Patch only while the hull is hurt, before the Salvage Cache', () => {
       const progression = fill(createProgression(5));
       maxOut(progression);
       progression.trailSlotIds = () => [];
       progression.playerService = {
         getStats: () => ({ health: 50, maxHealth: 100 }),
       };
-      expect(offerIds(progression, 5)[0]).toBe('hull_patch');
+      expect(offerIds(progression, 5)).toEqual(['hull_patch', 'salvage_cache']);
       progression.playerService = {
         getStats: () => ({ health: 100, maxHealth: 100 }),
       };
-      expect(offerIds(progression, 5)[0]).toBe('salvage_cache');
+      expect(offerIds(progression, 5)).toEqual(['salvage_cache']);
     });
 
     it('a fallback pick is spent, never held, and can come again', () => {

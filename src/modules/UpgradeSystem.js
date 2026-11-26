@@ -295,7 +295,8 @@ class UpgradeSystem extends BaseSystem {
   }
 
   // Slots full and the offer short: more trail cards the trail allows, then
-  // the fallback cards (Hull Patch while hurt, Salvage Cache otherwise).
+  // the fallback cards: Hull Patch only while hurt (on a full hull it mends
+  // nothing), first, then Salvage Cache; the offer may stay a card short.
   fillFullOffer(selection, pool, count) {
     const trailIds = this.trailSlotIds();
     selection.push(
@@ -310,14 +311,11 @@ class UpgradeSystem extends BaseSystem {
     );
     const hurt = this.isHullHurt();
     const fallbacks = this.upgradeDefinitions
-      .filter((definition) => definition.fallback)
-      .sort((a, b) =>
-        (a.id === 'hull_patch') === hurt
-          ? -1
-          : (b.id === 'hull_patch') === hurt
-            ? 1
-            : 0
-      );
+      .filter(
+        (definition) =>
+          definition.fallback && (hurt || definition.id !== 'hull_patch')
+      )
+      .sort((a, b) => (b.id === 'hull_patch') - (a.id === 'hull_patch'));
     fallbacks.forEach((definition) => {
       if (selection.length < count) selection.push(definition);
     });

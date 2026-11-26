@@ -28,6 +28,7 @@ export const NEXT = {
     'Sovereign, beaten, no longer breaks into pieces: it stays whole for the ending (with reduced motion it burns away where it fell).', // not confirmed
   ],
   fixed: [
+    'With every card slot full and the hull whole, a level-up no longer offers a Hull Patch that would mend nothing: the Salvage Cache comes alone (with a hurt hull, both come, the patch first).', // not confirmed
     'After a Retry, a Leech still holds what it had eaten (killing it gives it all back, with its bonus) and no longer grows a little at each Retry, and a Shade that was hidden stays hidden instead of reappearing at once.', // not confirmed
     "Settings (F10, or View on a pad) no longer open over the level-up cards, a chest's cards or the ending's choice: under Settings, Enter, Space, 1 to 3 or A picked a card, closed the chest or chose and saved an ending without you seeing it, and the run went on with an invisible Settings still open. They open again as soon as the choice is made.", // not confirmed
     "On a phone held sideways, the ending's choice now fits the screen: both options show every line, with no scrolling.", // not confirmed
