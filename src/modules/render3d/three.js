@@ -80,9 +80,14 @@ function asOutput(target) {
   );
 }
 
+// Both composers are built on a target and sized in drawing-buffer pixels,
+// as r128 measured a composer given its target (pixel ratio 1); r187 takes
+// the renderer's ratio, which drew the menu's chain (device ratio) at twice
+// the screen's width and height.
 class EffectComposer extends Composer {
   constructor(renderer, target) {
     super(renderer, target);
+    this.setPixelRatio(1);
     asOutput(this.renderTarget1);
     asOutput(this.renderTarget2);
   }
