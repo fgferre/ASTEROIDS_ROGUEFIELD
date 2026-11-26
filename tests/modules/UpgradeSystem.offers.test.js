@@ -493,7 +493,7 @@ describe('level-up offers', () => {
 
     it('Afterburn Lance caps the flak bonus at the bolt range', () => {
       expect(shown('afterburn_lance', 'scatter').description).toBe(
-        'Flak bolts deal +10% damage per 100 px flown: they burst by 180 px, so up to +18%. Lock-on range +15%.'
+        'Flak bolts deal +10% damage per 100 px flown: they burst by 180 px, so up to +18%.'
       );
     });
   });
