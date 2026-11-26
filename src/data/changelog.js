@@ -31,7 +31,7 @@ export const NEXT = {
     "On a phone held sideways, the ending's choice now fits the screen: both options show every line, with no scrolling.", // not confirmed
   ],
   unseen: [
-    "The ending's last image is built on the loading screen (about one second more of loading), so nothing stalls when the choice opens or at any cut.",
+    "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",
   ],
 };
 

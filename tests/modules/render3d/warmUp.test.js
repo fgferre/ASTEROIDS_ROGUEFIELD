@@ -109,11 +109,12 @@ describe('Renderer3D.warmUp', () => {
     const progress = [];
     // The story is untold here: its freighter is made too.
     renderer.story = { warm: vi.fn() };
-    // The ending's last image: built and compiled before the frame of
-    // everything uploads it.
+    // The ending's last image: built on the story's Wake once it is made,
+    // compiled and drawn into the composer's target.
     renderer.ending = {
-      warm: vi.fn((compile) => {
-        expect(composer.render).not.toHaveBeenCalled();
+      warm: vi.fn((compile, post) => {
+        expect(renderer.story.warm).toHaveBeenCalledTimes(1);
+        expect(post).toBe(true);
         compile();
       }),
       // its beats at home, in the story's scene, once the story is made

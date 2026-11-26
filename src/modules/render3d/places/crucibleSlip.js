@@ -1,14 +1,17 @@
 // The last image's slip (render3d/endingScene.js `twin`, on the script the
 // owner approved, 24/11): on one arc of the Crucible (theCrucible.js), out
 // of every other shot, a cradle of the arcs' own build holding a Wake
-// identical to ours (travel/wake.js), finished and empty: its engines cold,
-// every light of it off but one window. Running lamps lead along the arc's
-// outer edge to the cradle and onto it, numbered in the order the light
-// reaches them. Built on the loading screen (theCrucible.js `slip()`,
-// render3d/endingScene.js warm), hidden until the beat shows it. Nothing here draws from the set's
-// scatter (`kit.random`): the arcs keep their decks and lamps.
+// identical to ours, finished and empty: its engines cold, every light of
+// it off but one window. The twin is the opening's own Wake (travel/
+// wake.js, built by storyScene.js), its painted hull drawn again: the same
+// geometry and baked maps, in materials of its own (the sky's reflection
+// cut), without its lights. Running lamps lead along the arc's outer edge
+// to the cradle and onto it, numbered in the order the light reaches
+// them. Built on the loading screen (theCrucible.js `slip()`, render3d/
+// endingTwin.js warm), hidden until the beat shows it. Nothing here draws
+// from the set's scatter (`kit.random`): the arcs keep their decks and
+// lamps.
 
-import { buildWake, setWakeLight } from '../travel/wake.js';
 import { bakeWakeGlow } from '../travel/wakeSurface.js';
 
 // proposta 24/11: where on its arc the slip stands (rad), the twin's
@@ -37,15 +40,48 @@ export const SLIP = Object.freeze({
 // The arcs' deck and its lights (theCrucible.js arc()).
 const DECK = { width: 110, thick: 26, lamp: 9 };
 
+// The painted hull of `wake` (buildWake's) again, in a group of its own:
+// each mesh on the same geometry, its material a copy (with the paint's
+// shader patches, which a copy drops) keeping `env` of the sky's
+// reflection. The opening's Wake is left as it is.
+function paintedTwin(THREE, wake, env) {
+  const group = new THREE.Group();
+  wake.group.children.forEach((part) => {
+    if (!part.isMesh) return;
+    const material = part.material.clone();
+    material.onBeforeCompile = part.material.onBeforeCompile;
+    material.customProgramCacheKey = part.material.customProgramCacheKey;
+    material.userData.rimBase = part.material.userData.rimBase;
+    material.envMapIntensity *= env;
+    const mesh = new THREE.Mesh(part.geometry, material);
+    mesh.castShadow = part.castShadow;
+    mesh.receiveShadow = part.receiveShadow;
+    group.add(mesh);
+  });
+  return group;
+}
+
+// The Wake's extent in its model units, lights included (as drawn whole).
+function extent(THREE, wake) {
+  const box = new THREE.Box3();
+  wake.group.traverse((part) => {
+    if (!part.geometry) return;
+    if (!part.geometry.boundingBox) part.geometry.computeBoundingBox();
+    box.union(part.geometry.boundingBox);
+  });
+  return box;
+}
+
 /**
- * The slip on arc `spec` (theCrucible.js ARCS) with the set's `kit`:
+ * The slip on arc `spec` (theCrucible.js ARCS) with the set's `kit`, its
+ * twin drawn from `wake` (the opening's, buildWake's):
  * { object (for the arc's turning group, hidden), frame (the cradle's own
  * frame: x along the arc, y up, z out from the star), lamps (meshes, in the
  * order the light reaches them), pane (the lit window), paneColor (its
  * colour fully lit), glow and glowColor (its halo, likewise) and paneAt
  * (its centre in the frame) }.
  */
-export function buildSlip(THREE, kit, { radius, height, tilt }) {
+export function buildSlip(THREE, kit, { radius, height, tilt }, wake) {
   const { tone } = kit;
   const steel = tone('#423d36');
   const dark = tone('#35312c');
@@ -57,25 +93,15 @@ export function buildSlip(THREE, kit, { radius, height, tilt }) {
   object.position.set(0, height, 0);
   object.rotation.set(tilt, 0, tilt * 0.6, 'YXZ');
 
-  const twin = buildWake(THREE);
+  // far under the field: the sky's reflection mostly gone, no light on
+  const twin = paintedTwin(THREE, wake, SLIP.env);
   const scale = SLIP.length / 100;
-  twin.group.scale.setScalar(scale);
-  twin.group.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(twin.group);
+  twin.scale.setScalar(scale);
+  const box = extent(THREE, wake);
+  box.min.multiplyScalar(scale);
+  box.max.multiplyScalar(scale);
   const half = (box.max.z - box.min.z) / 2;
   const rise = box.max.y - box.min.y;
-  // far under the field: the sky's reflection mostly gone
-  twin.group.traverse((part) => {
-    if (part.material?.isMeshStandardMaterial) {
-      part.material.envMapIntensity *= SLIP.env;
-    }
-  });
-  [twin.lights.windows, twin.lights.lamps, twin.lights.floods]
-    .concat(twin.lights.beacons, twin.lights.engines)
-    .forEach((light) => {
-      setWakeLight(light, 0);
-      light.visible = false;
-    });
 
   // The cradle's frame: past the deck's outer edge, x along the arc.
   const a = SLIP.angle;
@@ -85,12 +111,12 @@ export function buildSlip(THREE, kit, { radius, height, tilt }) {
   frame.rotation.y = -a + Math.PI / 2;
   object.add(frame);
   const keel = DECK.thick * 0.5;
-  twin.group.position.set(
+  twin.position.set(
     -(box.min.x + box.max.x) / 2,
     keel - box.min.y,
     -(box.min.z + box.max.z) / 2
   );
-  frame.add(twin.group);
+  frame.add(twin);
 
   const hull = [];
   const L = SLIP.length;
@@ -158,8 +184,8 @@ export function buildSlip(THREE, kit, { radius, height, tilt }) {
   const paneColor = tone(css, level);
   const geometry = paneOf(
     THREE,
-    twin.lights.windows,
-    twin.anchors.bridge.position,
+    wake.lights.windows,
+    wake.anchors.bridge.position,
     SLIP.reach
   );
   const lit = new THREE.Mesh(
@@ -184,9 +210,9 @@ export function buildSlip(THREE, kit, { radius, height, tilt }) {
   glow.scale.set(across, across, 1);
   glow.position.copy(centre).setZ(centre.z + 0.05);
   lit.add(glow);
-  twin.group.add(lit);
-  twin.group.updateMatrix();
-  const paneAt = centre.clone().applyMatrix4(twin.group.matrix);
+  twin.add(lit);
+  twin.updateMatrix();
+  const paneAt = centre.clone().applyMatrix4(twin.matrix);
   return {
     object,
     frame,

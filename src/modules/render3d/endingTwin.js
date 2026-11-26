@@ -7,8 +7,8 @@
 // severed and dark, its lamps going out from the farthest, the window
 // last, then the black; Stewardship's plated in light, its lamps lighting
 // along the arc to the slip, the window lit to the cut. The slip is built
-// and its programs compiled on the loading screen (warm). Nothing is
-// allocated per frame.
+// on the opening's Wake, its programs compiled and its buffers uploaded on
+// the loading screen (warm). Nothing is allocated per frame.
 
 import { ENDING_SHOTS, ENDING_WAKE, easeInOut } from '../../core/cinematics.js';
 import { colorOf } from './batches.js';
@@ -53,10 +53,11 @@ export function twinAt(u, ending, durationMs, out = {}) {
 }
 
 export class LastImage {
-  /** `t`: Renderer3D's WebGL kit. */
-  constructor(t) {
+  /** `t`: Renderer3D's WebGL kit; `story`: the opening (its Wake). */
+  constructor(t, story) {
     const { THREE } = t;
     this.t = t;
+    this.story = story;
     this.slip = null;
     this.state = {};
     this.from = new THREE.Vector3();
@@ -69,17 +70,28 @@ export class LastImage {
   }
 
   /**
-   * Loading screen: the slip built on its arc and shown while `compile`
-   * builds its programs, then hidden (the frame of everything after
-   * uploads its buffers).
+   * Loading screen, after the opening's (its Wake built): the slip built on
+   * its arc, shown while `compile` builds its programs and one draw of the
+   * scene as it stands (its lights as compiled), the slip unculled, uploads
+   * what is its own (into the composer's target when `post`, as the frames
+   * draw), then hidden.
    */
-  warm(compile) {
-    const set = this.t.backdrop.places.built.get(CRUCIBLE);
-    this.slip = set.slip();
+  warm(compile, post) {
+    const t = this.t;
+    const set = t.backdrop.places.built.get(CRUCIBLE);
+    this.slip = set.slip(this.story.wake);
     const shown = set.object.visible;
     set.object.visible = true;
     this.slip.object.visible = true;
     compile();
+    const parts = [];
+    this.slip.object.traverse((part) => parts.push(part));
+    const culled = parts.map((part) => part.frustumCulled);
+    parts.forEach((part) => (part.frustumCulled = false));
+    t.renderer.setRenderTarget(post ? t.composer.readBuffer : null);
+    t.renderer.render(t.scene, t.camera);
+    t.renderer.setRenderTarget(null);
+    parts.forEach((part, i) => (part.frustumCulled = culled[i]));
     this.slip.object.visible = false;
     set.object.visible = shown;
   }
