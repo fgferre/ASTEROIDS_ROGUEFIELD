@@ -608,8 +608,7 @@ export default class GameSessionService {
     // Before the reset: the first layer's rock count already follows it.
     const waveManager = resolveService('enemies', this.services)?.waveManager;
     if (waveManager) {
-      waveManager.bossRush = this.bossRush;
-      waveManager.sector = this.sector;
+      waveManager.mode = this.mode;
     }
 
     try {

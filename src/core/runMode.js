@@ -18,7 +18,12 @@
 
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { DAILY_DIFFICULTY } from '../data/difficulty.js';
-import { sectorById } from '../data/sectors.js';
+import {
+  bossRushDirectorFor,
+  directorFor,
+  nextBossRushLayer,
+} from '../data/layers.js';
+import { sectorById, sectorStage } from '../data/sectors.js';
 
 const DESCENT = Object.freeze({
   kind: 'descent',
@@ -28,6 +33,15 @@ const DESCENT = Object.freeze({
   headStart: 0,
   /** The layer whose Warden wins the run. */
   lastLayer: RUN_FINAL_LAYER,
+  /** The layer that follows `layer` (0 before the first). */
+  nextLayer: (layer) => Math.max(layer + 1, 1),
+  /**
+   * `layer`'s plan before the difficulty scales it: a sector's own stage, else
+   * the table's (past it, endless modifiers rolled from `seed`).
+   */
+  layerPlan: (layer, seed) => directorFor(layer, seed),
+  /** After `layer`, the Warden a breather leads to, or none. */
+  breatherTo: () => null,
   /** A Warden before the last one gives a card pick. */
   wardensGivePicks: false,
   /** The run is scored by the Wardens it kills (record, Salvage). */
@@ -62,6 +76,9 @@ const DAILY = Object.freeze({
 const BOSS_RUSH = Object.freeze({
   ...DESCENT,
   kind: 'bossRush',
+  nextLayer: (layer) => nextBossRushLayer(layer),
+  layerPlan: (layer) => bossRushDirectorFor(layer),
+  breatherTo: (layer) => nextBossRushLayer(layer),
   wardensGivePicks: true,
   scoredByWardens: true,
   goesOnAfterVictory: false,
@@ -77,6 +94,9 @@ function sectorMode(sector) {
     sector,
     headStart: sector.headStart ?? 0,
     lastLayer: sector.layers[1],
+    nextLayer: (layer) => Math.max(layer + 1, sector.layers[0]),
+    layerPlan: (layer, seed) =>
+      sectorStage(sector, layer) ?? directorFor(layer, seed),
     goesOnAfterVictory: false,
     writesLayerRecord: false,
     writesSectorRecord: true,

@@ -425,7 +425,7 @@ describe('run replay', () => {
       bossRush: false,
     });
     expect(replay.session.bossRush).toBe(true);
-    expect(replay.services.enemies.waveManager.bossRush).toBe(true);
+    expect(replay.services.enemies.waveManager.mode.kind).toBe('bossRush');
     expect(replay.services.player.currentHull.id).toBe(BASTION_HULL_ID);
     expect(replay.snapshot()).toEqual(recorded);
   });
