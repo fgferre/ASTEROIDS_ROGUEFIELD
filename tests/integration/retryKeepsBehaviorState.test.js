@@ -49,7 +49,6 @@ describe('a Retry keeps what its behaviors hold', () => {
     for (let i = 0; i < 180; i += 1) game.step();
     vi.advanceTimersByTime(3000);
     const flow = game.session.retry;
-    flow.retryCountElement = { textContent: '1', isConnected: true };
     flow.retryCountdownElement = {
       textContent: '',
       isConnected: true,

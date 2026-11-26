@@ -631,6 +631,7 @@ export function createSimulationManifest(context = {}, presentation) {
             difficulty: resolved['difficulty'],
           },
           gameState: context.gameState,
+          playLink: context.playLink,
         });
 
         if (

@@ -15,7 +15,6 @@ import { RunEnd } from './session/runEnd.js';
 import { HeadStart } from './session/headStart.js';
 import { RetryCountdown } from './session/retryCountdown.js';
 import { MenuButtons } from './session/menuButtons.js';
-import { playRemoteLink, remoteLinkLines } from '../modules/ui/remoteLink.js';
 
 /**
  * GameSessionService orchestrates lifecycle state for a single game run.
@@ -33,7 +32,19 @@ export default class GameSessionService {
    * @param {Object} options.services - Systems coordinated by the session
    * @param {Object} [options.gameState] - Raw game state reference used during bootstrap
    */
-  constructor({ eventBus, random, gameStateFacade, services = {}, gameState }) {
+  /**
+   * `playLink({ options, hullName, button, onConnect, eventBus })`: plays the
+   * way into a run started from the menu (app.js gives ui/remoteLink.js);
+   * without it, as headless, the run starts at once.
+   */
+  constructor({
+    eventBus,
+    random,
+    gameStateFacade,
+    services = {},
+    gameState,
+    playLink,
+  }) {
     if (!eventBus) {
       throw new Error('[GameSessionService] Missing event bus instance');
     }
@@ -151,13 +162,16 @@ export default class GameSessionService {
       requestRetry: (options) => this.retry.requestRetry(options),
       exitToMenu: (payload) => this.exitToMenu(payload),
       continueBeyondVictory: () => this.runEnd.continueBeyondVictory(),
-      linkIn: (options, start, button) =>
-        playRemoteLink({
-          lines: remoteLinkLines(options, this.resolveHullDefinition()?.name),
-          button,
-          onConnect: start,
-          eventBus: this.eventBus,
-        }),
+      linkIn:
+        playLink &&
+        ((options, start, button) =>
+          playLink({
+            options,
+            hullName: this.resolveHullDefinition()?.name,
+            button,
+            onConnect: start,
+            eventBus: this.eventBus,
+          })),
     });
 
     if (

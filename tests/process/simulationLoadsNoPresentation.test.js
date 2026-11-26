@@ -40,10 +40,7 @@ const SYSTEMS = [
 ];
 
 // importer → target: why the simulation may load that presentation file.
-const ALLOWED = {
-  'src/services/GameSessionService.js → src/modules/ui/remoteLink.js':
-    'playRemoteLink and remoteLinkLines play the link into a run from the menu',
-};
+const ALLOWED = {};
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {

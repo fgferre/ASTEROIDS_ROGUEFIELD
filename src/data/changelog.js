@@ -42,6 +42,7 @@ export const NEXT = {
     'If part of the game fails to start, the loading screen now stays and says so, asking you to reload the page, instead of opening a menu whose Launch does nothing.', // not confirmed
   ],
   unseen: [
+    "Three small clean-ups with nothing to notice: the run's session no longer loads the screen code of the link into a run (the game hands it over), the Retries left are a number the session keeps instead of the button's text, and the death snapshot loses fallbacks to methods no system has.", // not confirmed
     "Leaving a run for the menu now clears its pickups, chests and Overcharge, and a run's drops count from its mode's first layer from the start (a sector's head start or a build carried to the next sector kept the old run's layer until its first layer began); nothing could be picked up meanwhile, so nobody notices.", // not confirmed
     'Two object pools the game never took from and a housekeeping that grew and shrank the pools on the wall clock inside every step are gone; it changed no run (measured on 15 recorded scenarios), so nobody notices.', // not confirmed
     "After a Retry the layer goes on with its own draws from where they stood at the death (the next rocks, their variants and fragments, the waves and the rewards), instead of starting again from the run's first draw; nobody can tell one sequence from the other, and the same death still gives the same Retry.", // not confirmed

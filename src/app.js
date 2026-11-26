@@ -17,6 +17,7 @@ import { mobileGuard } from './bootstrap/mobileGuard.js';
 import { watchGameBox } from './core/viewport.js';
 import { TouchControls } from './modules/input/touchControls.js';
 import { followBindingHints } from './modules/ui/bindingHints.js';
+import { playRemoteLink, remoteLinkLines } from './modules/ui/remoteLink.js';
 import { showStartFailure } from './modules/menu/loadingScreen.js';
 import {
   activateProfileHarness,
@@ -230,6 +231,10 @@ function init(recording = null, touch = false) {
       seed: initialSeed,
       randomSeed: initialSeed,
       randomSeedSource: seedSource,
+      // The way into a run from the menu, on screen (the session stays free
+      // of presentation code).
+      playLink: ({ options, hullName, ...link }) =>
+        playRemoteLink({ lines: remoteLinkLines(options, hullName), ...link }),
     };
 
     // Initialize DI system first (Phase 2.1)
