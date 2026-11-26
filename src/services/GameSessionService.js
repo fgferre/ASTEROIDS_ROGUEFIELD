@@ -669,9 +669,7 @@ export default class GameSessionService {
     this.emitGameStarted({
       source,
       timestamp: Date.now(),
-      // runCinematics reads the kind from these two until it asks the mode
-      // (this branch's last commit); the music starts the sector's score.
-      bossRush: this.mode.kind === 'bossRush',
+      // The music starts the sector's score from its id.
       sector: this.mode.sector?.id ?? null,
       mode: this.mode,
       replay,

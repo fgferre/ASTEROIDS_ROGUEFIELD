@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import RandomService from '../../../src/core/RandomService.js';
+import { runModeFor } from '../../../src/core/runMode.js';
 import { STORY } from '../../../src/data/story.js';
 import { sectorById } from '../../../src/data/sectors.js';
 import {
@@ -321,7 +322,7 @@ describe('deathTransmission', () => {
 
 describe('runVoiceLines', () => {
   const keys = (start, layer) =>
-    runVoiceLines(start, layer).map((line) => line.key);
+    runVoiceLines(runModeFor(start), layer).map((line) => line.key);
   const deaths = STORY.death.map((_, i) => `death:${i}`);
 
   it("a sector ending on a Sentinel: its stage lines, its Sentinel's, its machines' sightings, every death line", () => {

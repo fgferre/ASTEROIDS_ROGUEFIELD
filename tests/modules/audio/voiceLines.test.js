@@ -6,6 +6,7 @@ import { STORY } from '../../../src/data/story.js';
 import { SECTORS } from '../../../src/data/sectors.js';
 import { BIOMES } from '../../../src/data/biomes.js';
 import { TRAVEL } from '../../../src/core/cinematics.js';
+import { runModeFor } from '../../../src/core/runMode.js';
 import {
   createVoicePlayer,
   loadVoiceManifest,
@@ -159,7 +160,7 @@ describe('voiceFor', () => {
 
   it("readies a run's death lines in its chapter's Warden's voice", () => {
     BIOMES.forEach(({ layers }) => {
-      const deaths = runVoiceLines({}, layers[0]).filter(
+      const deaths = runVoiceLines(runModeFor({}), layers[0]).filter(
         (l) => l.key.startsWith('death:') && l.speaker !== ring
       );
       expect(deaths.length).toBeGreaterThan(0);
@@ -381,8 +382,8 @@ describe('createVoicePlayer', () => {
   });
 
   it("a run's lines load as it is offered, stay through its fight, and go when the next run's replace them or the menu lets them go", async () => {
-    const run = runVoiceLines({ sector: 'quarantine-grid' });
-    const next = runVoiceLines({ sector: 'wardens-reach' });
+    const run = runVoiceLines(runModeFor({ sector: 'quarantine-grid' }));
+    const next = runVoiceLines(runModeFor({ sector: 'wardens-reach' }));
     const { player, fetched } = makePlayer();
     const files = (lines) => [
       ...new Set(

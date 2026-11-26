@@ -39,33 +39,9 @@ const ALLOWED_LINES = [
 const PENDING = [
   'src/modules/ui/RunEndScreens.js',
   'src/modules/ui/runTimeline.js',
-  'src/modules/ui/runCinematics.js',
   'src/modules/render3d/Renderer3D.js',
 ];
-const PENDING_LINES = [
-  [
-    'src/modules/ui/transmissions.js',
-    'function layerLines(layer, sector, bossRush) {',
-  ],
-  ['src/modules/ui/transmissions.js', 'const director = bossRush'],
-  [
-    'src/modules/ui/transmissions.js',
-    'bossRush && layer === BOSS_RUSH_LAYERS[0] && bossRushTransmission(),',
-  ],
-  [
-    'src/modules/ui/transmissions.js',
-    'export function runVoiceLines({ sector: id, bossRush } = {}, layer = 1) {',
-  ],
-  [
-    'src/modules/ui/transmissions.js',
-    'const rush = Boolean(bossRush) && !sector;',
-  ],
-  ['src/services/session/runEnd.js', 'bossRush: {'],
-  [
-    'src/services/GameSessionService.js',
-    "bossRush: this.mode.kind === 'bossRush',",
-  ],
-];
+const PENDING_LINES = [['src/services/session/runEnd.js', 'bossRush: {']];
 
 const CHECKS = [
   ['a bossRush flag', /\bbossRush\b/],
