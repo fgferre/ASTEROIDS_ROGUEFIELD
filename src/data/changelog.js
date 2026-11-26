@@ -28,6 +28,7 @@ export const NEXT = {
     'Sovereign, beaten, no longer breaks into pieces: it stays whole for the ending (with reduced motion it burns away where it fell).', // not confirmed
   ],
   fixed: [
+    "Settings (F10, or View on a pad) no longer open over the level-up cards, a chest's cards or the ending's choice: under Settings, Enter, Space, 1 to 3 or A picked a card, closed the chest or chose and saved an ending without you seeing it, and the run went on with an invisible Settings still open. They open again as soon as the choice is made.", // not confirmed
     "On a phone held sideways, the ending's choice now fits the screen: both options show every line, with no scrolling.", // not confirmed
     'If the same pilot was changed in another tab, any click in the Hangar (buying, licences, seals, Pressure, the starting card) now closes it and takes the game back to the start screen, instead of changing something that would not be saved.', // not confirmed
     'The key hints in the menu, the Flight Computer briefing and the pause screen show the keys and pad buttons you set in Settings, not the defaults; the first move tip names your movement keys too.', // not confirmed

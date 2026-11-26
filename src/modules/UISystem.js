@@ -753,6 +753,16 @@ class UISystem extends BaseSystem {
       if (appState?.getRawState?.()?.sessionState === 'quitting') {
         return;
       }
+      // Not over a choice: its keys reached it under Settings, picking a card
+      // or recording an ending unseen while the run went on behind them
+      // (outside audit 8, verdict B7). Settings open again once it is made.
+      if (
+        this.levelUpScreen.levelUpState.isVisible ||
+        this.chestCeremony.current ||
+        this.runEndScreens.choice
+      ) {
+        return;
+      }
       let source = payload.source || 'menu';
       if (appState?.getScreen?.() === 'playing') {
         if (appState.isPaused?.()) {
