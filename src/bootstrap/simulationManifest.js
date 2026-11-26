@@ -31,8 +31,6 @@ export const DEFAULT_POOL_CONFIG = {
   particles: { initial: 60, max: 400 },
   asteroids: { initial: 20, max: 100 },
   xpOrbs: { initial: 40, max: 250 },
-  shockwaves: { initial: 8, max: 25 },
-  tempObjects: { initial: 15, max: 60 },
 };
 
 function ensureGameStateService(gameState) {

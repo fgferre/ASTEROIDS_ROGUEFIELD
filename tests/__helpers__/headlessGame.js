@@ -145,7 +145,6 @@ export function createHeadlessGame({ seedSource = 'test' } = {}) {
     },
     /** Mirrors the fixed-step body of app.js gameLoop. */
     step() {
-      services['game-pools'].update(STEP_SECONDS);
       const adjusted = services.effects.update(STEP_SECONDS);
       for (const name of UPDATE_ORDER) {
         services[name].update(adjusted);

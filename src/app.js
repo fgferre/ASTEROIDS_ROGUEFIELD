@@ -463,7 +463,6 @@ function gameLoop(currentTime) {
       // Stop mid-frame when a step pauses the run (level-up, pause): the
       // remaining steps must not depend on how frames were batched.
       for (let i = 0; i < steps && gameSessionService.isRunning(); i += 1) {
-        GamePools.update(stepSeconds);
         // Effects own freeze frames and time dilation: they return the
         // simulation delta the game systems should actually advance by.
         const adjustedDelta = effects.update(stepSeconds);

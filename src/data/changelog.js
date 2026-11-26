@@ -42,6 +42,7 @@ export const NEXT = {
     'If part of the game fails to start, the loading screen now stays and says so, asking you to reload the page, instead of opening a menu whose Launch does nothing.', // not confirmed
   ],
   unseen: [
+    'Two object pools the game never took from and a housekeeping that grew and shrank the pools on the wall clock inside every step are gone; it changed no run (measured on 15 recorded scenarios), so nobody notices.', // not confirmed
     "After a Retry the layer goes on with its own draws from where they stood at the death (the next rocks, their variants and fragments, the waves and the rewards), instead of starting again from the run's first draw; nobody can tell one sequence from the other, and the same death still gives the same Retry.", // not confirmed
     "A `?replay=` link now opens only a recording on the game's own site (another site learned who opened it), and a recording's Hangar setup must hold exactly what a run writes, within what owning every item can give (a link flew a ship with a hull of 100,000); players cannot make replay links yet, so nobody notices.", // not confirmed
     'The controls code is split in three files by subject (the bindings, the pad, the rest), so it can be changed again without passing the line limit; it reads keys, pads and touch exactly as before.', // not confirmed
