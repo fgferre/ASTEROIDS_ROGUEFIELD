@@ -59,6 +59,7 @@ export const NEXT = {
     'Starting a sector with a head start (the Crucible gives 26 level-ups) now plays one level-up flash, shake, slow motion and sound instead of one for every level at once.', // not confirmed
     "In a narrow window with a pad, the strip of pad buttons on Mission Control no longer covers the Hangar, Codex and Settings buttons, and in the Hangar a hull's line that does not fit (the Bastion's, the Solar Slicer's) breaks between its parts instead of leaving a lone number on the second line.", // not confirmed
     "On a short window (a small laptop), a new pilot's Launch button on Mission Control was hidden under the Ring and could not be clicked; Launch now always shows whole, the Ring takes less height, and when the sectors do not all fit their list scrolls on its own.", // not confirmed
+    'On a smaller phone held sideways, the Launch button on Mission Control was off the bottom of the screen and could not be reached; it now always shows whole, the sector list and the line beside the difficulty scroll on their own when they do not fit, and the version moved to the top row so it no longer covers the Boss Rush tab.', // not confirmed
   ],
   unseen: [
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",
