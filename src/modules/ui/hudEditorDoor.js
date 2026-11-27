@@ -6,7 +6,8 @@
 // the editor shows once it is here, its input layer pushed then. Nothing
 // changes on screen while it travels, and a player who has moved on by then
 // gets it on the next press. A file that does not arrive leaves the screen
-// as it was with a short notice, and the next press asks for it again.
+// as it was with a short notice, and the next press asks for it again; Chrome
+// keeps a failed load until the page reloads, so the notice says to reload.
 // Shut, the HUD wears the HUD Layout setting's layout.
 
 import { resolveService } from '../../core/serviceUtils.js';
@@ -112,7 +113,7 @@ function showLoadNotice() {
   notice.className = 'hud-editor-notice';
   notice.setAttribute('role', 'status');
   notice.textContent =
-    "The HUD editor couldn't load. Check the connection and try again.";
+    "The HUD editor couldn't load. Check the connection, then reload the page.";
   document.body.appendChild(notice);
   setTimeout(() => notice.remove(), NOTICE_MS);
 }

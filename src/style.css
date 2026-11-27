@@ -5973,7 +5973,7 @@ body.touch-play .hud-frame [data-touch-action]::after {
    toast (.hed-toast, editorStyles.js), over Settings or the pause screen === */
 .hud-editor-notice {
   position: fixed;
-  top: 32px;
+  top: 8px;
   left: 50%;
   z-index: 150;
   transform: translateX(-50%);

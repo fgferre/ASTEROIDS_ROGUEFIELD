@@ -415,8 +415,15 @@ export class LevelUpScreen {
     });
     button.addEventListener('mouseenter', () => {
       this.emit('ui-hover', { source: 'upgrade-selection', index });
-      // Keyboard focus follows: Enter and the highlight name the same card.
-      this.focusLevelUpOption(index);
+    });
+    // Keyboard focus follows the mouse that moves onto a card: Enter and the
+    // highlight name the same card. Only a move: a card that comes under a
+    // resting cursor (Settings closing over it) leaves the highlight where
+    // the pad or the keys put it.
+    button.addEventListener('mousemove', () => {
+      if (this.levelUpState.focusIndex !== index) {
+        this.focusLevelUpOption(index);
+      }
     });
     button.addEventListener('focus', () => this.focusLevelUpOption(index));
 

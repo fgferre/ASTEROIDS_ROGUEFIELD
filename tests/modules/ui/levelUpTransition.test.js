@@ -197,7 +197,7 @@ describe('Level-up card transition', () => {
       expect(container.children[0].classes.has('is-focused')).toBe(true);
     });
 
-    it('moves keyboard focus to the card the pointer lights, so one card is armed', () => {
+    it('moves keyboard focus to the card the mouse moves onto, so one card is armed, and not to one that comes under a resting cursor', () => {
       document.createElement = () => {
         const listeners = {};
         const node = {
@@ -239,7 +239,13 @@ describe('Level-up card transition', () => {
       inputLayers.push(levelUp.inputLayer); // up, on top
 
       levelUp.focusLevelUpOption(0);
+      // The card comes under a resting cursor (Settings closing over it):
+      // the highlight stays where the pad put it.
       cards[1].listeners.mouseenter();
+      expect(cards[0].classes.has('is-focused')).toBe(true);
+      expect(cards[1].classes.has('is-focused')).toBe(false);
+
+      cards[1].listeners.mousemove();
 
       expect(cards[1].classes.has('is-focused')).toBe(true);
       expect(cards[0].classes.has('is-focused')).toBe(false);
