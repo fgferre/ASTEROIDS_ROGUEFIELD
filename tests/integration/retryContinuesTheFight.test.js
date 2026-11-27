@@ -28,6 +28,7 @@ import { installDomStubs } from '../__helpers__/domStubs.js';
 const DEATH_STEPS = 180; // the field plays on 3 s under the end screen
 const WARMUP_LIMIT = 3600; // steps a boss gets to start an attack
 const AFTER_STEPS = 600; // the fight played on after the Retry
+const PLAYED_LAYER = 9; // a layer with every rock variant and Elites
 
 // A Herald's strike, announced (its windup) and not yet thrown.
 const heraldWindup = (b) => b.cycleTimer > 0 && b.cycleTimer <= b.cycleWindup();
@@ -348,6 +349,34 @@ function expectTheFightGoesOn(id, run) {
   expect(differences(first.end, run().end).join('\n')).toBe('');
 }
 
+// A layer played for real: its spawner on (rocks of each variant it draws,
+// its enemies, Elites), the ship firing with the cards it is offered for
+// 30 s; then its death, the run's one Retry and 10 s more.
+function playedLayer() {
+  const game = newGame();
+  const { enemies, progression } = game.services;
+  enemies.waveManager.currentWave = PLAYED_LAYER - 1;
+  enemies.waveManager.waveInProgress = false;
+  enemies.startNextWave();
+  const play = (steps) => {
+    for (let i = 0; i < steps; i += 1) {
+      if (game.takeOfferedUpgrade()) {
+        progression.applyUpgrade(progression.pendingUpgradeOptions[0].id);
+      }
+      game.step();
+    }
+  };
+  play(1800);
+  const kills = enemies.sessionStats.totalKills;
+  const unread = new Set();
+  const atDeath = dump(game, unread);
+  retry(game);
+  const lost = differences(atDeath, dump(game, unread));
+  game.services.player.setInvulnerableTimer(1e9);
+  play(AFTER_STEPS);
+  return { kills, unread: [...unread].sort(), lost, end: dump(game) };
+}
+
 const bossIds = listContent('bosses').map(({ id }) => id);
 const enemyIds = ['asteroid', ...listContent('enemies').map(({ id }) => id)];
 
@@ -388,5 +417,13 @@ describe('a Retry continues the fight where it stopped', () => {
 
   it.each(enemyIds)('enemy %s, killed mid-life', (id) => {
     expectTheFightGoesOn(id, () => fight(id, setUpEnemy));
+  });
+
+  it('a layer played with cards, killed and retried', () => {
+    const first = playedLayer();
+    expect(first.kills).toBeGreaterThan(0);
+    expect(first.unread).toEqual([]);
+    expect(first.lost.join('\n')).toBe('');
+    expect(differences(first.end, playedLayer().end).join('\n')).toBe('');
   });
 });
