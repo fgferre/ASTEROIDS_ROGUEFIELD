@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import { GamePools } from '../../src/core/GamePools.js';
@@ -28,7 +30,58 @@ function route(owner, service, functions = functionsOf(service)) {
   return { eventBus, functions };
 }
 
+// What the combat code reads of cardEffects: `cardEffects.x`, `cardEffects?.x`,
+// `cardEffects().x`, or { x } = ...cardEffects.
+const combatFiles = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory()
+      ? combatFiles(join(dir, entry.name))
+      : [join(dir, entry.name)]
+  );
+const combatText = [
+  ...combatFiles('src/modules/combat'),
+  'src/modules/CombatSystem.js',
+]
+  .map((f) => readFileSync(f, 'utf8'))
+  .join('\n');
+const cardEffectsRead = new Set([
+  ...[...combatText.matchAll(/cardEffects(?:\(\))?\??\.(\w+)/g)].map(
+    (m) => m[1]
+  ),
+  ...[
+    ...combatText.matchAll(/\{([^{}]*)\}\s*=\s*[\w.()]*cardEffects\b/g),
+  ].flatMap((m) => m[1].split(',').map((name) => name.split(':')[0].trim())),
+]);
+
 describe('card effect routes', () => {
+  it('a `lands` into combat cardEffects names a key the combat code reads', () => {
+    const unread = declaredCardEffects()
+      .filter(({ effect }) => typeof effect.lands === 'string')
+      .flatMap(({ source, effect }) => {
+        const name = /cardEffects\.(\w+)$/.exec(effect.lands)?.[1];
+        return name && !cardEffectsRead.has(name)
+          ? [
+              `${source}: '${effect.lands}' (nothing in combat reads cardEffects.${name})`,
+            ]
+          : [];
+      });
+    expect([...new Set(unread)]).toEqual([]);
+  });
+
+  it("every payload key a `lands` map names is in that rank's payload", () => {
+    const missing = declaredCardEffects()
+      .filter(({ effect }) => effect.lands && typeof effect.lands === 'object')
+      .flatMap(({ source, effect }) =>
+        Object.values(effect.lands)
+          .filter((key) => !(key in (effect.payload ?? {})))
+          .map(
+            (key) =>
+              `${source}: '${effect.event}' lands '${key}', not in its payload`
+          )
+      );
+    expect([...new Set(missing)]).toEqual([]);
+  });
+
   it('stores the delivered object where the card says, under the event name', () => {
     const combat = { cards: { cardEffects: {} } };
     const { eventBus } = route(combat, 'combat');

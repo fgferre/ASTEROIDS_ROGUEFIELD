@@ -68,12 +68,43 @@ const matches = (pattern) =>
       .filter(({ text: code }) => !/^(\/\/|\/\*|\*)/.test(code));
   });
 
+// The quoted keys at the top of the object literal that is the 4th argument of
+// the routeCardEffects( call at `from`: the table handed to the router, not
+// every 'name': in the file. Strings and comments are skipped while scanning.
+function tableKeys(text, from) {
+  const keys = [];
+  const stack = [];
+  let arg = 0;
+  let i = text.indexOf('(', text.indexOf('routeCardEffects', from));
+  for (; i < text.length; i++) {
+    const ch = text[i];
+    if (text.startsWith('//', i)) i = text.indexOf('\n', i);
+    else if (text.startsWith('/*', i)) i = text.indexOf('*/', i) + 1;
+    else if (ch === "'" || ch === '"' || ch === '`') {
+      const start = i;
+      for (i++; text[i] !== ch; i++) if (text[i] === '\\') i++;
+      const inTable = arg === 3 && stack.length === 2 && stack[1] === '{';
+      const key = /^\s*:/.test(text.slice(i + 1, i + 8));
+      if (inTable && key) keys.push(text.slice(start + 1, i));
+    } else if ('({['.includes(ch)) stack.push(ch);
+    else if (')}]'.includes(ch)) {
+      stack.pop();
+      if (!stack.length) break;
+    } else if (ch === ',' && stack.length === 1) arg++;
+  }
+  return keys;
+}
+
 // The owners: who calls routeCardEffects, as which service, and the events of
 // the functions in its file (the table's keys).
 const owners = new Map(
   matches(/routeCardEffects\(\s*this,\s*'([\w-]+)'/g).map((call) => {
     const { text } = sources.find(({ f }) => f === call.f);
-    const keys = [...text.matchAll(/^\s*'([\w:-]+)'\s*:/gm)].map((m) => m[1]);
+    const from = text
+      .split('\n')
+      .slice(0, call.line - 1)
+      .join('\n').length;
+    const keys = tableKeys(text, from + 1);
     return [call.name, { ...call, functions: new Set(keys) }];
   })
 );
@@ -86,6 +117,31 @@ const listeners = matches(
 )
   .concat(matches(/\bon:\s*['"`]([\w:-]+)['"`]/g))
   .filter(({ name }) => events.has(name));
+
+// An effect's event named anywhere else in the code, whatever holds it (a
+// constant, a table): the literal itself is the signal. The declarations and
+// the router are where the names belong; the rest is named below.
+const NAMED_OK = [
+  {
+    file: 'src/modules/collectibles/PickupSystem.js',
+    event: 'upgrade-weapon-tuning',
+    reason: "PickupSystem emits the weapon tuning's announcement itself",
+  },
+];
+const nameHome = (f) =>
+  f.startsWith('src/content/cards/') ||
+  f.startsWith('src/data/upgrades/') ||
+  f === 'src/modules/cardEffectRoutes.js';
+// Looked up per event name, not by pairing quotes, so an apostrophe in a
+// comment cannot hide a literal further down the file.
+const namings = [...events].flatMap((event) =>
+  matches(new RegExp(`['"\`](${event})['"\`]`, 'g'))
+);
+// The owner's own table is where its functions are named, by key.
+const isTableKey = ({ f, name, text }) =>
+  owners
+    .get([...owners.keys()].find((o) => owners.get(o).f === f))
+    ?.functions.has(name) && /^['"][\w:-]+['"]\s*:/.test(text);
 const isExcused = ({ f, name }) =>
   EXCUSED.some(({ file, event }) => file === f && event === name);
 
@@ -148,17 +204,33 @@ describe('card effects routed from the card', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('no effect event is named outside its card, the router and the named exceptions', () => {
+    const offenders = namings
+      .filter(({ f }) => !nameHome(f))
+      .filter((naming) => !isExcused(naming) && !isTableKey(naming))
+      .filter(
+        ({ f, name }) =>
+          !NAMED_OK.some(({ file, event }) => file === f && event === name)
+      )
+      .map(({ f, line, name, text }) => `${f}:${line}: '${name}' in ${text}`);
+    expect(offenders).toEqual([]);
+  });
+
   it('every excused listener is still there, and every announcement is heard', () => {
     const stale = EXCUSED.filter(
       ({ file, event }) =>
         !listeners.some(({ f, name }) => f === file && name === event)
     ).map(({ file, event }) => `${file}: no longer hears '${event}'`);
+    const namedGone = NAMED_OK.filter(
+      ({ file, event }) =>
+        !namings.some(({ f, name }) => f === file && name === event)
+    ).map(({ file, event }) => `${file}: no longer names '${event}'`);
     const unheard = effects
       .filter(({ effect }) => 'to' in effect && !ownersOf(effect).length)
       .filter(
         ({ effect }) => !listeners.some(({ name }) => name === effect.event)
       )
       .map(({ source, effect }) => `${source}: nobody hears '${effect.event}'`);
-    expect([...stale, ...new Set(unheard)]).toEqual([]);
+    expect([...stale, ...namedGone, ...new Set(unheard)]).toEqual([]);
   });
 });
