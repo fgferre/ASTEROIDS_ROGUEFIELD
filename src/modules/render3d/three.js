@@ -12,7 +12,7 @@ import { EffectComposer as Composer } from 'three/examples/jsm/postprocessing/Ef
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { UnrealBloomPass as BloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { SMAAPass as EdgePass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 
 // Colours as r128 read them: a hex or a Color is used as given, never
 // converted from sRGB (r152 turned that conversion on). Before any Color.
@@ -52,31 +52,6 @@ function legacyLights(chunk) {
 core.ShaderChunk.lights_pars_begin = legacyLights(
   core.ShaderChunk.lights_pars_begin
 );
-
-// An opaque material writes its own alpha, as in r128: three now forces it
-// to 1, decided when the program is built, and the game fades the
-// Ring and the places' surfaces by turning `transparent` on as they go (no
-// rebuild, which would compile mid-play): built opaque, a Ring fading to
-// nothing stood whole on the journey's arrivals.
-const opaqueChunk = core.ShaderChunk.opaque_fragment.replace(
-  /#ifdef OPAQUE\s*diffuseColor\.a = 1\.0;\s*#endif/,
-  ''
-);
-if (opaqueChunk === core.ShaderChunk.opaque_fragment) {
-  throw new Error('three.js: the opaque chunk changed');
-}
-core.ShaderChunk.opaque_fragment = opaqueChunk;
-
-// An instanced mesh is never culled, as in r128: three now culls it by one
-// sphere round all its instances, worked out once and never again as they
-// move, and the backdrop's far fragments, which grow in and out with each
-// place, went missing at the edge of the ending's views.
-class InstancedMesh extends core.InstancedMesh {
-  constructor(...args) {
-    super(...args);
-    this.frustumCulled = false;
-  }
-}
 
 // Since r163 a material's envMapIntensity scales only its own envMap, and
 // the scene's sky (Scene.environment) takes Scene.environmentIntensity. The
@@ -196,14 +171,9 @@ function asOutput(target) {
   );
 }
 
-// Both composers are built on a target and sized in drawing-buffer pixels,
-// as r128 measured a composer given its target (pixel ratio 1); r187 takes
-// the renderer's ratio, which drew the menu's chain (device ratio) at twice
-// the screen's width and height.
 class EffectComposer extends Composer {
   constructor(renderer, target) {
     super(renderer, target);
-    this.setPixelRatio(1);
     asOutput(this.renderTarget1);
     asOutput(this.renderTarget2);
   }
@@ -212,16 +182,6 @@ class EffectComposer extends Composer {
     super.reset(target);
     asOutput(this.renderTarget1);
     asOutput(this.renderTarget2);
-  }
-}
-
-// r128's SMAA left the composer's buffers where they were; since then it
-// swaps them, and the game's chains (sceneSetup.js displayTarget, the
-// opening's) were built on it staying put.
-class SMAAPass extends EdgePass {
-  constructor(...args) {
-    super(...args);
-    this.needsSwap = false;
   }
 }
 
@@ -346,7 +306,6 @@ class UnrealBloomPass extends BloomPass {
 const THREE = {
   ...core,
   WebGLRenderer,
-  InstancedMesh,
   EffectComposer,
   RenderPass,
   ShaderPass,

@@ -540,6 +540,9 @@ class Renderer3D extends BaseSystem {
   playEndingBeat(id, durationMs, ending) {
     const kind = isRevelationBeat(id) ? 'revelation' : 'ending';
     const drawn = this.startCinematic(holdIntroStart, 1, true, kind);
+    // Warmed on the way to the Crucible; a door that skips it (the dev
+    // ?content= capture) warms it here, or the last image has no slip.
+    if (drawn) warmEnding(this);
     return drawn && this.ending.start(id, durationMs, ending);
   }
 
