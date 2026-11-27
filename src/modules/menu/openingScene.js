@@ -165,6 +165,10 @@ export function createOpeningScene(menu, random, shotName = null) {
     type: THREE.HalfFloatType,
   });
   const composer = new THREE.EffectComposer(renderer, target);
+  // Sized in drawing-buffer pixels (setSize below), so at ratio 1: it takes
+  // the renderer's, the device's, and would draw the chain at twice the
+  // screen's width and height.
+  composer.setPixelRatio(1);
   const worldPass = new THREE.RenderPass(world, camera);
   const renderWorld = worldPass.render.bind(worldPass);
   worldPass.render = (...args) => {
