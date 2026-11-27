@@ -10,7 +10,7 @@
  *   data        texto     ex. "2026-11-23"
  *   contexto    texto | [texto]   parágrafos de abertura
  *   tipo        "gosto" (faz pergunta, tem respostas) | "conferencia" (só para ver: sem pergunta)
- *   endereco    texto     endereço de teste; só http://192.168.1.185:<porta>/... (nunca localhost)
+ *   endereco    texto     endereço de teste; só http://<endereço do Mac>:<porta>/... (nunca localhost)
  *   tabela      {colunas:[texto], linhas:[[texto]]}   tabela de comparação (também vale dentro de uma seção)
  *   midia       [item]    mídia solta do cartão
  *   secoes      [seção]   blocos do cartão, cada um pode ter uma pergunta
@@ -26,8 +26,9 @@
  *   opcoes     [{letra:"A", texto, recomendada:true}]   marca-se a letra; a resposta copiada sai por frase (só em "gosto")
  * Recusas (saída 1, nada escrito): "gosto" com menos de 3 variantes em todas as seções
  * (a maior seção conta), a não ser com --uma "motivo" (o motivo vai impresso no cartão);
- * endereço (em qualquer texto) cujo host não seja 192.168.1.185; caminho de mídia que não existe.
+ * endereço (em qualquer texto) cujo host não seja o endereço atual do Mac (ipconfig getifaddr en0); caminho de mídia que não existe.
  */
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -56,7 +57,20 @@ try {
 }
 const dir = path.dirname(path.resolve(arquivo));
 const id = path.basename(arquivo, path.extname(arquivo));
-const HOST = '192.168.1.185';
+// The Mac's address changes with the network: read it now; the old fixed
+// address is only the fallback when the command fails.
+const HOST = (() => {
+  try {
+    return (
+      execSync('ipconfig getifaddr en0', {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim() || '192.168.1.185'
+    );
+  } catch {
+    return '192.168.1.185';
+  }
+})();
 
 const esc = (s) =>
   String(s ?? '').replace(
@@ -212,6 +226,7 @@ const css = `:root{--bg:#0d0f12;--card:#171a1f;--line:#262b33;--text:#e6e9ee;--d
 *{box-sizing:border-box}
 body{margin:0 auto;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,system-ui,sans-serif;padding:16px 16px 140px;max-width:1240px}
 a{color:var(--accent);word-break:break-all}
+p,li,td,th,figcaption,label,h1,h2,h3{overflow-wrap:anywhere}
 h1{font-size:22px;margin:8px 0} h2{font-size:18px;margin:16px 0 4px} p{margin:6px 0} p.note{color:var(--dim);margin:4px 0 12px}
 section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
 section.done{border-color:#155a61} section h3{font-size:16px;margin:0 0 4px} section .why{color:var(--dim);margin:0 0 10px}
