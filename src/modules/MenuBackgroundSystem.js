@@ -280,6 +280,8 @@ class MenuBackgroundSystem extends BaseSystem {
       this.unsubscribeFromSettings = null;
     }
 
+    this.hullPreview?.release();
+
     super.destroy();
 
     this.stop();

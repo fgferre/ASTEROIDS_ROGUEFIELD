@@ -149,6 +149,23 @@ export class MenuHullPreview {
     this.radius = 1;
     this.depth = 0;
     this.time = 0;
+    // The stage box is measured once and again only when it can have changed
+    // (its size, the window, or another stage element).
+    this.stageElement = null;
+    this.stageRect = null;
+    this.stageObserver = new ResizeObserver(() => {
+      this.stageRect = null;
+    });
+    this.invalidateStage = () => {
+      this.stageRect = null;
+    };
+    window.addEventListener('resize', this.invalidateStage);
+  }
+
+  /** Stops watching the stage and the window. */
+  release() {
+    this.stageObserver.disconnect();
+    window.removeEventListener('resize', this.invalidateStage);
   }
 
   /**
@@ -297,7 +314,16 @@ export class MenuHullPreview {
    */
   update(dt, stageElement, reducedMotion) {
     const { THREE, camera } = this;
-    const stage = stageElement?.getBoundingClientRect();
+    if (stageElement !== this.stageElement) {
+      this.stageObserver.disconnect();
+      if (stageElement) this.stageObserver.observe(stageElement);
+      this.stageElement = stageElement;
+      this.stageRect = null;
+    }
+    if (!this.stageRect) {
+      this.stageRect = stageElement?.getBoundingClientRect();
+    }
+    const stage = this.stageRect;
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     if (!this.hull || !stage?.width) {
       this.root.visible = false;
