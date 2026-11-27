@@ -60,7 +60,7 @@ export const NEXT = {
     "In a narrow window with a pad, the strip of pad buttons on Mission Control no longer covers the Hangar, Codex and Settings buttons, and in the Hangar a hull's line that does not fit (the Bastion's, the Solar Slicer's) breaks between its parts instead of leaving a lone number on the second line.", // not confirmed
   ],
   unseen: [
-    'One part of the game now decides which screen gets the keys, the pad and the confirm: only the screen on top, so a screen under another can no longer react; the HUD editor is loaded only when you open it, so the game starts lighter.', // not confirmed
+    'One part of the game now decides which screen gets the keys, the pad and the confirm: only the screen on top, so a screen under another can no longer react; the HUD editor no longer loads with the game: it comes quietly once the menu is up, so the game starts lighter and the editor still opens at once.', // not confirmed
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",
     'A `?replay=` link that points at a damaged or hostile recording (wrong shapes, absurd lengths, another site over plain http, a huge file) now ends in the replay notice instead of a frozen page; players cannot make replay links yet, so nobody notices.', // not confirmed
     'The first-visit tips now save through the held-progress path, so demo and profiling runs (?content=, ?profile=) leave the real pilot untouched; players never start those runs.', // not confirmed

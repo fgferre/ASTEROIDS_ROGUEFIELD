@@ -2,19 +2,51 @@
 //
 // The HUD editor's door (Settings → Edit HUD Layout, the pause screen's
 // Edit HUD). The editor (hud/editor/) is the largest screen and the least
-// opened, so its file comes with the first press: the press asks for it and
-// the editor shows once it is here, its input layer pushed then. Nothing
-// changes on screen while it travels, and a player who has moved on by then
-// gets it on the next press. A file that does not arrive leaves the screen
-// as it was with a short notice, and the next press asks for it again; Chrome
-// keeps a failed load until the page reloads, so the notice says to reload.
+// opened, so its file stays out of the game's start: it comes in the
+// background once the menu has stood alone for a moment (never during the
+// loading or the opening), or with the first press if that comes sooner.
+// The editor shows once its file is here, its input layer pushed then;
+// nothing changes on screen while it travels, and a player who has moved on
+// by then gets it on the next press. The file is asked for once: a failure
+// stays (the browser keeps it until the page reloads), quiet in the
+// background, and each press shows a short notice saying to reload.
 // Shut, the HUD wears the HUD Layout setting's layout.
 
 import { resolveService } from '../../core/serviceUtils.js';
+import { inputLayers } from '../input/inputLayers.js';
 import { activePreset, instrumentCatalog } from './hud/editor/layoutStore.js';
 
-// As long as the editor's own toasts (editorDialogs.js).
-const NOTICE_MS = 2600;
+// Long enough to read its two sentences.
+const NOTICE_MS = 5000;
+// The menu is looked at this often; two looks in a row with nothing over it
+// (the loading screen, the opening, the pilots, a scene) bring the file.
+const MENU_LOOK_MS = 1500;
+
+// The editor's file, asked for once.
+function editorFile(ui) {
+  ui.hudEditorFile ??= import('./hud/editor/HudEditor.js');
+  return ui.hudEditorFile;
+}
+
+/** The menu shown (screenSwitch.js): the editor's file comes in the
+ * background once the menu has stood alone, while it stays the screen. */
+export function loadHudEditorAtIdleMenu(ui) {
+  if (ui.hudEditor || ui.hudEditorFile || ui.hudEditorLook) return;
+  let aloneBefore = false;
+  const look = () => {
+    ui.hudEditorLook = null;
+    const state = resolveService('game-state', ui.dependencies);
+    if (ui.hudEditorFile || state.getScreen() !== 'menu') return;
+    const alone = !inputLayers.top() && !inputLayers.cinematic;
+    if (alone && aloneBefore) {
+      editorFile(ui).catch(() => {});
+      return;
+    }
+    aloneBefore = alone;
+    ui.hudEditorLook = setTimeout(look, MENU_LOOK_MS);
+  };
+  ui.hudEditorLook = setTimeout(look, MENU_LOOK_MS);
+}
 
 /** The HUD Layout setting's layout on the HUD; the editor owns it while open. */
 export function followHudLayout(ui, video) {
@@ -35,7 +67,7 @@ export function openHudEditor(ui) {
   }
   if (ui.hudEditorArriving) return ui.hudEditorArriving;
   const asked = askedFrom(ui);
-  ui.hudEditorArriving = import('./hud/editor/HudEditor.js')
+  ui.hudEditorArriving = editorFile(ui)
     .then(
       ({ HudEditor }) => {
         ui.hudEditor = new HudEditor({
@@ -113,7 +145,7 @@ function showLoadNotice() {
   notice.className = 'hud-editor-notice';
   notice.setAttribute('role', 'status');
   notice.textContent =
-    "The HUD editor couldn't load. Check the connection, then reload the page.";
+    "The HUD editor couldn't load. Reloading the page brings it back, but a run in progress is lost: finish or leave it first.";
   document.body.appendChild(notice);
   setTimeout(() => notice.remove(), NOTICE_MS);
 }

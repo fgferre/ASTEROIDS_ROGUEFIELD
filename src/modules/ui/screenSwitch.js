@@ -7,6 +7,7 @@
 // cinematic's hold on the run.
 
 import { resolveService } from '../../core/serviceUtils.js';
+import { loadHudEditorAtIdleMenu } from './hudEditorDoor.js';
 
 // The overlays that pause a run over its HUD: cards, chest, flight briefing.
 const CARD_OVERLAYS = ['levelup', 'chest', 'flight'];
@@ -120,6 +121,7 @@ export function showScreen(ui, screenName, options = {}) {
       ui.mainMenu.refreshBossRushLock();
       ui.campaignMap.menuShown();
       ui.refreshMenuTips();
+      loadHudEditorAtIdleMenu(ui);
     }
 
     if (emitEvent) {
