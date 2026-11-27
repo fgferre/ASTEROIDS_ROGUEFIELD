@@ -18,6 +18,7 @@ import {
   Onboarding,
   SHIELD_TIP_SECONDS,
   TIP_EXPIRIES_TO_DONE,
+  isStrafing,
   modeNotice,
   onboardingPrompts,
 } from '../../../src/modules/ui/onboarding.js';
@@ -62,7 +63,7 @@ describe('Onboarding', () => {
     expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();
   });
 
-  it('teaches move, dash, shield in order, each after a gap', () => {
+  it('teaches move, dash, strafe, shield in order, each after a gap', () => {
     const view = fakeView();
     const shown = [];
     const onboarding = new Onboarding(view, (id) => shown.push(id));
@@ -80,13 +81,18 @@ describe('Onboarding', () => {
     onboarding.dashed();
     expect(view.showing).toBeNull();
 
+    run(onboarding, ONBOARDING_GAP_SECONDS + STEP);
+    expect(view.showing).toBe('strafe');
+    onboarding.update(STEP, { strafing: true });
+    expect(view.showing).toBeNull();
+
     run(onboarding, ONBOARDING_GAP_SECONDS + 1);
     expect(view.showing).toBeNull(); // no shield on the ship yet
     run(onboarding, STEP * 2, { shieldReady: true });
     expect(view.showing).toBe('shield');
     onboarding.shieldRaised();
     expect(view.showing).toBeNull();
-    expect(shown).toEqual(['move', 'dash', 'shield']);
+    expect(shown).toEqual(['move', 'dash', 'strafe', 'shield']);
   });
 
   it('waits for a HUD banner before showing a tip', () => {
@@ -102,7 +108,7 @@ describe('Onboarding', () => {
   it('sets an unused shield tip aside for the run, not forever', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,
-      JSON.stringify({ done: ['move', 'dash'] })
+      JSON.stringify({ done: ['move', 'dash', 'strafe'] })
     );
     const view = fakeView();
     const onboarding = new Onboarding(view);
@@ -130,8 +136,8 @@ describe('Onboarding', () => {
     run(onboarding, DASH_TIP_SECONDS + STEP);
     expect(view.showing).toBeNull();
     expect(saved()).not.toContain('dash');
-    run(onboarding, ONBOARDING_GAP_SECONDS + STEP, { shieldReady: true });
-    expect(view.showing).toBe('shield');
+    run(onboarding, ONBOARDING_GAP_SECONDS + STEP);
+    expect(view.showing).toBe('strafe');
   });
 
   it("holds a tip's time while a notice covers it", () => {
@@ -154,7 +160,7 @@ describe('Onboarding', () => {
   it('brings a tip that ran out back next run, until the third time', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,
-      JSON.stringify({ done: ['move', 'shield'] })
+      JSON.stringify({ done: ['move', 'strafe', 'shield'] })
     );
     const view = fakeView();
     for (let time = 1; time <= TIP_EXPIRIES_TO_DONE; time += 1) {
@@ -213,7 +219,7 @@ describe('Onboarding', () => {
   it('counts the shield raised while its tip is up', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,
-      JSON.stringify({ done: ['move', 'dash'] })
+      JSON.stringify({ done: ['move', 'dash', 'strafe'] })
     );
     const view = fakeView();
     const onboarding = new Onboarding(view);
@@ -238,6 +244,98 @@ describe('Onboarding', () => {
     onboarding.dashed();
     expect(saved()).toContain('dash');
     expect(view.showing).toBeNull();
+  });
+
+  it('counts the strafe only once its tip is due, and later in the run it ran out in', () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({ done: ['move'] })
+    );
+    const view = fakeView();
+    const onboarding = new Onboarding(view);
+    onboarding.start();
+    onboarding.update(STEP, { strafing: true }); // the dash tip is up
+    expect(view.showing).toBe('dash');
+    onboarding.dashed();
+    run(onboarding, ONBOARDING_GAP_SECONDS + STEP);
+    expect(view.showing).toBe('strafe');
+    run(onboarding, DASH_TIP_SECONDS + STEP);
+    expect(view.showing).toBeNull();
+    expect(saved()).not.toContain('strafe');
+    onboarding.update(STEP, { strafing: true });
+    expect(saved()).toContain('strafe');
+  });
+
+  it('teaches the strafe to a record that finished before it', () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({
+        done: ['move', 'dash', 'shield', 'cards', 'cardsHeadStart'],
+      })
+    );
+    const view = fakeView();
+    const onboarding = new Onboarding(view);
+    onboarding.start();
+    onboarding.update(STEP);
+    expect(view.showing).toBe('strafe');
+  });
+
+  it('takes the strafe tip off at the win that opens the ending, uncounted', () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({ done: ['move', 'dash'] })
+    );
+    const view = fakeView();
+    const onboarding = new Onboarding(view);
+    onboarding.start();
+    onboarding.update(STEP);
+    expect(view.showing).toBe('strafe');
+    const handlers = new Map();
+    UISystem.prototype.setupEventListeners.call(
+      Object.setPrototypeOf(
+        {
+          onboarding,
+          chestCeremony: { clear() {} },
+          runEndScreens: { opensChoice: () => true },
+          cinematics: { startRevelation() {} },
+          registerEventListener: (name, fn) => handlers.set(name, fn),
+        },
+        UISystem.prototype
+      )
+    );
+    handlers.get('run-won')({ wave: 20, sector: 'the-crucible' });
+    expect(view.showing).toBeNull();
+    run(onboarding, DASH_TIP_SECONDS + 1, { strafing: true });
+    expect(view.showing).toBeNull();
+    expect(saved()).not.toContain('strafe');
+  });
+
+  it('tells a strafe from a turn in each flight and on each device', () => {
+    const frame = (values) => ({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      strafeLeft: false,
+      strafeRight: false,
+      strafeHold: false,
+      pad: false,
+      moveX: 0,
+      moveY: 0,
+      ...values,
+    });
+    expect(isStrafing(frame({ strafeLeft: true }))).toBe(true); // Z
+    expect(isStrafing(frame({ left: true }))).toBe(false); // A alone
+    expect(isStrafing(frame({ strafeHold: true }))).toBe(false); // Space alone
+    expect(
+      isStrafing(frame({ strafeHold: true, right: true }), 'classic')
+    ).toBe(true); // Space + D, or STRAFE + the thumb
+    expect(isStrafing(frame({ strafeHold: true, pad: true, moveX: 0.8 }))).toBe(
+      true
+    ); // LB + the stick
+    expect(isStrafing(frame({ pad: true, moveX: 0.8 }))).toBe(false);
+    expect(isStrafing(frame({ pad: true, moveX: 0.8 }), 'classic')).toBe(true);
+    expect(isStrafing(null)).toBe(false);
   });
 
   it('shows the cards tip on the first level-up and counts the pick', () => {
@@ -277,7 +375,7 @@ describe('Onboarding', () => {
   it('still teaches the head start to a record from before it', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,
-      JSON.stringify({ done: ['move', 'dash', 'shield', 'cards'] })
+      JSON.stringify({ done: ['move', 'dash', 'strafe', 'shield', 'cards'] })
     );
     const onboarding = new Onboarding(fakeView());
     onboarding.start();
@@ -295,7 +393,7 @@ describe('Onboarding', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,
       JSON.stringify({
-        done: ['move', 'dash', 'shield', 'cards', 'cardsHeadStart'],
+        done: ['move', 'dash', 'strafe', 'shield', 'cards', 'cardsHeadStart'],
         expired: { dash: 2 },
       })
     );
@@ -329,7 +427,15 @@ describe('Onboarding', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,
       JSON.stringify({
-        done: ['move', 'dash', 'shield', 'cards', 'cardsHeadStart', 'hangar'],
+        done: [
+          'move',
+          'dash',
+          'strafe',
+          'shield',
+          'cards',
+          'cardsHeadStart',
+          'hangar',
+        ],
       })
     );
     const tips = new Onboarding(fakeView());
@@ -412,6 +518,16 @@ describe('Onboarding', () => {
       'D',
     ]);
     expect(onboardingPrompts(keys).dash.keys).toEqual(['⇧ Shift']);
+    const strafe = onboardingPrompts({
+      ...keys,
+      strafeLeft: 'Z',
+      strafeRight: 'C',
+      strafeHold: 'Space',
+    }).strafe;
+    expect(strafe.keys).toEqual(['Z', 'C']);
+    expect(strafe.text).toBe(
+      'Slide sideways with Z and C, or hold Space with A and D.'
+    );
   });
 
   it('shows the gesture and the on-screen buttons on touch', () => {
@@ -420,6 +536,7 @@ describe('Onboarding', () => {
     expect(prompts.move.text).toMatch(/left thumb/);
     expect(prompts.dash.keys).toEqual(['DASH']);
     expect(prompts.shield.keys).toEqual(['SHIELD']);
+    expect(prompts.strafe.keys).toEqual(['STRAFE']);
   });
 
   it('names the pad buttons when the gamepad was used last', () => {
@@ -429,13 +546,19 @@ describe('Onboarding', () => {
       moveLeft: 'L-Stick ←',
       moveRight: 'L-Stick →',
       dash: 'RB',
-      activateShield: 'LB',
+      activateShield: 'LT',
+      strafeHold: 'LB',
     };
     const prompts = onboardingPrompts(buttons, 'modern', 'gamepad');
     expect(prompts.move.keys).toEqual(['L-Stick']);
     expect(prompts.move.text).toMatch(/left stick/);
     expect(prompts.dash.keys).toEqual(['RB']);
-    expect(prompts.shield.keys).toEqual(['LB']);
+    expect(prompts.shield.keys).toEqual(['LT']);
+    expect(prompts.strafe.keys).toEqual(['LB', 'L-Stick']);
+    expect(prompts.strafe.text).toMatch(/^Hold LB and push the left stick/);
+    expect(
+      onboardingPrompts(buttons, 'classic', 'gamepad').strafe.keys
+    ).toEqual(['L-Stick']);
 
     const onboarding = new Onboarding(fakeView());
     onboarding.start();

@@ -26,6 +26,7 @@ export const NEXT = {
   ],
   improved: [
     'Sovereign, beaten, no longer breaks into pieces: it stays whole for the ending (with reduced motion it burns away where it fell).', // not confirmed
+    'A first-time tip now teaches the strafe after the dash: Z and C, or Space held with A and D, on a pad LB with the left stick (in Classic flight the stick alone), by touch STRAFE; it leaves once you slide sideways.', // not confirmed
   ],
   fixed: [
     "On a phone held sideways, the ending's choice now fits the screen: both options show every line, with no scrolling.", // not confirmed

@@ -9,7 +9,12 @@ import { STORY } from '../data/story.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { FIRST_RUN_MODE } from '../core/runMode.js';
-import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
+import {
+  Onboarding,
+  TIP_ACTIONS,
+  isStrafing,
+  onboardingPrompts,
+} from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
 import { LevelUpScreen } from './ui/LevelUpScreen.js';
@@ -912,16 +917,15 @@ class UISystem extends BaseSystem {
 
   update(deltaTime) {
     this.tacticalHud.update(deltaTime);
-    if (this.onboarding.current) {
-      const moving = resolveService(
-        'input',
-        this.dependencies
-      ).getMovementInput();
+    // While active: a strafe tip set aside this run still counts when used.
+    if (this.onboarding.active) {
+      const input = resolveService('input', this.dependencies);
+      const player = resolveService('player', this.dependencies);
+      const moving = input.getMovementInput();
       this.onboarding.update(deltaTime, {
         moving: moving.up || moving.down || moving.left || moving.right,
-        shieldReady:
-          resolveService('player', this.dependencies).getShieldState().maxHits >
-          0,
+        strafing: isStrafing(input.stepFrame, player.controlScheme),
+        shieldReady: player.getShieldState().maxHits > 0,
         bannerBusy: Boolean(this.tacticalHud.layout?.isBannerBusy()),
         tipCovered: Boolean(this.tacticalHud.layout?.isNoticeShowing()),
       });
@@ -1098,16 +1102,7 @@ class UISystem extends BaseSystem {
       this.resolveSettingsService()?.getCategoryValues('controls') || {};
     const device = resolveService('input', this.dependencies).getActiveDevice();
     const keys = {};
-    [
-      'moveUp',
-      'moveDown',
-      'moveLeft',
-      'moveRight',
-      'dash',
-      'activateShield',
-      'toggleAimMode',
-      'toggleSpreadMode',
-    ].forEach((action) => {
+    TIP_ACTIONS.forEach((action) => {
       keys[action] = this.settingsPanel.formatBindingLabel(
         controls[action]?.[device]?.[0],
         device
