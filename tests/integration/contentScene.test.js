@@ -111,11 +111,11 @@ describe('content scene on a live run', () => {
     const drone = getItem('enemies', 'drone');
 
     const quiet = play('enemies', drone);
-    expect(quiet.services.combat.bullets).toHaveLength(0);
+    expect(quiet.services.combat.projectiles.bullets).toHaveLength(0);
 
     startRun();
     const loud = play('enemies', drone, { fire: true });
-    expect(loud.services.combat.bullets.length).toBeGreaterThan(0);
+    expect(loud.services.combat.projectiles.bullets.length).toBeGreaterThan(0);
   });
 
   describe.each(idsOf('bosses'))('boss %s', (id, item) => {
@@ -128,7 +128,7 @@ describe('content scene on a live run', () => {
       expect(bosses).toHaveLength(1);
       expect(bosses[0].displayName).toBe(item.displayName);
       expect(countType(first.enemies, 'asteroid')).toBe(0);
-      expect(services.combat.bullets).toHaveLength(0);
+      expect(services.combat.projectiles.bullets).toHaveLength(0);
     });
 
     it("shows the boss's layer in the HUD, not layer 1", () => {
@@ -240,7 +240,7 @@ describe('content scene on a live run', () => {
       });
       for (let step = 0; step < STEPS; step += 1) game.step();
 
-      expect(combat.bullets.length).toBeGreaterThan(0);
+      expect(combat.projectiles.bullets.length).toBeGreaterThan(0);
     });
 
     it('leaves the ship of the next run free to move', () => {

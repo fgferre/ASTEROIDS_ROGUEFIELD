@@ -71,7 +71,8 @@ describe('Scatter Coil family forms', () => {
   // The centre bolt of a fresh volley, put at (190, 300) flying along +x.
   const centreBolt = (combat) => {
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
-    const bolt = combat.bullets[combat.bullets.length - 3];
+    const bolt =
+      combat.projectiles.bullets[combat.projectiles.bullets.length - 3];
     bolt.x = 190;
     bolt.y = 300;
     return bolt;
@@ -128,7 +129,7 @@ describe('Scatter Coil family forms', () => {
     const { combat, eventBus } = scatter([rock, drone, neighbour]);
     eventBus.emit('synergy-unlocked', { family: 'thermal' });
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
-    const [a, b, c, d, e] = combat.bullets;
+    const [a, b, c, d, e] = combat.projectiles.bullets;
     const hit = (bolt, enemy) =>
       combat.processBulletHit(bolt, enemy, combat.cachedEnemies);
 
@@ -153,12 +154,12 @@ describe('Scatter Coil family forms', () => {
     expect(combat.weapons.kindled.some((k) => k.enemy === rock)).toBe(false);
     [d, e].forEach((bolt) => hit(bolt, drone));
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
-    combat.bullets.slice(-3).forEach((bolt) => hit(bolt, drone));
+    combat.projectiles.bullets.slice(-3).forEach((bolt) => hit(bolt, drone));
     expect(combat.cards.burns.has(drone)).toBe(false);
 
     eventBus.emit('apex-unlocked', { family: 'thermal' });
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
-    combat.bullets.slice(-3).forEach((bolt) => hit(bolt, drone));
+    combat.projectiles.bullets.slice(-3).forEach((bolt) => hit(bolt, drone));
     expect(combat.cards.burns.has(drone)).toBe(true);
     expect(combat.cards.burns.has(neighbour)).toBe(true);
     expect(drone.look).toBeUndefined();
@@ -173,7 +174,8 @@ describe('Scatter Coil family forms', () => {
     const { combat, eventBus } = scatter([target, near, next, later, far]);
     eventBus.emit('synergy-unlocked', { family: 'arc' });
     const bolt = centreBolt(combat);
-    const bolt2 = combat.bullets[combat.bullets.length - 4];
+    const bolt2 =
+      combat.projectiles.bullets[combat.projectiles.bullets.length - 4];
     bolt2.x = 190;
     bolt2.y = 300;
 
@@ -221,7 +223,8 @@ describe('Scatter Coil family forms', () => {
     const bolt = centreBolt(combat);
 
     combat.processBulletHit(bolt, victim, combat.cachedEnemies);
-    const shards = () => combat.bullets.filter((b) => b.volley.scrap);
+    const shards = () =>
+      combat.projectiles.bullets.filter((b) => b.volley.scrap);
     expect(shards()).toHaveLength(0);
     combat.updateWeaponEffects(FORMS.salvage.delay - 0.01);
     expect(shards()).toHaveLength(0);

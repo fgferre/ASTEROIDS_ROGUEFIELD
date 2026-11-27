@@ -57,7 +57,8 @@ function seeker(list) {
 // A salvo's first missile, put on `enemy`'s rim flying along +x.
 function missileOn(combat, enemy) {
   combat.handleShooting(1, STATS);
-  const missile = combat.bullets[combat.bullets.length - 2];
+  const missile =
+    combat.projectiles.bullets[combat.projectiles.bullets.length - 2];
   missile.x = enemy.x - enemy.radius;
   missile.y = enemy.y;
   missile.vx = 275;
@@ -194,7 +195,8 @@ describe('Seeker Swarm family forms', () => {
 
     eventBus.emit('apex-unlocked', { family: 'field' });
     const first = missileOn(combat, target);
-    const other = combat.bullets[combat.bullets.length - 1];
+    const other =
+      combat.projectiles.bullets[combat.projectiles.bullets.length - 1];
     other.x = 150;
     other.y = 350;
     other.vx = 275;

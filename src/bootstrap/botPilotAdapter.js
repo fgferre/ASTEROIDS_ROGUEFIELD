@@ -229,7 +229,7 @@ export function readWorld(services, time, memory = new WeakMap()) {
       };
     }
   });
-  for (const b of combat.enemyBullets || []) {
+  for (const b of combat.projectiles.enemyBullets || []) {
     movers.push({
       x: b.x,
       y: b.y,

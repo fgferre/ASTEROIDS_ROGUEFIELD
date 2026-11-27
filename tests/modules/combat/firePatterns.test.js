@@ -767,14 +767,20 @@ describe('fire patterns', () => {
     const { combat } = armed('seeker-swarm', [below]);
 
     combat.handleShooting(1, STATS);
-    expect(combat.bullets).toHaveLength(salvo.missiles);
-    const headings = combat.bullets.map((m) => Math.atan2(m.vy, m.vx));
-    const speeds = combat.bullets.map((m) => Math.hypot(m.vx, m.vy));
-    combat.bullets.forEach((m) => expect(m.seeker.target).toBe(below));
+    expect(combat.projectiles.bullets).toHaveLength(salvo.missiles);
+    const headings = combat.projectiles.bullets.map((m) =>
+      Math.atan2(m.vy, m.vx)
+    );
+    const speeds = combat.projectiles.bullets.map((m) =>
+      Math.hypot(m.vx, m.vy)
+    );
+    combat.projectiles.bullets.forEach((m) =>
+      expect(m.seeker.target).toBe(below)
+    );
 
     const dt = 0.1;
     combat.updateBullets(dt);
-    combat.bullets.forEach((missile, i) => {
+    combat.projectiles.bullets.forEach((missile, i) => {
       const turned = Math.atan2(missile.vy, missile.vx) - headings[i];
       expect(turned).toBeCloseTo(salvo.turn * dt, 6); // both turn toward +y
       expect(Math.hypot(missile.vx, missile.vy)).toBeCloseTo(speeds[i], 6);
@@ -786,7 +792,9 @@ describe('fire patterns', () => {
     combat.weapons.enemies().forEachActiveEnemy = (callback) =>
       [below, next].forEach(callback);
     combat.updateBullets(dt);
-    combat.bullets.forEach((m) => expect(m.seeker.target).toBe(next));
+    combat.projectiles.bullets.forEach((m) =>
+      expect(m.seeker.target).toBe(next)
+    );
   });
 
   it('seeker: with the Overcharge Coil at rank 3 missiles fly 30% faster and turn 60% tighter', () => {
@@ -801,7 +809,7 @@ describe('fire patterns', () => {
       })
     );
     combat.handleShooting(1, STATS);
-    const [missile] = combat.bullets;
+    const [missile] = combat.projectiles.bullets;
     const base = combat.weapons.bulletSpeed / 1.15 ** 3;
     expect(Math.hypot(missile.vx, missile.vy)).toBeCloseTo(
       base * 1.3 * WEAPON_FORMS['seeker-swarm'].base.projectile.speedMultiplier,
@@ -820,7 +828,7 @@ describe('fire patterns', () => {
       lanceDamageMultiplier: 1.15,
     });
     combat.handleShooting(1, STATS);
-    const [missile] = combat.bullets;
+    const [missile] = combat.projectiles.bullets;
     expect(missile.seeker.target).toBe(far);
     const shot = DAMAGE * salvo.damageMultiplier;
     expect(missile.damage).toBeCloseTo(
@@ -843,14 +851,14 @@ describe('fire patterns', () => {
     };
     combat.cards.rollCardChance = vi.fn(() => true);
     combat.handleShooting(1, { multishot: 0, damage: DAMAGE });
-    const salvo = combat.bullets.length;
+    const salvo = combat.projectiles.bullets.length;
     // Each missile locks on within a few frames: one roll each, a twin each.
     for (let frame = 0; frame < 30; frame += 1) {
       combat.updateBullets(1 / 60);
       tickWeaponField(combat.weapons, 1 / 60, STATS);
     }
     expect(combat.cards.rollCardChance).toHaveBeenCalledTimes(salvo);
-    const twins = combat.bullets.slice(salvo);
+    const twins = combat.projectiles.bullets.slice(salvo);
     expect(twins).toHaveLength(salvo);
     twins.forEach((twin) => expect(twin.seeker.splits).toBe(false));
     // The two missiles chase one enemy each, so each twin takes the other.
@@ -865,14 +873,14 @@ describe('fire patterns', () => {
     const { combat, enemies } = armed('seeker-swarm', [weak, other]);
     combat.weapons.apexWeapon('salvage');
     combat.handleShooting(1, STATS);
-    const [missile] = combat.bullets;
+    const [missile] = combat.projectiles.bullets;
     expect(missile.seeker.breed).toBe(2);
 
     combat.processBulletHit(missile, weak, enemies);
     expect(weak.destroyed).toBe(true);
-    const before = combat.bullets.length;
+    const before = combat.projectiles.bullets.length;
     tickWeaponField(combat.weapons, 0.01, STATS);
-    const brood = combat.bullets.slice(before);
+    const brood = combat.projectiles.bullets.slice(before);
     expect(brood).toHaveLength(2);
     brood.forEach((m) => expect(m.seeker.breed).toBe(0));
   });
@@ -885,8 +893,8 @@ describe('fire patterns', () => {
     combat.handleShooting(1, STATS);
     combat.handleShooting(1, STATS);
 
-    expect(combat.bullets.slice(-6)).toHaveLength(6);
-    combat.bullets.slice(-6).forEach((missile) => {
+    expect(combat.projectiles.bullets.slice(-6)).toHaveLength(6);
+    combat.projectiles.bullets.slice(-6).forEach((missile) => {
       expect(missile.seeker.breed).toBe(2);
     });
   });

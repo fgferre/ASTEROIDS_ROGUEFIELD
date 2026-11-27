@@ -55,13 +55,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.setAimMode('manual');
       combat.setSpreadMode('concentrated');
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.slice(before);
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBe(3);
       // Fix-pass (F6): manual + concentrated now keeps every origin at the
@@ -309,12 +309,12 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.setSpreadMode('concentrated');
       combat.setAimMode('manual');
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.slice(before);
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBe(3);
       const noseExpected = { x: 416, y: 300 };
@@ -373,12 +373,12 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
       combat.setAimMode('manual');
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.slice(before);
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBe(1);
       // Bullet should spawn at (416, 300) — the muzzle, not the ship center (400, 300).
@@ -594,13 +594,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
           combat.updateTargeting(0);
         }
 
-        const before = combat.bullets.length;
+        const before = combat.projectiles.bullets.length;
         const player = combat.getCachedPlayer();
         combat.handleShooting(
           combat.weapons.shootCooldown + 0.001,
           player.getStats()
         );
-        const fired = combat.bullets.slice(before);
+        const fired = combat.projectiles.bullets.slice(before);
 
         expect(fired.length).toBe(2);
       });
@@ -634,13 +634,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
         combat.targeting.targetUpdateTimer = 0;
         combat.updateTargeting(0);
 
-        const before = combat.bullets.length;
+        const before = combat.projectiles.bullets.length;
         const player = combat.getCachedPlayer();
         combat.handleShooting(
           combat.weapons.shootCooldown + 0.001,
           player.getStats()
         );
-        const fired = combat.bullets.slice(before);
+        const fired = combat.projectiles.bullets.slice(before);
         expect(fired.length).toBeGreaterThanOrEqual(n);
 
         const enemy = combat.targeting.currentTarget;

@@ -163,7 +163,7 @@ export function setupCombatHarness({
  * the cooldown gate at `canShoot()` clears.
  */
 export function captureVectorSet(combat, fireCount = 8) {
-  const before = combat.bullets.length;
+  const before = combat.projectiles.bullets.length;
   const dt = combat.weapons.shootCooldown + 0.001;
   for (let i = 0; i < fireCount; i++) {
     // Re-establish target acquisition each tick (no-op if already locked).
@@ -172,7 +172,7 @@ export function captureVectorSet(combat, fireCount = 8) {
     const stats = player.getStats();
     combat.handleShooting(dt, stats);
   }
-  const fired = combat.bullets.slice(before);
+  const fired = combat.projectiles.bullets.slice(before);
   const angles = fired.map((b) => Math.atan2(b.vy, b.vx)).sort((a, b) => a - b);
   return {
     count: fired.length,

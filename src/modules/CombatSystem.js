@@ -287,20 +287,8 @@ class CombatSystem extends BaseSystem {
   }
 
   // === PROJECTILES (combat/Projectiles.js) ===
-  // Projectiles owns the shots in flight. The 3D renderer, the HUD metrics,
-  // Herald and the test helpers read these arrays on the combat object; the
-  // weapons suite assigns `bullets`.
-  get bullets() {
-    return this.projectiles.bullets;
-  }
-
-  set bullets(value) {
-    this.projectiles.bullets = value;
-  }
-
-  get enemyBullets() {
-    return this.projectiles.enemyBullets;
-  }
+  // Projectiles owns the shots in flight; readers ask it
+  // (combat.projectiles.bullets).
 
   // What a Retry brings back of the combat: the enemy shots in flight.
   getSnapshotState() {
@@ -386,12 +374,12 @@ class CombatSystem extends BaseSystem {
     this.projectiles.updateEnemyBullets(deltaTime, player);
     const perf = this.projectiles.projectilePerf;
     perf.projectileUpdateMs = performance.now() - projectileUpdateStart;
-    perf.projectilePlayerCount = this.bullets.length;
-    perf.projectileEnemyCount = this.enemyBullets.length;
+    perf.projectilePlayerCount = this.projectiles.bullets.length;
+    perf.projectileEnemyCount = this.projectiles.enemyBullets.length;
 
     const enemies = this.cachedEnemies;
     this.cachedPhysics.forEachBulletCollision(
-      this.bullets,
+      this.projectiles.bullets,
       (bullet, asteroid) => {
         if (!asteroid || bullet.hit) {
           return;

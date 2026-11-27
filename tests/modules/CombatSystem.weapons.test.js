@@ -151,13 +151,13 @@ describe('Harmonic Plasma Lance', () => {
 
     const stats = { multishot: 1, damage: DAMAGE };
     for (let shot = 0; shot < 3; shot += 1) combat.handleShooting(1, stats);
-    expect(combat.bullets).toHaveLength(3);
+    expect(combat.projectiles.bullets).toHaveLength(3);
     expect(combat.weapons.beams).toHaveLength(0);
 
     // On the cooldown exactly: the clock carries nothing past it.
     combat.weapons.lastShotTime = combat.weapons.shootCooldown;
     combat.handleShooting(0, stats);
-    expect(combat.bullets).toHaveLength(3);
+    expect(combat.projectiles.bullets).toHaveLength(3);
     expect(combat.weapons.beams).toHaveLength(1);
     expect(beamFired).toHaveBeenCalledTimes(1);
     const hit = 100 - DAMAGE * BEAM.damageMultiplier;
@@ -187,7 +187,7 @@ describe('Harmonic Plasma Lance', () => {
     expect(combat.weapons.beams).toHaveLength(0);
     combat.handleShooting(1, stats);
     expect(combat.weapons.beams).toHaveLength(1);
-    expect(combat.bullets).toHaveLength(2);
+    expect(combat.projectiles.bullets).toHaveLength(2);
     expect(combat.getWeaponState().shotsToBeam).toBe(3);
   });
 
@@ -625,12 +625,14 @@ describe('Scatter Coil', () => {
     // On the cooldown exactly: the clock carries nothing past it.
     combat.weapons.lastShotTime = combat.weapons.shootCooldown;
     combat.handleShooting(0, { multishot: 1, damage: DAMAGE });
-    expect(combat.bullets).toHaveLength(FAN.bolts);
-    const angles = combat.bullets.map((bolt) => Math.atan2(bolt.vy, bolt.vx));
+    expect(combat.projectiles.bullets).toHaveLength(FAN.bolts);
+    const angles = combat.projectiles.bullets.map((bolt) =>
+      Math.atan2(bolt.vy, bolt.vx)
+    );
     const half = (FAN.fan * Math.PI) / 360;
     expect(angles[0]).toBeCloseTo(-half, 6);
     expect(angles[FAN.bolts - 1]).toBeCloseTo(half, 6);
-    combat.bullets.forEach((bolt) => {
+    combat.projectiles.bullets.forEach((bolt) => {
       expect(bolt.kind).toBe('flak');
       expect(Math.hypot(bolt.vx, bolt.vy)).toBeCloseTo(
         combat.weapons.bulletSpeed * BOLT.speedMultiplier,
@@ -646,19 +648,19 @@ describe('Scatter Coil', () => {
       expect.objectContaining({ pattern: 'fan' })
     );
 
-    combat.bullets = [];
+    combat.projectiles.bullets = [];
     combat.handleShooting(1, { multishot: 3, damage: DAMAGE });
-    expect(combat.bullets).toHaveLength(FAN.bolts + 2);
-    combat.bullets = [];
+    expect(combat.projectiles.bullets).toHaveLength(FAN.bolts + 2);
+    combat.projectiles.bullets = [];
     combat.handleShooting(1, { multishot: 20, damage: DAMAGE });
-    expect(combat.bullets).toHaveLength(FAN.maxBolts);
+    expect(combat.projectiles.bullets).toHaveLength(FAN.maxBolts);
   });
 
   it('Overcharge Coil at rank 3: bolts fly 50% faster and burst 80 px further', () => {
     const { combat, eventBus } = scatter([]);
     fullCoil(eventBus);
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
-    const [bolt] = combat.bullets;
+    const [bolt] = combat.projectiles.bullets;
     const speed = Math.hypot(bolt.vx, bolt.vy);
     expect(speed).toBeCloseTo(
       (combat.weapons.bulletSpeed / 1.15 ** 3) * 1.5 * BOLT.speedMultiplier,
@@ -674,11 +676,13 @@ describe('Scatter Coil', () => {
       lanceDamageMultiplier: 1.15,
     });
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
-    const angles = combat.bullets.map((bolt) => Math.atan2(bolt.vy, bolt.vx));
+    const angles = combat.projectiles.bullets.map((bolt) =>
+      Math.atan2(bolt.vy, bolt.vx)
+    );
     const half = (FAN.fan * 0.8 * Math.PI) / 360;
     expect(angles[0]).toBeCloseTo(-half, 6);
     expect(angles.at(-1)).toBeCloseTo(half, 6);
-    expect(combat.bullets[0].damage).toBeCloseTo(
+    expect(combat.projectiles.bullets[0].damage).toBeCloseTo(
       DAMAGE * 1.15 * BOLT.damageMultiplier,
       6
     );
@@ -690,10 +694,10 @@ describe('Scatter Coil', () => {
     const stats = { multishot: 1, damage: DAMAGE };
     combat.handleShooting(1, stats);
     const wait = combat.weapons.lastShotTime;
-    expect(combat.bullets).toHaveLength(FAN.bolts);
+    expect(combat.projectiles.bullets).toHaveLength(FAN.bolts);
 
     tickWeaponField(combat.weapons, 0.11, stats);
-    expect(combat.bullets).toHaveLength(2 * FAN.bolts);
+    expect(combat.projectiles.bullets).toHaveLength(2 * FAN.bolts);
     expect(combat.weapons.lastShotTime).toBe(wait);
     expect(combat.cards.rollCardChance).toHaveBeenCalledTimes(1);
   });
@@ -711,8 +715,10 @@ describe('Scatter Coil', () => {
 
     // 7 bolts on 3 locks: 3, 2, 2.
     combat.handleShooting(1, { multishot: 3, damage: DAMAGE });
-    expect(combat.bullets).toHaveLength(FAN.bolts + 2);
-    const angles = combat.bullets.map((bolt) => Math.atan2(bolt.vy, bolt.vx));
+    expect(combat.projectiles.bullets).toHaveLength(FAN.bolts + 2);
+    const angles = combat.projectiles.bullets.map((bolt) =>
+      Math.atan2(bolt.vy, bolt.vx)
+    );
     const step = (FAN.fan * Math.PI) / 180 / (FAN.bolts - 1);
     const groups = [angles.slice(0, 3), angles.slice(3, 5), angles.slice(5)];
     groups.forEach((group, index) => {
@@ -738,17 +744,17 @@ describe('Scatter Coil', () => {
     ).toEqual(combat.targeting.currentTargetLocks.map((enemy) => enemy.id));
 
     // Fewer bolts than locks: one bolt each for the first locks.
-    combat.bullets = [];
+    combat.projectiles.bullets = [];
     fireFan(
       combat.weapons,
       { ...FAN, bolts: 2, maxBolts: 2 },
       { x: 100, y: 300 },
       { multishot: 1, damage: DAMAGE }
     );
-    expect(combat.bullets).toHaveLength(2);
+    expect(combat.projectiles.bullets).toHaveLength(2);
     [0, 1].forEach((index) => {
       const { predictedAim } = combat.targeting.currentLockAssignments[index];
-      const bolt = combat.bullets[index];
+      const bolt = combat.projectiles.bullets[index];
       expect(Math.atan2(bolt.vy, bolt.vx)).toBeCloseTo(
         Math.atan2(predictedAim.y - PIVOT.y, predictedAim.x - PIVOT.x),
         6
@@ -765,8 +771,8 @@ describe('Scatter Coil', () => {
       { x: 100, y: 300 },
       { multishot: 1, damage: DAMAGE }
     );
-    expect(combat.bullets).toHaveLength(1);
-    const [bolt] = combat.bullets;
+    expect(combat.projectiles.bullets).toHaveLength(1);
+    const [bolt] = combat.projectiles.bullets;
     expect(Number.isFinite(bolt.vx) && Number.isFinite(bolt.vy)).toBe(true);
     expect(Math.atan2(bolt.vy, bolt.vx)).toBeCloseTo(0, 9);
     expect(Number.isFinite(bolt.x) && Number.isFinite(bolt.y)).toBe(true);
@@ -785,7 +791,7 @@ describe('Scatter Coil', () => {
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
     for (let step = 0; step < 4; step += 1) combat.updateBullets(0.1);
 
-    expect(combat.bullets).toHaveLength(0);
+    expect(combat.projectiles.bullets).toHaveLength(0);
     expect(bursts).toHaveBeenCalledTimes(FAN.bolts);
     // one burst caught the centre enemy; the rest burned out on nothing
     expect(bursts.mock.calls.filter(([burst]) => !burst.fizzled)).toHaveLength(
@@ -819,7 +825,7 @@ describe('Scatter Coil', () => {
     eventBus.emit('synergy-unlocked', { family: 'thermal' });
 
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
-    const bolt = combat.bullets[2];
+    const bolt = combat.projectiles.bullets[2];
     bolt.x = 190;
     bolt.y = 300;
     combat.processBulletHit(bolt, target, combat.cachedEnemies);
@@ -874,13 +880,13 @@ describe('multi-lock turret layers', () => {
     let { combat, tips } = locked(null);
     expect(new Set(tips.map((tip) => `${tip.x},${tip.y}`)).size).toBe(3);
     combat.handleShooting(1, STATS);
-    expectFrom(combat.bullets, tips);
+    expectFrom(combat.projectiles.bullets, tips);
 
     // 7 bolts on 3 locks: 3, 2, 2.
     ({ combat, tips } = locked('scatter'));
     combat.handleShooting(1, STATS);
     expectFrom(
-      combat.bullets,
+      combat.projectiles.bullets,
       [0, 0, 0, 1, 1, 2, 2].map((i) => tips[i])
     );
 
@@ -953,7 +959,7 @@ describe('weapon evolutions', () => {
     const { combat, eventBus } = makeCombat([a, b, c]);
     eventBus.emit('synergy-unlocked', { family: 'kinetic' });
     combat.createBullet({ x: 0, y: 0 }, { x: 10, y: 0 }, DAMAGE);
-    const bullet = combat.bullets[0];
+    const bullet = combat.projectiles.bullets[0];
 
     combat.processBulletHit(bullet, a, combat.cachedEnemies);
     expect(bullet.hit).toBe(false);
@@ -1095,7 +1101,7 @@ describe('Apex evolutions', () => {
     const { combat, eventBus } = makeCombat(line);
     eventBus.emit('apex-unlocked', { family: 'kinetic' });
     combat.createBullet({ x: 0, y: 0 }, { x: 10, y: 0 }, DAMAGE);
-    const bullet = combat.bullets[0];
+    const bullet = combat.projectiles.bullets[0];
 
     line.forEach((enemy) => {
       combat.processBulletHit(bullet, enemy, combat.cachedEnemies);

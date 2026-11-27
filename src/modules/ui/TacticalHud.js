@@ -329,7 +329,7 @@ export class TacticalHud {
             enemies: enemies.getActiveEnemies(),
             pickups: this.pickups()?.getActivePickups() || [],
             orbs: this.xpOrbs()?.xpOrbs || [],
-            shots: combat?.enemyBullets || [],
+            shots: combat?.projectiles.enemyBullets || [],
             now: performance.now(),
           },
           this.radarMemory
@@ -385,7 +385,7 @@ export class TacticalHud {
           if (e.type !== 'asteroid' || hitsWithin(ship, e, horizon))
             out.push(e);
         }
-        for (const shot of combat?.enemyBullets || []) {
+        for (const shot of combat?.projectiles.enemyBullets || []) {
           if (shot.active === false || shot.hit) continue;
           if (hitsWithin(ship, shot, horizon)) out.push(shot);
         }

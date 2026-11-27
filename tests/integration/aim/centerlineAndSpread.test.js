@@ -171,13 +171,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.slice(before);
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(2);
 
@@ -204,13 +204,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.slice(before);
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(2);
 
@@ -233,13 +233,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.slice(before);
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(4);
 
@@ -265,13 +265,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.targeting.currentTargetLocks = [];
       combat.targeting.currentLockAssignments = [];
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.slice(before);
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(3);
 
@@ -625,13 +625,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
         combat.setSpreadMode(spreadMode);
         combat.targeting.targetUpdateTimer = 0;
         combat.updateTargeting(0);
-        const before = combat.bullets.length;
+        const before = combat.projectiles.bullets.length;
         const player = combat.getCachedPlayer();
         combat.handleShooting(
           combat.weapons.shootCooldown + 0.001,
           player.getStats()
         );
-        return combat.bullets.slice(before);
+        return combat.projectiles.bullets.slice(before);
       }
 
       const firedConc = rank3FireAt('concentrated');
@@ -678,13 +678,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // Fire and verify all bullets aim at parallel lanes around the SAME
       // anchor enemy. If F4's scenario were real, later shots would aim at
       // different enemies → velocity angles would diverge.
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.slice(before);
+      const fired = combat.projectiles.bullets.slice(before);
       expect(fired.length).toBeGreaterThanOrEqual(2);
 
       // All angles must be near-identical (parallel-lane invariant).
@@ -710,13 +710,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       // Case 1: with getTurretAngle, manual fire uses the turret heading (=== 0 in
       // harness mock). Bullet velocity should point +x.
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.slice(before);
+      const fired = combat.projectiles.bullets.slice(before);
       expect(fired.length).toBe(1);
       expect(fired[0].vx).toBeGreaterThan(0);
       expect(Math.abs(fired[0].vy)).toBeLessThan(0.001);

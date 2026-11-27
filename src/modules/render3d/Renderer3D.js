@@ -660,8 +660,8 @@ class Renderer3D extends BaseSystem {
     if (player?.position) visit(player.position, player, 'angle', null);
     const combat = this.cachedCombat;
     const lists = [
-      combat?.bullets,
-      combat?.enemyBullets,
+      combat?.projectiles.bullets,
+      combat?.projectiles.enemyBullets,
       this.cachedPickups?.pickups,
       this.cachedXPOrbs?.xpOrbs,
       this.cachedHealthHearts?.hearts,
@@ -1077,7 +1077,7 @@ class Renderer3D extends BaseSystem {
         }
       }
     };
-    scan(this.cachedCombat?.enemyBullets || []);
+    scan(this.cachedCombat?.projectiles.enemyBullets || []);
     scan(this.cachedEnemies?.getActiveEnemies() || []);
     return out;
   }

@@ -61,13 +61,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       playerState.multishot = 4;
       playerState.damage = 100;
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.length - before;
+      const fired = combat.projectiles.bullets.length - before;
       expect(fired).toBe(1);
     });
 
@@ -96,13 +96,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       playerState.multishot = 4;
       playerState.damage = 100;
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.length - before;
+      const fired = combat.projectiles.bullets.length - before;
       expect(fired).toBe(4);
     });
 
@@ -127,13 +127,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       playerState.multishot = 4;
       playerState.damage = 10;
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.length - before;
+      const fired = combat.projectiles.bullets.length - before;
       expect(fired).toBe(4);
     });
 
@@ -252,13 +252,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
         1
       );
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.length - before;
+      const fired = combat.projectiles.bullets.length - before;
 
       // The lone target HP=50 only needs 1 shot at damage=100. The 3 extra
       // multishot slots have nowhere else to go (no other enemies in range),
@@ -295,13 +295,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
         2
       );
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      const fired = combat.bullets.length - before;
+      const fired = combat.projectiles.bullets.length - before;
 
       // Each enemy needs 1 bullet (dmg=100 vs HP=50). With 4 distinct enemies
       // and multishot=4 budget, exactly 4 bullets fired total (NOT 16).
@@ -394,8 +394,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
         combat.weapons.shootCooldown + 0.001,
         player.getStats()
       );
-      expect(combat.bullets.length).toBeGreaterThan(0);
-      const b = combat.bullets[combat.bullets.length - 1];
+      expect(combat.projectiles.bullets.length).toBeGreaterThan(0);
+      const b =
+        combat.projectiles.bullets[combat.projectiles.bullets.length - 1];
       // If either of these flips, the fix-pass-3 Finding 3 test must be
       // re-audited to ensure it still reads observable fields.
       expect(b).not.toHaveProperty('targetX');

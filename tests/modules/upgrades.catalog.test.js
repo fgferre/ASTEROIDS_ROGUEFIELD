@@ -94,7 +94,7 @@ function makeCombat(list = []) {
 
 const fireLance = (combat) => {
   combat.createBullet(PLAYER, { x: 400, y: 300 }, DAMAGE);
-  return combat.bullets[combat.bullets.length - 1];
+  return combat.projectiles.bullets[combat.projectiles.bullets.length - 1];
 };
 
 describe('R5.4 cards on the weapon (CombatSystem)', () => {
@@ -166,7 +166,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     for (let shot = 0; shot < BEAM.every; shot += 1) {
       harmonic.combat.handleShooting(1, stats);
     }
-    expect(harmonic.combat.bullets[0].damage).toBe(DAMAGE);
+    expect(harmonic.combat.projectiles.bullets[0].damage).toBe(DAMAGE);
     expect(far.health).toBeLessThan(100);
   });
 
@@ -285,7 +285,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     const { combat, eventBus } = makeCombat([near, far, boss]);
     const shotNear = { x: 260, y: 300, vx: -200, vy: 0 };
     const shotFar = { x: 400, y: 300, vx: -200, vy: 0 };
-    combat.enemyBullets.push(shotNear, shotFar);
+    combat.projectiles.enemyBullets.push(shotNear, shotFar);
     takeCard(eventBus, 'gravity_brake', 3);
     combat.updateWeaponEffects(0.5);
     expect(near.x).toBeCloseTo(250 - 100 * 0.5 * 0.5, 6);
