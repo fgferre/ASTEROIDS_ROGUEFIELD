@@ -879,14 +879,14 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
 
   // Thruster trails: Cinder Trail embers, Ion Trail as a cyan ribbon.
   const cinderRgb = rgbOf(THREE, WEAPON_EVOLUTIONS.thermal.look.trail);
-  combat.cinders.forEach((c) => {
+  combat.cards.cinders.forEach((c) => {
     const k = c.life / c.maxLife;
     glow.push(c.x, TRAIL_H, c.y, cinderRgb, 6 + 6 * k, 0.6 * k);
   });
   // The ion trail crackles (a kinked bolt per segment, re-kinked as it
   // fades) so it reads apart from the cyan exhaust it sits on.
   const ionRgb = rgbOf(THREE, PALETTE.player);
-  const ions = combat.ions;
+  const ions = combat.cards.ions;
   for (let i = 1; i < ions.length; i += 1) {
     const a = ions[i - 1];
     const b = ions[i];
@@ -911,7 +911,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   // Afterburn: the dash's line, an amber band under a hot core that cools
   // first, so old segments read as embers.
   const amberRgb = rgbOf(THREE, PALETTE.shot);
-  const burnLine = combat.afterburnTrail;
+  const burnLine = combat.cards.afterburnTrail;
   for (let i = 0; i < burnLine.length; i += 1) {
     const b = burnLine[i];
     const k = b.life / b.maxLife;
@@ -945,17 +945,17 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   // bites and drips slag (lote 4), so nothing is drawn round it here.
   staticFrame += 1;
   const fieldRgb = rgbOf(THREE, WEAPON_EVOLUTIONS.field.look.trail);
-  combat.slows.forEach((entry, enemy) => {
+  combat.cards.slows.forEach((entry, enemy) => {
     pushStatic(ribbons, enemy, fieldRgb, white, 1);
   });
   // Singularity: each pulled machine crackles harder; at each hit point
   // matter spirals in to a dark core over the pull.
   const singularityRgb = rgbOf(THREE, WEAPON_APEX.field.look.outer);
-  combat.pulls.forEach((entry, enemy) => {
+  combat.cards.pulls.forEach((entry, enemy) => {
     pushStatic(ribbons, enemy, singularityRgb, white, 1.4);
   });
   const pull = WEAPON_APEX.field.pull;
-  combat.wells.forEach((well) => {
+  combat.cards.wells.forEach((well) => {
     const k = well.life / well.maxLife;
     const at = (seed, kk) => {
       const reach = pull.radius * (0.3 + 0.7 * glint(seed, 7)) * kk ** 0.8;
@@ -1001,7 +1001,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   const rail = combat.weapons.hasEvolution('kinetic');
   const railRgb = rgbOf(THREE, RAIL_RGB);
   const lanceArc = combat.weapons.lanceLook.arc || PALETTE.player;
-  combat.arcs.forEach((arc) => {
+  combat.cards.arcs.forEach((arc) => {
     const k = arc.life / arc.maxLife;
     const { points } = arc;
     const arcRgb = rgbOf(THREE, arc.color || lanceArc);

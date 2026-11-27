@@ -92,9 +92,9 @@ describe('Seeker Swarm family forms', () => {
     expect(combat.weapons.flakBursts).toHaveLength(0);
     expect(combat.weapons.lodged).toHaveLength(1);
     // no Incendiary Lance: the hit itself sets nothing burning
-    expect(combat.burns.has(target)).toBe(false);
+    expect(combat.cards.burns.has(target)).toBe(false);
     step(combat, 0.3);
-    expect(combat.burns.has(target)).toBe(true);
+    expect(combat.cards.burns.has(target)).toBe(true);
     expect(near.health).toBe(1000);
     step(combat, 0.75);
     expect(combat.weapons.lodged).toHaveLength(0);
@@ -128,7 +128,7 @@ describe('Seeker Swarm family forms', () => {
     expect(near.health).toBe(1000);
     step(combat, 0.8);
     expect(combat.weapons.thermite.every((p) => !p.flying)).toBe(true);
-    expect(combat.burns.has(near)).toBe(true);
+    expect(combat.cards.burns.has(near)).toBe(true);
     expect(near.health).toBeLessThan(1000);
     expect(far.health).toBe(1000);
   });
@@ -149,10 +149,10 @@ describe('Seeker Swarm family forms', () => {
 
     combat.processBulletHit(missile, target, combat.cachedEnemies);
     // no Chain Lance off the hit
-    expect(combat.arcs).toHaveLength(0);
+    expect(combat.cards.arcs).toHaveLength(0);
     combat.updateWeaponEffects(0.01);
-    expect(combat.arcs).toHaveLength(1);
-    expect(combat.arcs[0]).toMatchObject({ heavy: true, bolt: false });
+    expect(combat.cards.arcs).toHaveLength(1);
+    expect(combat.cards.arcs[0]).toMatchObject({ heavy: true, bolt: false });
     step(combat, 0.5);
     hops.slice(0, 3).forEach((e) => {
       expect(e.health).toBeCloseTo(1000 - each, 6);
@@ -182,7 +182,7 @@ describe('Seeker Swarm family forms', () => {
     combat.processBulletHit(missile, target, combat.cachedEnemies);
     expect(combat.weapons.flakBursts).toHaveLength(1);
     expect(combat.weapons.gravityWells).toHaveLength(1);
-    expect(combat.slows.size).toBe(0); // no Gravitic Lance
+    expect(combat.cards.slows.size).toBe(0); // no Gravitic Lance
     step(combat, 0.3);
     expect(side.y).toBeLessThan(330);
     expect(outside.y).toBe(395);

@@ -106,7 +106,7 @@ describe('fire patterns', () => {
       );
     expect(line[cast.jumps + 1].health).toBe(100);
     expect(aside.health).toBe(100);
-    expect(combat.arcs).toHaveLength(cast.jumps + 1);
+    expect(combat.cards.arcs).toHaveLength(cast.jumps + 1);
     expect(combat.weapons.lastShotTime).toBeCloseTo(
       -combat.weapons.shootCooldown * (cast.cooldownMultiplier - 1),
       9
@@ -146,7 +146,7 @@ describe('fire patterns', () => {
     const empty = armed('arc-caster', [out]).combat;
     empty.handleShooting(1, STATS);
     expect(out.health).toBe(100);
-    expect(empty.arcs).toHaveLength(1);
+    expect(empty.cards.arcs).toHaveLength(1);
   });
 
   describe('chain: the families and the six cards', () => {
@@ -383,13 +383,13 @@ describe('fire patterns', () => {
 
     it('arc: a cycle cutting five enemies starts one chain; Storm forks it', () => {
       const combat = cut(crowd(), (c) => c.weapons.evolveWeapon('arc'));
-      expect(combat.arcs).toHaveLength(forms.perShot.chains);
+      expect(combat.cards.arcs).toHaveLength(forms.perShot.chains);
       const storm = cut(crowd(), (c) => c.weapons.apexWeapon('arc'));
-      expect(storm.arcs.length).toBeGreaterThan(1);
+      expect(storm.cards.arcs.length).toBeGreaterThan(1);
       // The next cycle gets a new budget.
       combat.handleShooting(1, STATS);
       tickWeaponField(combat.weapons, 0.01, STATS);
-      expect(combat.arcs).toHaveLength(2 * forms.perShot.chains);
+      expect(combat.cards.arcs).toHaveLength(2 * forms.perShot.chains);
     });
 
     it('kinetic: Railshot and Coilgun cut harder and shove further', () => {
@@ -584,13 +584,13 @@ describe('fire patterns', () => {
     const { combat } = armed('furnace-corona', crowd());
     combat.weapons.evolveWeapon('arc');
     combat.handleShooting(1, STATS);
-    expect(combat.arcs).toHaveLength(
+    expect(combat.cards.arcs).toHaveLength(
       WEAPON_FORMS['furnace-corona'].base.familyForms.perShot.chains
     );
     const storm = armed('furnace-corona', crowd());
     storm.combat.weapons.apexWeapon('arc');
     storm.combat.handleShooting(1, STATS);
-    expect(storm.combat.arcs.length).toBeGreaterThan(2);
+    expect(storm.combat.cards.arcs.length).toBeGreaterThan(2);
   });
 
   it('aura: a lance hit with no shot budget starts a chain every time', () => {
@@ -757,7 +757,7 @@ describe('fire patterns', () => {
     combat.weapons.apexWeapon('thermal');
     expect(combat.weapons.weapon.form.id).toBe('sunheart');
     combat.handleShooting(1, STATS);
-    expect(combat.burns.has(inside)).toBe(true);
+    expect(combat.cards.burns.has(inside)).toBe(true);
   });
 
   it('seeker: a salvo gives each missile a target and turns it at most `turn` rad/s, at its speed', () => {

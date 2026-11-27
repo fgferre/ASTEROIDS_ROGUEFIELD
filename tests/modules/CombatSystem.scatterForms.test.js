@@ -134,9 +134,9 @@ describe('Scatter Coil family forms', () => {
 
     hit(a, rock);
     hit(b, rock);
-    expect(combat.burns.has(rock)).toBe(false);
+    expect(combat.cards.burns.has(rock)).toBe(false);
     hit(c, rock);
-    expect(combat.burns.has(rock)).toBe(true);
+    expect(combat.cards.burns.has(rock)).toBe(true);
     expect(rock.look).toBe('kindled');
     // it dies (its own burn, a bolt): its pieces fly off burning
     const piece = makeEnemy('piece', 205, 300, {
@@ -146,7 +146,7 @@ describe('Scatter Coil family forms', () => {
     });
     rock.destroyed = true;
     eventBus.emit('enemy-destroyed', { enemy: rock, fragments: [piece] });
-    expect(combat.burns.has(piece)).toBe(true);
+    expect(combat.cards.burns.has(piece)).toBe(true);
     expect(combat.weapons.flung).toEqual([
       expect.objectContaining({ enemy: piece, fire: true }),
     ]);
@@ -154,13 +154,13 @@ describe('Scatter Coil family forms', () => {
     [d, e].forEach((bolt) => hit(bolt, drone));
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
     combat.bullets.slice(-3).forEach((bolt) => hit(bolt, drone));
-    expect(combat.burns.has(drone)).toBe(false);
+    expect(combat.cards.burns.has(drone)).toBe(false);
 
     eventBus.emit('apex-unlocked', { family: 'thermal' });
     combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
     combat.bullets.slice(-3).forEach((bolt) => hit(bolt, drone));
-    expect(combat.burns.has(drone)).toBe(true);
-    expect(combat.burns.has(neighbour)).toBe(true);
+    expect(combat.cards.burns.has(drone)).toBe(true);
+    expect(combat.cards.burns.has(neighbour)).toBe(true);
     expect(drone.look).toBeUndefined();
   });
 
@@ -179,7 +179,7 @@ describe('Scatter Coil family forms', () => {
 
     combat.processBulletHit(bolt, target, combat.cachedEnemies);
     const each = bolt.shrapnel * FORMS.arc.damageFraction[0];
-    expect(combat.arcs).toHaveLength(2);
+    expect(combat.cards.arcs).toHaveLength(2);
     expect(near.health).toBeCloseTo(100 - each, 6);
     expect(next.health).toBeCloseTo(100 - each, 6);
     expect(near.vx).toBe(0);

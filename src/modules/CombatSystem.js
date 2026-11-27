@@ -424,40 +424,8 @@ class CombatSystem extends BaseSystem {
   }
 
   // === HITS AND CARDS (combat/HitResolution.js, combat/CardEffects.js) ===
-  // CardEffects owns what the cards leave on the Field. The 3D weapon mirror
-  // and the weapons, upgrade and afterburn suites read it on the combat
-  // object.
-  get arcs() {
-    return this.cards.arcs;
-  }
-
-  get wells() {
-    return this.cards.wells;
-  }
-
-  get burns() {
-    return this.cards.burns;
-  }
-
-  get slows() {
-    return this.cards.slows;
-  }
-
-  get pulls() {
-    return this.cards.pulls;
-  }
-
-  get cinders() {
-    return this.cards.cinders;
-  }
-
-  get ions() {
-    return this.cards.ions;
-  }
-
-  get afterburnTrail() {
-    return this.cards.afterburnTrail;
-  }
+  // CardEffects owns what the cards leave on the Field; readers ask it
+  // (combat.cards.arcs).
 
   // Called on the combat object by the weapons, upgrade, knockback, afterburn
   // and boss feedback suites.

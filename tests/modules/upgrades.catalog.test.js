@@ -254,7 +254,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     combat.updateWeaponEffects(1 / 60);
     expect(near.health).toBe(100 - 40);
     expect(far.health).toBe(100);
-    expect(combat.arcs).toHaveLength(1);
+    expect(combat.cards.arcs).toHaveLength(1);
   });
 
   it('Chain Capacitor: one more chain jump with Chain Lance, else a 10% double hit', () => {
@@ -312,7 +312,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     // Rank 3: sparks at full damage chain until one fails to kill.
     const full = sparked(3);
     expect(full.healths).toEqual([0, 0, 100 - DAMAGE]);
-    expect(full.combat.arcs).toHaveLength(2);
+    expect(full.combat.cards.arcs).toHaveLength(2);
     // No kill, no spark.
     const tough = makeEnemy('tough', 200, 300);
     const other = makeEnemy('other', 250, 300);

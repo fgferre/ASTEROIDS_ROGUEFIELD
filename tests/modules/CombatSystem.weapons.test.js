@@ -323,10 +323,10 @@ describe('Harmonic Plasma Lance', () => {
     expect(hits.mock.calls.map(([data]) => data.enemy.id)).toEqual(['solid']);
     // The beam's own Thermal form: its scar sets alight what lies on it.
     combat.updateWeaponEffects(0.01);
-    expect(combat.burns.has(phased)).toBe(false);
-    expect(combat.burns.has(solid)).toBe(true);
+    expect(combat.cards.burns.has(phased)).toBe(false);
+    expect(combat.cards.burns.has(solid)).toBe(true);
     // The solid one's arc has nothing else within 140 px.
-    expect(combat.arcs).toHaveLength(0);
+    expect(combat.cards.arcs).toHaveLength(0);
 
     combat.updateWeaponEffects(2);
     expect(phased.health).toBe(100);
@@ -364,21 +364,21 @@ describe('Harmonic beam forms', () => {
       { family: 'thermal', name: 'Searing Beam' },
     ]);
     // The beam hit lands no lance burn; its scar touches on the next tick.
-    expect(combat.burns.size).toBe(0);
+    expect(combat.cards.burns.size).toBe(0);
     expect(combat.weapons.scars).toHaveLength(1);
     combat.updateWeaponEffects(0.01);
-    expect(combat.burns.has(near)).toBe(true);
-    expect(combat.burns.has(late)).toBe(false);
+    expect(combat.cards.burns.has(near)).toBe(true);
+    expect(combat.cards.burns.has(late)).toBe(false);
 
     late.y = 300;
     combat.updateWeaponEffects(0.2);
-    expect(combat.burns.has(late)).toBe(true);
+    expect(combat.cards.burns.has(late)).toBe(true);
     combat.updateWeaponEffects(0.8);
     expect(combat.weapons.scars).toHaveLength(0);
 
     const other = makeEnemy('other', 0, 0);
     combat.processBulletHit(lance(), other, enemies);
-    expect(combat.burns.has(other)).toBe(true);
+    expect(combat.cards.burns.has(other)).toBe(true);
   });
 
   it('Sunspear (Thermal ×5): the beam reaches 50% further and stays 0.5 s; its line burns 2 s', () => {
@@ -411,7 +411,7 @@ describe('Harmonic beam forms', () => {
     expect(up.health).toBeCloseTo(100 - bolt, 6);
     expect(down.health).toBeCloseTo(100 - bolt, 6);
     expect(third.health).toBe(100);
-    expect(three.combat.arcs.map((x) => x.bolt)).toEqual([true, true]);
+    expect(three.combat.cards.arcs.map((x) => x.bolt)).toEqual([true, true]);
 
     // At 5: from the one enemy it crosses, a chain jumping 3 times.
     const start = makeEnemy('start', 200, 300);
@@ -424,7 +424,7 @@ describe('Harmonic beam forms', () => {
       .forEach((hop) => expect(hop.health).toBeCloseTo(100 - heavy, 6));
     expect(hops[3].health).toBe(100);
     expect(start.health).toBeCloseTo(100 - beamHit, 6);
-    expect(five.combat.arcs).toHaveLength(3);
+    expect(five.combat.cards.arcs).toHaveLength(3);
   });
 
   it('Salvage: orbs from beam kills fly to the ship; at 5 the beam also sends every orb it crosses', () => {
@@ -545,7 +545,7 @@ describe('Harmonic beam forms', () => {
     expect(struck.y).toBe(300);
     expect(far.y).toBe(380);
     expect(boss.y).toBe(330);
-    expect([...combat.slows.keys()]).toEqual([struck, near]);
+    expect([...combat.cards.slows.keys()]).toEqual([struck, near]);
   });
 
   it('Field ×5: the beam leaves one trench on its line that drags what is in reach toward it for 1.2 s', () => {
@@ -832,7 +832,7 @@ describe('Scatter Coil', () => {
       6
     );
     expect(phased.health).toBe(100);
-    expect(combat.burns.size).toBe(0);
+    expect(combat.cards.burns.size).toBe(0);
   });
 });
 
@@ -918,7 +918,7 @@ describe('weapon evolutions', () => {
     });
     combat.updateWeaponEffects(1);
     expect(target.health).toBeCloseTo(85.5, 6);
-    expect(combat.burns.size).toBe(0);
+    expect(combat.cards.burns.size).toBe(0);
   });
 
   it('Chain Lance: the arc jumps to the nearest enemy within 140 px for 50%', () => {
@@ -938,13 +938,13 @@ describe('weapon evolutions', () => {
     expect(source.health).toBe(90);
     expect(nearest.health).toBe(95);
     expect(farther.health).toBe(100);
-    expect(combat.arcs).toHaveLength(1);
+    expect(combat.cards.arcs).toHaveLength(1);
 
     // Only one jump, and nothing within range means no arc.
     const alone = makeEnemy('e', 400, 400);
     combat.cachedEnemies.list.push(alone);
     combat.processBulletHit(lance(), alone, combat.cachedEnemies);
-    expect(combat.arcs).toHaveLength(1);
+    expect(combat.cards.arcs).toHaveLength(1);
     expect(outOfRange.health).toBe(100);
   });
 
@@ -1072,8 +1072,8 @@ describe('Apex evolutions', () => {
     combat.updateWeaponEffects(0.4); // target tick 1 sets the neighbour alight
     expect(target.health).toBeCloseTo(88.5, 6);
     expect(neighbour.health).toBe(100);
-    expect(combat.burns.size).toBe(2);
-    expect(combat.arcs).toHaveLength(1);
+    expect(combat.cards.burns.size).toBe(2);
+    expect(combat.cards.arcs).toHaveLength(1);
 
     // The spread burn: 2 ticks of the same 1.5 over 0.6 s.
     combat.updateWeaponEffects(0.3);
@@ -1087,7 +1087,7 @@ describe('Apex evolutions', () => {
     expect(target.health).toBeCloseTo(85.5, 6);
     expect(neighbour.health).toBeCloseTo(97, 6);
     expect(beyond.health).toBe(100);
-    expect(combat.burns.size).toBe(0);
+    expect(combat.cards.burns.size).toBe(0);
   });
 
   it('Coilgun: a lance pierces everything on its line for +25% damage', () => {
@@ -1123,8 +1123,8 @@ describe('Apex evolutions', () => {
       95, 95, 95, 95, 95,
     ]);
     // a+b (the fork), a→d→f, b→e: one hop per jump past the first.
-    expect(combat.arcs).toHaveLength(5);
-    expect(combat.arcs.every((arc) => arc.heavy)).toBe(true);
+    expect(combat.cards.arcs).toHaveLength(5);
+    expect(combat.cards.arcs.every((arc) => arc.heavy)).toBe(true);
   });
 
   it('Singularity Lance: a hit pulls the target and enemies within 90 px toward it at 160 px/s for 0.5 s, instead of slowing', () => {
@@ -1141,16 +1141,16 @@ describe('Apex evolutions', () => {
       target,
       combat.cachedEnemies
     );
-    expect(combat.slows.size).toBe(0);
-    expect(combat.wells).toHaveLength(1);
+    expect(combat.cards.slows.size).toBe(0);
+    expect(combat.cards.wells).toHaveLength(1);
 
     for (let i = 0; i < 6; i += 1) combat.updateWeaponEffects(0.1);
     expect(target.x).toBeCloseTo(-10, 6); // reached the point and stays
     expect(neighbour.x).toBeCloseTo(-5, 6); // 0.5 s × 160 px/s, then free
     expect(far.x).toBe(105);
     expect(boss.x).toBe(30);
-    expect(combat.pulls.size).toBe(0);
-    expect(combat.wells).toHaveLength(0);
+    expect(combat.cards.pulls.size).toBe(0);
+    expect(combat.cards.wells).toHaveLength(0);
   });
 
   it('Motherlode: lance kills drop twice the orbs', () => {
