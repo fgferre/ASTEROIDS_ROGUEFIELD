@@ -53,17 +53,6 @@ core.ShaderChunk.lights_pars_begin = legacyLights(
   core.ShaderChunk.lights_pars_begin
 );
 
-// An instanced mesh is never culled, as in r128: three now culls it by one
-// sphere round all its instances, worked out once and never again as they
-// move, and the backdrop's far fragments, which grow in and out with each
-// place, went missing at the edge of the ending's views.
-class InstancedMesh extends core.InstancedMesh {
-  constructor(...args) {
-    super(...args);
-    this.frustumCulled = false;
-  }
-}
-
 // Since r163 a material's envMapIntensity scales only its own envMap, and
 // the scene's sky (Scene.environment) takes Scene.environmentIntensity. The
 // game's materials set their own strength against the scene's sky, as r128
@@ -332,7 +321,6 @@ class UnrealBloomPass extends BloomPass {
 const THREE = {
   ...core,
   WebGLRenderer,
-  InstancedMesh,
   EffectComposer,
   RenderPass,
   ShaderPass,
