@@ -215,6 +215,17 @@ describe('Renderer3D.warmUp', () => {
     expect(renderer.ending.warmHome).toHaveBeenCalledTimes(1);
   });
 
+  it('warms the ending as it starts when no way to the Crucible did (?content=)', () => {
+    const { renderer } = warmable();
+    renderer.ready();
+    renderer.ending = { warm: vi.fn(), warmHome: vi.fn(), start: vi.fn() };
+    renderer.startCinematic = () => true;
+    renderer.playEndingBeat('opens', 1000);
+    renderer.playEndingBeat('twin', 1000, 'severance');
+    expect(renderer.ending.warm).toHaveBeenCalledTimes(1);
+    expect(renderer.ending.start).toHaveBeenCalledTimes(2);
+  });
+
   it('compiles every preset program variant, the current preset last', () => {
     const { renderer, variants } = warmable();
     compileScene(renderer);
