@@ -9,6 +9,7 @@
 
 import { createSeededRandom } from './asteroidMesh.js';
 import { colorOf } from './batches.js';
+import { mergeStatic } from './mergeStatic.js';
 import { PlaceSets } from './places/placeSets.js';
 import { BrokenRing } from './ring/brokenRing.js';
 import { RING_LOOK } from './ring/ringShape.js';
@@ -57,10 +58,10 @@ function ringStructures(THREE) {
     );
     // None of these writes depth: only the order they draw in layers them.
     // Each arc sorts at the centre of its circle (its bounding sphere is the
-    // whole circle's), a beam at its own middle: an edge, made after its
-    // band, draws over it, and a beam nearer than that centre over both.
-    // Three's own sphere sits mid-arc, and a band drawn over its edge halved
-    // the violet line.
+    // whole circle's), and the beams with them, so all tie and draw in the
+    // order they were made: an edge over its band, the beams over both (the
+    // outer edge runs through them). Three's own sphere sits mid-arc, and a
+    // band drawn over its edge halved the violet line.
     [band, rim].forEach((mesh) => {
       mesh.geometry.boundingSphere = new THREE.Sphere(
         new THREE.Vector3(),
@@ -72,19 +73,29 @@ function ringStructures(THREE) {
       group.add(mesh);
     });
   });
-  // Beams joining the arcs, every few degrees.
-  for (let i = 0; i <= 6; i += 1) {
-    const angle = start + (arc * (i + 0.5)) / 7;
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(560, 24, 30), dark);
-    const mid = 1775;
-    beam.position.set(
-      center.x + Math.cos(angle) * mid,
-      0,
-      center.z - Math.sin(angle) * mid
-    );
-    beam.rotation.y = angle;
-    group.add(beam);
-  }
+  // Beams joining the arcs, every few degrees: one mesh at the circle's
+  // centre, sorting there with the arcs.
+  const mid = 1775;
+  const beams = new THREE.Mesh(
+    mergeStatic(
+      THREE,
+      Array.from({ length: 7 }, (_, i) => {
+        const angle = start + (arc * (i + 0.5)) / 7;
+        return {
+          geometry: new THREE.BoxGeometry(560, 24, 30),
+          position: [Math.cos(angle) * mid, 0, -Math.sin(angle) * mid],
+          rotationY: angle,
+        };
+      })
+    ),
+    dark
+  );
+  beams.geometry.boundingSphere = new THREE.Sphere(
+    new THREE.Vector3(),
+    mid + 300
+  );
+  beams.position.set(center.x, 0, center.z);
+  group.add(beams);
   group.position.y = -1080;
   group.traverse((child) => {
     child.renderOrder = -10;
