@@ -47,6 +47,8 @@ export class CodexScreen {
     );
     document.addEventListener('keydown', (event) => {
       if (!this.codexState.isOpen) return;
+      // Not under Settings: its keys are Settings' own.
+      if (document.body?.classList.contains('is-settings-open')) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         this.closeCodex();
