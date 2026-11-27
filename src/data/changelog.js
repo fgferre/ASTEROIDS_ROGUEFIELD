@@ -53,6 +53,7 @@ export const NEXT = {
     'Every weapon now fires as fast as its numbers say: the shot clock threw away what was left over at each shot, so weapons fired a little slower than written (the Lance about 3.75 shots a second instead of 4) and fire-rate cards gave more or less than they promised (Heat Sink 3 gave the Lance +45% instead of +37%).', // not confirmed
     'Reactor Bleed and Grav Anchor now say what they do: their bonus holds while you are not thrusting, so turning and strafing keep it; the cards said any movement key ended it.', // not confirmed
     "The emergency brake's shove now throws enemies at its full strength for half a second before their own top speed holds them again: a slow enemy was held at once, so against a Husk the Reactive Brake's stronger shove made no difference.", // not confirmed
+    'Starting a sector with a head start (the Crucible gives 26 level-ups) now plays one level-up flash, shake, slow motion and sound instead of one for every level at once.', // not confirmed
   ],
   unseen: [
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",

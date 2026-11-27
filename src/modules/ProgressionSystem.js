@@ -446,11 +446,14 @@ class ProgressionSystem extends UpgradeSystem {
     };
   }
 
-  emitLevelUp(context) {
+  // `quiet` marks a level of a burst that is not the last: its logic runs,
+  // but the shake, slow motion, flash and sound play once, on the last.
+  emitLevelUp(context, { quiet = false } = {}) {
     this.eventBus?.emit?.('player-leveled-up', {
       newLevel: context.level,
       previousRequirement: context.previousRequirement,
       nextRequirement: context.nextRequirement,
+      ...(quiet && { quiet }),
     });
 
     // The pick screen opens after a short delay so the level-up slow-mo plays first.
