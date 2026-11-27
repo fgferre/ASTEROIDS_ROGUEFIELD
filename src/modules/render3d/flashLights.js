@@ -4,7 +4,7 @@
 // fast; the oldest is reused when the pool is full.
 
 import { HALF_H, HALF_W } from './batches.js';
-import { pointStrength } from './three.js';
+import { POINT_DECAY, pointStrength } from './three.js';
 
 // proposta 17/10: pool size, height over the plane, reach and decay.
 const POOL_SIZE = 6;
@@ -30,7 +30,12 @@ export class FlashLights {
     this.next = 0;
     this.hitReady = true;
     for (let i = 0; i < POOL_SIZE; i += 1) {
-      const light = new THREE.PointLight(0xffffff, 0, LIGHT_DISTANCE, 2);
+      const light = new THREE.PointLight(
+        0xffffff,
+        0,
+        LIGHT_DISTANCE,
+        POINT_DECAY
+      );
       scene.add(light);
       this.lights.push(light);
     }
@@ -109,7 +114,7 @@ export class VeinLights {
     this.enabled = true;
     this.lights = [];
     for (let i = 0; i < VEIN_COUNT; i += 1) {
-      const light = new THREE.PointLight(0xffffff, 0, 1, 2);
+      const light = new THREE.PointLight(0xffffff, 0, 1, POINT_DECAY);
       scene.add(light);
       this.lights.push(light);
     }

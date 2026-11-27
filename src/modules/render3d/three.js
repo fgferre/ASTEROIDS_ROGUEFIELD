@@ -16,17 +16,17 @@ import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 
 // Lights in three's units (r155 made r128's optional, r165 removed them):
 // each light's r128 strength is set × Math.PI where the game sets it. A
-// point light also fades otherwise: r128 linearly to nothing at its distance
-// (pow(1 − d / distance, decay)), three with the inverse power of the
-// distance, windowed to nothing at it. pointStrength() is the three
-// intensity of `light` (at its distance and decay, set first) that lights
-// as r128's `strength` did at half that distance.
+// point light also fades otherwise: r128 as (1 − d / distance)² to nothing
+// at its distance, three as 1 / d^decay, windowed to nothing at it. The
+// game's point lights take decay POINT_DECAY, whose curve, scaled, follows
+// r128's over the whole reach (within 5% near the light, 0.7× at a quarter,
+// up to 1.7× at three quarters where little light is left); with decay 2 a
+// light matched at mid-reach burned what stood close to it white. So
+// pointStrength() is the three intensity of `light` (its distance set
+// first) that lights as r128's `strength` did.
+export const POINT_DECAY = 0.5;
 export function pointStrength(light, strength) {
-  const { distance, decay } = light;
-  return (
-    (strength * Math.PI * 0.5 ** decay) /
-    ((distance / 2) ** -decay * (1 - 0.5 ** 4) ** 2)
-  );
+  return strength * Math.PI * 0.1926 * Math.sqrt(light.distance);
 }
 
 // After a lost context comes back, three keeps the dead context's handles on

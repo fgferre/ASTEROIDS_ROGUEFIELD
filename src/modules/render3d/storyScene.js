@@ -14,7 +14,7 @@ import { STORY_MS, STORY_SHOT_MS, easeInOut } from '../../core/cinematics.js';
 import { STORY_SKY, buildStorySky } from './story/storySky.js';
 import { buildWake, setWakeLight } from './travel/wake.js';
 import { buildFieldRocks } from './story/storyRocks.js';
-import { pointStrength } from './three.js';
+import { POINT_DECAY, pointStrength } from './three.js';
 import { lightWake } from './travel/wakeRig.js';
 
 // proposta 18/11: the shots, in order: `ms` long, the camera from `from` to
@@ -183,7 +183,7 @@ export class StoryScene {
       new THREE.Vector3()
     );
     // The hangar's own light: its mouth lies in the bow's shadow.
-    this.bay = new THREE.PointLight(0xbfd8ff, 0, 900, 2);
+    this.bay = new THREE.PointLight(0xbfd8ff, 0, 900, POINT_DECAY);
     this.bay.position.copy(this.hangar).add(new THREE.Vector3(120, -60, 0));
     scene.add(this.bay);
     this.signal = new THREE.Sprite(

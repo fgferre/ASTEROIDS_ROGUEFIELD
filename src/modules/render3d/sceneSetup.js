@@ -4,7 +4,7 @@
 // flashes, returned as one kit (Renderer3D's `three`).
 
 import { KEY_LIGHT_DIR, PALETTE } from '../../data/constants/palette.js';
-import THREE from './three.js';
+import THREE, { POINT_DECAY } from './three.js';
 import {
   CapsuleBatch,
   PointBatch,
@@ -256,7 +256,7 @@ export function setupThree(seeded) {
     colorOf(THREE, PALETTE.boss),
     0,
     WARDEN_LIGHT_DISTANCE,
-    2
+    POINT_DECAY
   );
   scene.add(key, key.target, fill, hemi, wardenLight);
   const skies = buildSkies(THREE, renderer);

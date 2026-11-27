@@ -14,7 +14,7 @@
 import { PALETTE } from '../../data/constants/palette.js';
 import { createAsteroidGeometry } from '../render3d/asteroidMesh.js';
 import { colorOf } from '../render3d/batches.js';
-import { pointStrength } from '../render3d/three.js';
+import { POINT_DECAY, pointStrength } from '../render3d/three.js';
 
 // proposta 17/11: sizes (radius in units, share of rocks), stretch per axis,
 // drift and spin. Radii scale with the shot's `scale`.
@@ -482,7 +482,12 @@ export function createOpeningRocks({
 
   // Created at 0 up front: the light count never changes (no recompiles).
   const lights = Array.from({ length: LIGHTS.pool }, () => {
-    const light = new THREE.PointLight(colorOf(THREE, '#ffd29a'), 0, 1, 2);
+    const light = new THREE.PointLight(
+      colorOf(THREE, '#ffd29a'),
+      0,
+      1,
+      POINT_DECAY
+    );
     fx.add(light);
     return light;
   });

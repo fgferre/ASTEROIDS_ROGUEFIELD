@@ -25,6 +25,7 @@
 
 import { ALL_HULLS } from '../../data/shipModels.js';
 import { DissolvePool } from './dissolve.js';
+import { POINT_DECAY } from './three.js';
 import { NOZZLE_HEIGHT, VISUAL_SCALE } from './hullModel.js';
 import * as hullLivery from './hullLivery.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
@@ -107,7 +108,7 @@ export class PlayerMirror {
     // A dark stand-in, on only while the ship is hidden (a blink, a death):
     // the lit programs are keyed on the count of lights shown, so without
     // it hiding the ship recompiles every lit material mid-play.
-    this.standIn = new THREE.PointLight(0x000000, 0, 1, 2);
+    this.standIn = new THREE.PointLight(0x000000, 0, 1, POINT_DECAY);
     this.standIn.visible = false;
     scene.add(this.standIn);
 

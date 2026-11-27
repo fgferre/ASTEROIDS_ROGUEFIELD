@@ -8,7 +8,7 @@ import { PALETTE } from '../../../data/constants/palette.js';
 import { SHIP_MAX_SPEED } from '../../../data/constants/physics.js';
 import { colorOf, rgbOf } from '../batches.js';
 import { NOZZLE_HEIGHT, VISUAL_SCALE, throatGeometry } from '../hullModel.js';
-import { pointStrength } from '../three.js';
+import { POINT_DECAY, pointStrength } from '../three.js';
 
 const TRAIL_MIN = 12;
 const TRAIL_LENGTH = 22;
@@ -91,7 +91,7 @@ export function createEngines(mirror, THREE) {
     colorOf(THREE, PALETTE.player),
     0,
     150,
-    2
+    POINT_DECAY
   );
   mirror.group.add(mirror.light);
 }
