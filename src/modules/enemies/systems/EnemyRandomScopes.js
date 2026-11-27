@@ -309,7 +309,11 @@ export class EnemyRandomScopes {
     }
   }
 
-  /** Each stream back where it stood, once the field is rebuilt. */
+  /**
+   * Each stream back where it stood, once the field is rebuilt; a scope first
+   * opened after the death (the first enemy of a type born under the end
+   * screen) is closed again, as it was not there then.
+   */
   restoreStreamPositions(snapshot) {
     restoreStreams(this.randomScopes, snapshot.states);
     restoreStreams(
@@ -329,7 +333,9 @@ function streamStates(scopes) {
 }
 
 function restoreStreams(scopes, states) {
-  Object.entries(states ?? {}).forEach(([scope, state]) => {
-    scopes?.[scope]?.restore(state);
+  Object.entries(scopes ?? {}).forEach(([scope, generator]) => {
+    if (scope === 'base' || !generator?.serialize) return;
+    if (states?.[scope]) generator.restore(states[scope]);
+    else delete scopes[scope];
   });
 }

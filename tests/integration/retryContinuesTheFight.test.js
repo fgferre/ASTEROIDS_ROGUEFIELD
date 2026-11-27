@@ -383,9 +383,10 @@ function spawnBoss(game, id) {
 
 // The real path: the death, the seconds the field plays on, the end screen,
 // the Retry and its 3-2-1 (the game does not step under the countdown).
-function retry(game) {
+function retry(game, underTheEndScreen = () => {}) {
   game.services.player.setInvulnerableTimer(0);
   game.services.world.handlePlayerDeath();
+  underTheEndScreen(game);
   for (let i = 0; i < DEATH_STEPS; i += 1) game.step();
   vi.advanceTimersByTime(3000);
   const flow = game.session.retry;
@@ -429,13 +430,13 @@ function setUpEnemy(game, id) {
 }
 
 // The death, the Retry, then 600 steps with no input. What each moment holds.
-function fight(id, setUp) {
+function fight(id, setUp, underTheEndScreen) {
   const game = newGame();
   const attacking = setUp(game, id);
   const unread = new Set();
   const atDeath = dump(game, unread);
   const shared = sharedWithOthers(game);
-  retry(game);
+  retry(game, underTheEndScreen);
   const afterRetry = dump(game, unread);
   const errorsBefore = console.error.mock.calls.length;
   let attackEnded = !attacking;
@@ -593,6 +594,15 @@ describe('a Retry continues the fight where it stopped', () => {
     expectTheFightGoesOn('foundry-mother', () =>
       fight('foundry-mother', withCards)
     );
+  });
+
+  it('a random scope first opened under the end screen is gone after the Retry', () => {
+    // A type of enemy first born in the seconds the field plays on after the
+    // death opens its scope then; the Retry brings back the scopes there
+    // were at the death, no other.
+    const newcomer = (game) =>
+      spawnViaFactory(game.services.enemies, 'hunter', { x: 600, y: 120 });
+    expectTheFightGoesOn('drone', () => fight('drone', setUpEnemy, newcomer));
   });
 
   it('a heart, a pickup, a chest and XP orbs on the field keep their streams', () => {
