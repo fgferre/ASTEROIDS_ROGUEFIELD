@@ -23,6 +23,7 @@ import {
 } from '../../core/storage.js';
 import { pilotSummaries } from '../../services/pilots.js';
 import { localDay } from '../../services/runRecords.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 // Set across the reload a choice makes: that entry goes straight on.
 const CHOSEN_KEY = 'roguefield:pilot-chosen';
@@ -176,7 +177,7 @@ export function openPilotSelect(onContinue, onBack) {
   function leave() {
     done = true;
     cancelAnimationFrame(rafId);
-    document.removeEventListener('keydown', onKey, true);
+    inputLayers.remove(layer);
     window.removeEventListener('storage', onStorage);
   }
 
@@ -258,13 +259,13 @@ export function openPilotSelect(onContinue, onBack) {
     buttons[next]?.focus();
   }
 
-  // Capture phase: the menu under this screen hears none of these keys. A
-  // held key's repeats do nothing, so a held Enter never reaches Delete.
+  // On the input layer stack: these keys are the screen's alone (the menu
+  // under it and the game hear none). A held key's repeats do nothing, so a
+  // held Enter never reaches Delete.
   function onKey(event) {
-    if (!SCREEN_KEYS.includes(event.key)) return;
+    if (!SCREEN_KEYS.includes(event.key)) return false;
     event.preventDefault();
-    event.stopPropagation();
-    if (event.repeat) return;
+    if (event.repeat) return true;
     const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[
       event.key
     ];
@@ -276,10 +277,11 @@ export function openPilotSelect(onContinue, onBack) {
       const own = focusable().includes(document.activeElement);
       activate(own ? document.activeElement : focusable()[0]);
     }
+    return true;
   }
 
-  function pollPad() {
-    const now = padState();
+  // A pad press, read here (not under Settings, which has the pad then).
+  function padPress(now) {
     if (now.go && !held.go) {
       const own = focusable().includes(document.activeElement);
       activate(own ? document.activeElement : focusable()[0]);
@@ -288,6 +290,16 @@ export function openPilotSelect(onContinue, onBack) {
       else back();
     } else if (now.left && !held.left) move(-1);
     else if (now.right && !held.right) move(1);
+  }
+
+  // A frame under Settings, or the one after it closed (by this same
+  // press, the pad's B), presses nothing here.
+  let wasCovered = false;
+  function pollPad() {
+    const now = padState();
+    const covered = inputLayers.covered(layer);
+    if (!covered && !wasCovered) padPress(now);
+    wasCovered = covered;
     held = now;
     if (!done) rafId = requestAnimationFrame(pollPad);
   }
@@ -295,7 +307,9 @@ export function openPilotSelect(onContinue, onBack) {
   screen.addEventListener('click', (event) =>
     activate(event.target.closest('button'))
   );
-  document.addEventListener('keydown', onKey, true);
+  // It reads the pad itself (pollPad), and the pad's pointer works over it.
+  const layer = { name: 'pilots', passes: ['pause'], pointer: true, onKey };
+  inputLayers.push(layer);
   window.addEventListener('storage', onStorage);
   rafId = requestAnimationFrame(pollPad);
   render(`[data-pilot-slot="${active}"]`);

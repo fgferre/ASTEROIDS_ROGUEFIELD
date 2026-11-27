@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/domStubs.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 import { updateRecords } from '../../../src/services/runRecords.js';
 import {
   CampaignMap,
@@ -296,11 +297,9 @@ describe('campaign map', () => {
     });
     const fakeDocument = { activeElement: focusOn('chapter') };
     let onKey;
-    let capture;
-    fakeDocument.addEventListener = (name, fn, options) => {
-      onKey = fn;
-      capture = options;
-    };
+    // A menu key of the input layer stack (window capture, before
+    // InputSystem's document listeners).
+    vi.spyOn(inputLayers, 'addBase').mockImplementation((fn) => (onKey = fn));
     vi.stubGlobal('document', fakeDocument);
     const list = () => ({ innerHTML: '', querySelectorAll: () => [] });
     const text = () => ({ textContent: '', hidden: false });
@@ -327,20 +326,19 @@ describe('campaign map', () => {
     map.chapters = campaignChapters(records(['debris-wake']));
     map.selectSector('salvage-lanes');
     const press = (key) => onKey({ key, preventDefault: () => {} });
+    expect(inputLayers.addBase).toHaveBeenCalledTimes(1);
 
-    // InputSystem stops ArrowDown at the document on the way down, so only a
-    // capture listener still hears it.
-    expect(capture).toBe(true);
     press('ArrowDown');
     press('ArrowDown');
     expect(focused).toEqual(['salvage-lanes', 'prime-gate']);
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('is drawn in the menu, not opened: no overlay, Escape does nothing, and the arrows only count while the panel is in view', () => {
     const fakeDocument = { activeElement: null };
     let onKey;
-    fakeDocument.addEventListener = (name, fn) => (onKey = fn);
+    vi.spyOn(inputLayers, 'addBase').mockImplementation((fn) => (onKey = fn));
     vi.stubGlobal('document', fakeDocument);
     const list = () => ({ innerHTML: '', querySelectorAll: () => [] });
     const text = () => ({ textContent: '', hidden: false });
@@ -376,6 +374,7 @@ describe('campaign map', () => {
     onKey({ key: 'ArrowDown', preventDefault });
     expect(focused).toEqual(['prime-gate']);
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('draws the panel each time the menu is shown; after a sector run it also shows the Campaign tab and focuses the next sector', async () => {

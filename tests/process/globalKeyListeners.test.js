@@ -1,10 +1,10 @@
-// Every key listener on window or document hears the key whatever screen is
-// open, so a new one can act under another open screen (Settings over the
-// briefing, the credits or the Codex let Enter and the arrows through, 26/11).
-// The list below is every such listener today, as file: count. A new one, or a
-// new file, fails here: add it only after checking it cannot act under another
-// open screen. src/public/ (other people's code) and the gitignored
-// exported-assets/ (the owner's board) are not the game.
+// A key listener on window or document hears every key whatever screen is
+// open. The screens take theirs through the input layer stack
+// (src/modules/input/inputLayers.js: only the screen on top hears a key), so
+// a global key listener lives only in the files below, each with its reason;
+// any other fails here with its file and line. src/public/ (other people's
+// code) and the gitignored exported-assets/ (the owner's board) are not the
+// game.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -23,43 +23,70 @@ const files = (dir) =>
 const KEY_LISTENER =
   /\b(?:window|document)\s*\.\s*addEventListener\s*\(\s*['"`](?:keydown|keyup|keypress)['"`]/g;
 
+// file: [how many, why it hears every key].
+const ALLOWED = {
+  'src/modules/input/inputLayers.js': [
+    2,
+    'the stack itself: one keydown and one keyup (window capture) that hand each key to the screen on top',
+  ],
+  'src/modules/InputSystem.js': [
+    4,
+    'the controls: every key and its release (acting on none a screen took), S and ArrowDown stopped early for password managers',
+  ],
+  'src/modules/AudioSystem.js': [
+    1,
+    "the audio unlock: the page's first key wakes the sound, whatever is on screen",
+  ],
+  'src/modules/ui/padPointer.js': [
+    1,
+    "the pad's pointer leaves when a real key is pressed",
+  ],
+  'src/utils/PerformanceMonitor.js': [
+    1,
+    'F3, the performance overlay: a tool, over any screen',
+  ],
+  'src/app.js': [
+    2,
+    'F8 and F9, the stats overlay and the replay download: tools, over any screen',
+  ],
+  'src/bootstrap/replaySession.js': [
+    1,
+    "a broken replay's notice leaves at the next key, once",
+  ],
+  'src/bootstrap/ringScene.js': [
+    1,
+    'the dev ring scene (?scene=): no game screen there',
+  ],
+};
+
+// Every key listener, as file:line.
 const found = {};
 for (const f of files('src')
   .map((f) => f.replaceAll('\\', '/'))
   .filter((f) => !f.startsWith('src/public/'))
   .filter((f) => !f.startsWith('src/exported-assets/'))) {
-  const count = readFileSync(f, 'utf8').match(KEY_LISTENER)?.length ?? 0;
-  if (count) found[f] = count;
+  const text = readFileSync(f, 'utf8');
+  for (const match of text.matchAll(KEY_LISTENER)) {
+    const line = text.slice(0, match.index).split('\n').length;
+    (found[f] ??= []).push(`${f}:${line}`);
+  }
 }
 
-const ALLOWED = {
-  'src/app.js': 2,
-  'src/bootstrap/replaySession.js': 1,
-  'src/bootstrap/ringScene.js': 1,
-  'src/modules/AudioSystem.js': 1,
-  'src/modules/InputSystem.js': 4,
-  'src/modules/menu/loadingScreen.js': 5,
-  'src/modules/menu/pilotSelect.js': 1,
-  'src/modules/ui/CampaignMap.js': 1,
-  'src/modules/ui/CodexScreen.js': 1,
-  'src/modules/ui/CreditsOverlay.js': 1,
-  'src/modules/ui/EndCredits.js': 1,
-  'src/modules/ui/HangarScreen.js': 1,
-  'src/modules/ui/LevelUpScreen.js': 1,
-  'src/modules/ui/PauseScreen.js': 1,
-  'src/modules/ui/RunEndScreens.js': 1,
-  'src/modules/ui/SettingsPanel.js': 1,
-  'src/modules/ui/hud/editor/HudEditor.js': 1,
-  'src/modules/ui/padPointer.js': 1,
-  'src/modules/ui/skipHold.js': 2,
-  'src/utils/PerformanceMonitor.js': 1,
-};
-
 describe('global key listeners', () => {
-  it('are only the ones checked against an open screen above them', () => {
+  it('live only in the files allowed, each with its reason', () => {
+    const extra = Object.entries(found).flatMap(([file, lines]) =>
+      lines.length > (ALLOWED[file]?.[0] ?? 0) ? lines : []
+    );
     expect(
-      found,
-      'A key listener on window or document is new or moved. Add it to the list only after checking it cannot act under another open screen (Settings, the cards, the chest, the briefing, the credits).'
-    ).toEqual(ALLOWED);
+      extra,
+      'A key listener on window or document outside the allowed list: a screen takes its keys as a layer of the input layer stack (onKey, src/modules/input/inputLayers.js). Only a listener that is not a screen goes in ALLOWED, with its reason.'
+    ).toEqual([]);
+  });
+
+  it('every one allowed is still there (the list says what stays)', () => {
+    const gone = Object.entries(ALLOWED)
+      .filter(([file, [count]]) => (found[file]?.length ?? 0) !== count)
+      .map(([file]) => file);
+    expect(gone, 'Update ALLOWED to what the file has now.').toEqual([]);
   });
 });

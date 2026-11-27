@@ -29,6 +29,7 @@ import {
   rumble,
   startMenuPadPolling,
 } from './input/gamepadReading.js';
+import { inputLayers } from './input/inputLayers.js';
 
 const PASSWORD_MANAGER_GUARD_CODES = new Set(['KeyS', 'ArrowDown']);
 // Gameplay presses are applied at the next fixed step (not in the DOM handler)
@@ -128,6 +129,11 @@ class InputSystem {
   }
 
   setupEventListeners() {
+    // The screens' layer stack hears each key first (window capture): only
+    // the screen on top acts on it. This system still hears every key and
+    // asks the stack whether a game action passes (emitActionEvent).
+    inputLayers.install(this.getEventBus());
+
     this.handleKeyDownCapture = (event) => {
       if (!this.shouldBlockPasswordManager(event)) {
         return;
@@ -191,11 +197,6 @@ class InputSystem {
       eventBus.on('game-started', (payload = {}) => {
         this.replaying = Boolean(payload.replay);
       });
-
-      // A cinematic holds the run (ui/runCinematics.js): Start is its skip
-      // key, never the pause; the ending's acts (they play on) no Settings.
-      eventBus.on('cinematic-started', (e) => (this.cinematic = e?.kind));
-      eventBus.on('cinematic-ended', () => (this.cinematic = null));
 
       eventBus.on('player-took-damage', (payload = {}) => {
         if ((payload.healthDamage ?? payload.damage) > 0) {
@@ -270,13 +271,19 @@ class InputSystem {
     if (key) this.keys[key] = true;
     if (code) this.codes[code] = true;
     this.setActiveDevice('keyboard');
+    // A key a screen took (input/inputLayers.js) is its alone: no action
+    // here, and no default held back (the HUD editor's text fields type it).
+    const taken = inputLayers.took(event);
 
-    if (isMovementBinding(this, key) || isMovementBinding(this, code)) {
+    if (
+      !taken &&
+      (isMovementBinding(this, key) || isMovementBinding(this, code))
+    ) {
       event.preventDefault();
     }
     // A Space's repeats arm no button, nor does the release of one begun in
     // flight (the strafe) on a screen opened under it: pressed again, it does.
-    if (code === 'space') {
+    if (code === 'space' && !taken) {
       if (!event.repeat) this.spaceFromFlight = this.isGameRunning();
       if (this.spaceFromFlight || event.repeat) event.preventDefault();
     }
@@ -286,7 +293,7 @@ class InputSystem {
 
     const actions = collectKeyboardActions(this, normalizedKey, normalizedCode);
 
-    if (!wasPressed) {
+    if (!wasPressed && !taken) {
       actions.forEach((action) => {
         // A repeat (the keys dropped on a focus loss) never confirms.
         if (event.repeat && action === 'confirm') return;
@@ -477,20 +484,23 @@ class InputSystem {
 
     const stepField = STEP_PRESS_FIELDS[action];
     if (stepField) {
-      // A press made on the pause screen must not fire on resume.
-      if (this.isGameRunning()) {
+      // A press made on the pause screen must not fire on resume, nor one
+      // made under a screen (a card picked by its key resumes the run).
+      if (this.isGameRunning() && inputLayers.passes(action, context.event)) {
         this.pendingStepPresses.add(stepField);
       }
       return;
     }
 
     switch (action) {
+      // The screen on top and the cinematic playing decide (input/inputLayers.js).
       case 'pause':
-        if (!this.cinematic || ['epilogue', 'arrival'].includes(this.cinematic))
+        if (inputLayers.passes('pause', context.event)) {
           eventBus?.emit?.('toggle-pause');
+        }
         break;
       case 'openSettings':
-        if (['revelation', 'ending'].includes(this.cinematic)) break;
+        if (!inputLayers.passes('openSettings', context.event)) break;
         eventBus?.emit?.('settings-menu-requested', {
           source: context.device || source || 'input',
         });

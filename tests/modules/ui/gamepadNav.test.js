@@ -4,6 +4,7 @@ import {
   GamepadMenuNav,
   pickFocusTarget,
 } from '../../../src/modules/ui/gamepadNav.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 
 const rect = (left, top, width = 100, height = 40) => ({
   left,
@@ -49,6 +50,7 @@ describe('GamepadMenuNav', () => {
   let restoreDom;
   beforeEach(() => {
     restoreDom = installDomStubs();
+    inputLayers.install(null); // nothing open: the menu
   });
   afterEach(() => restoreDom());
 
@@ -89,22 +91,26 @@ describe('GamepadMenuNav', () => {
     expect(clicks).toEqual([3]);
   });
 
-  it('drives the game over, not cards left under it', () => {
-    const shown = { classList: { contains: () => false } };
-    document.getElementById = (id) =>
-      id === 'levelup-screen' || id === 'gameover-screen' ? shown : null;
+  // The screen on top of the input layer stack, `element` shown.
+  const layer = (name) => ({
+    name,
+    passes: [],
+    element: { classList: { contains: () => false } },
+  });
+
+  it('drives the screen on top of the stack, not one left under it', () => {
+    inputLayers.push(layer('levelup'));
+    inputLayers.push(layer('gameover'));
     const ui = new GamepadMenuNav({});
     expect(ui.screen().id).toBe('gameover');
   });
 
   it('closes Settings with pad back instead of operating a covered screen', () => {
     const closeSettingsPanel = vi.fn();
-    const settings = { classList: { contains: () => false } };
-    document.getElementById = (id) =>
-      id === 'settings-screen' || id === 'levelup-screen' ? settings : null;
+    inputLayers.push(layer('levelup'));
+    inputLayers.push(layer('settings'));
     const ui = new GamepadMenuNav({
       settingsPanel: { capturing: false, closeSettingsPanel },
-      hudEditor: { isOpen: false },
     });
 
     ui.handle('back');

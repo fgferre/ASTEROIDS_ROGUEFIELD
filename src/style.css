@@ -386,6 +386,12 @@ select {
   z-index: 130;
 }
 
+/* Settings opens over any other overlay (the input layer stack keeps it on
+   top), so it is drawn over them too, the pilots (140) included. */
+#settings-screen {
+  z-index: 141;
+}
+
 /* Shared panel surface: pause, settings, credits */
 .pause-content,
 .settings-container,
@@ -6022,6 +6028,37 @@ body.touch-play .hud-frame [data-touch-action]::after {
   color: var(--danger);
   border-color: var(--danger);
   box-shadow: 0 0 12px rgba(255, 49, 49, 0.35);
+}
+
+/* === HUD editor that did not load (ui/hudEditorDoor.js): the editor's own
+   toast (.hed-toast, editorStyles.js), over Settings or the pause screen === */
+.hud-editor-notice {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  z-index: 150;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 48px);
+  margin: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-align: center;
+  color: var(--text);
+  pointer-events: none;
+}
+
+/* A phone held sideways: two lines between the panel's title and its close button. */
+@media (max-width: 900px) {
+  .hud-editor-notice {
+    max-width: min(calc(100vw - 48px), 460px);
+  }
 }
 
 /* === Door notice (mobileGuard): turn sideways; on a phone in the browser,

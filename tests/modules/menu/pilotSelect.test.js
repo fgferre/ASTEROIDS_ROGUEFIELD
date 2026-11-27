@@ -6,6 +6,7 @@ import {
   resolveActiveSlot,
 } from '../../../src/core/storage.js';
 import { openPilotSelect } from '../../../src/modules/menu/pilotSelect.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 
 // Another tab is another page on the same storage: it writes the keys itself.
 const HANGAR_2 = 'roguefield:slot2:hangar:v2';
@@ -13,10 +14,10 @@ const otherTabMakesPilot2 = (salvage) =>
   localStorage.setItem(HANGAR_2, JSON.stringify({ salvage }));
 
 // The pilots screen on a stand-in page: clicks reach its buttons by dataset,
-// keys its capture listener, and `pad.frame()` reads the stand-in pad.
+// keys its layer on top of the input layer stack, and `pad.frame()` reads
+// the stand-in pad.
 function openScreen(onContinue = vi.fn(), onBack = vi.fn()) {
   let onClick = null;
-  let onKey = null;
   let frame = null;
   const pad = { buttons: Array.from({ length: 16 }, () => ({})), axes: [] };
   const screen = {
@@ -32,18 +33,16 @@ function openScreen(onContinue = vi.fn(), onBack = vi.fn()) {
   vi.stubGlobal('document', {
     createElement: () => screen,
     body: { appendChild() {}, dataset: {} },
-    addEventListener: (type, fn) => type === 'keydown' && (onKey = fn),
-    removeEventListener() {},
     activeElement: null,
   });
   openPilotSelect(onContinue, onBack);
+  const layer = inputLayers.top();
   return {
     screen,
     onContinue,
     onBack,
     click: (dataset) => onClick({ target: { closest: () => ({ dataset }) } }),
-    key: (key) =>
-      onKey({ key, preventDefault() {}, stopPropagation() {}, repeat: false }),
+    key: (key) => layer.onKey({ key, preventDefault() {}, repeat: false }),
     padB: () => {
       pad.buttons[1] = { pressed: true };
       frame();

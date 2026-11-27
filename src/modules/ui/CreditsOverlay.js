@@ -1,6 +1,7 @@
 import { SUPPORT_EMAIL } from '../../data/credits.js';
 import { RELEASES } from '../../data/changelog.js';
 import { asArray } from '../upgradeCatalog.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 // src/modules/ui/CreditsOverlay.js
 //
@@ -87,18 +88,25 @@ export class CreditsOverlay {
       isOpen: false,
       triggerId: null,
     };
-    this.handleCreditsKeyDown = this.handleCreditsKeyDown.bind(this);
+    // Open, on the input layer stack: Escape closes it. The pause key still
+    // goes to the game, which ignores it on the menu.
+    this.inputLayer = {
+      name,
+      element: refs.overlay,
+      passes: ['pause'],
+      onKey: (event) => this.handleCreditsKeyDown(event),
+    };
   }
 
   /** A full screen change hid the overlay: no longer open, no opener kept. */
   markClosed() {
     this.creditsState.isOpen = false;
     this.creditsState.triggerId = null;
+    inputLayers.remove(this.inputLayer);
   }
 
   bindCreditsControls() {
     if (typeof document !== 'undefined') {
-      document.addEventListener('keydown', this.handleCreditsKeyDown);
       fillSupportEmail();
     }
 
@@ -175,6 +183,7 @@ export class CreditsOverlay {
     }
 
     this.creditsState.isOpen = true;
+    inputLayers.push(this.inputLayer);
 
     this.showScreen(this.name, { overlay: true, show: true });
     overlay.setAttribute('aria-hidden', 'false');
@@ -221,16 +230,14 @@ export class CreditsOverlay {
 
     this.creditsState.isOpen = false;
     this.creditsState.triggerId = null;
+    inputLayers.remove(this.inputLayer);
   }
 
   handleCreditsKeyDown(event) {
-    if (!this.creditsState.isOpen) {
-      return;
-    }
-
     if (event.key === 'Escape' || event.key === 'Esc') {
       event.preventDefault();
       this.closeCreditsOverlay({ restoreFocus: true });
     }
+    return false;
   }
 }
