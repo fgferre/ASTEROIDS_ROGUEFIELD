@@ -5616,6 +5616,8 @@ body.touch-play .credits-support__link {
     padding-right: 10px;
     border-bottom: 0;
     border-right: 1px solid var(--line);
+    /* on the shortest phones the tabs scroll above Back, never under it */
+    overflow: hidden auto;
   }
 
   body.touch-play :is(.hangar-dialog, .codex-dialog) .codex-tab {
