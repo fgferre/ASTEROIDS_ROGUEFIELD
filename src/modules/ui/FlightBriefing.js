@@ -57,6 +57,8 @@ export class FlightBriefing {
   /** Continue: modern flight from here on, back to play. */
   continue() {
     if (!this.isVisible || Date.now() < this.lockedUntil) return;
+    // Not under Settings: the confirm there is Settings' own.
+    if (document.body?.classList.contains('is-settings-open')) return;
     this.hide();
     this.ui.eventBus?.emit?.('modern-flight-engaged');
     this.ui.showGameUI();
