@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/domStubs.js';
 import {
@@ -350,5 +351,17 @@ describe('Run end screens', () => {
     expect(victory.body.innerHTML).toContain('DEBRIS WAKE · 8:32');
     expect(victory.nextBtn.dataset.sector).toBe('salvage-lanes');
     expect(victory.nextBtn.label.textContent).toBe('Next Sector');
+  });
+
+  it('no flying tip is drawn behind an end screen, across its title', () => {
+    const css = readFileSync(
+      new URL('../../../src/runEndScreens.css', import.meta.url),
+      'utf8'
+    );
+    const rule = css
+      .split('}')
+      .find((part) => part.includes('body:has(.end-screen:not(.hidden))'));
+    expect(rule).toContain('.onboarding-tip');
+    expect(rule).toMatch(/display:\s*none/);
   });
 });

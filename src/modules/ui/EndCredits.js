@@ -22,6 +22,8 @@ export class EndCredits {
     this.refs.continueBtn?.addEventListener('click', () => this.finish());
     document.addEventListener('keydown', (event) => {
       if (!this.onDone || event.repeat) return;
+      // Not under Settings: its Enter and Escape are Settings' own.
+      if (document.body?.classList.contains('is-settings-open')) return;
       if (event.key === 'Escape' || event.key === 'Enter') {
         event.preventDefault();
         this.finish();

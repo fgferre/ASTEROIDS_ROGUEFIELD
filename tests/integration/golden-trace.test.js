@@ -1,6 +1,9 @@
 /**
  * Golden trace: fixed headless runs, hashed second by second, must match the fixture byte for byte.
  * Regenerate: GOLDEN_UPDATE=1 npm test -- tests/integration/golden-trace.test.js
+ * Re-record x64 (golden-trace.x64.json): push any commit to a `golden/...` branch; the workflow
+ * golden-x64.yml records it on GitHub. Download its artifact `golden-trace-x64` into tests/__fixtures__/.
+ * arm64 uses golden-trace.json; x64 uses golden-trace.x64.json when it exists, else plays twice and compares.
  * The fixture changes only in a commit that means to change behavior; a refactor must leave it alone.
  * It holds on the CPU architecture it was recorded on (`arch`, today the owner's arm64 Mac): Math.sin,
  * cos, exp and friends may differ in the last bit on another architecture (CI runs on x64), and a
@@ -10,7 +13,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
@@ -22,9 +25,14 @@ import {
 import { installDomStubs, keyEvent } from '../__helpers__/domStubs.js';
 import { resolveService } from '../../src/core/serviceUtils.js';
 
-const FIXTURE = fileURLToPath(
+const FIXTURE_BASE = fileURLToPath(
   new URL('../__fixtures__/golden-trace.json', import.meta.url)
 );
+// arm64 (the owner's Mac) keeps the base file; any other architecture has its own.
+const FIXTURE =
+  process.arch === 'arm64'
+    ? FIXTURE_BASE
+    : FIXTURE_BASE.replace('.json', `.${process.arch}.json`);
 const UPDATE = Boolean(process.env.GOLDEN_UPDATE);
 const FRAMES_PER_SECOND = Math.round(1 / STEP_SECONDS);
 const SECONDS = 60;
@@ -229,7 +237,9 @@ function traceAgain(scenario) {
   }
 }
 
-const golden = JSON.parse(readFileSync(FIXTURE, 'utf8'));
+const golden = JSON.parse(
+  readFileSync(existsSync(FIXTURE) ? FIXTURE : FIXTURE_BASE, 'utf8')
+);
 const SAME_ARCH = golden.arch === process.arch;
 const SAME_NODE = golden.node === process.version;
 if (SAME_ARCH && !SAME_NODE && !UPDATE) {

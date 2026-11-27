@@ -47,6 +47,8 @@ export const NEXT = {
     'Card texts no longer promise what a weapon cannot get: the Afterburn Lance sells no lock-on range to weapons that never aim or cannot reach that far (the Shard Halo, the Furnace Corona, the Arc Caster and the Scatter Coil), and the Heat Sink, the Overclocked Core, Gyro Servos and the Targeting Matrix tell the Halo what its speed-up really is: the blades may cut the same enemy again sooner.', // not confirmed
     "Launching from the map a sector that begins with a head start (every sector after the first), the scenes before the run (the story, the journey, the descent) no longer sit under a gold tint: the head start's level-up flash stayed lit over them until the run began.", // not confirmed
     "A flying tip (the dash, the shield, the first moves) still on screen when Sovereign falls no longer stays over the ending's scenes or dim behind its choice: it leaves at the last blow, and since it was not used the next run teaches it again.", // not confirmed
+    'A flying tip still on screen when a sector is won or the ship is lost no longer shows faintly through the victory or game-over screen, across its title; it is back with the ship on a Retry.', // not confirmed
+    'Settings opened over the flight briefing, the end credits or the Codex no longer lets a key act on the screen underneath: Enter closed the briefing or the credits, and the arrows changed the Codex tab, without you seeing it.', // not confirmed
   ],
   unseen: [
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",
@@ -78,6 +80,8 @@ export const NEXT = {
     'The interface, the menu background, the reward code and the run session now find the services they use the one way the rest of the game does, instead of through shortcuts and nicknames of their own, and a test keeps those from coming back; each finds the same service as before, so nothing changes in play.', // not confirmed
     'The kind of run (the Descent, the Daily Field, the Boss Rush or a campaign sector) is now settled once when a run starts, in one place that every part of the game asks, instead of seven copies learnt at different moments; every layer, record, medal, Salvage, banner and recording comes out the same, so nobody notices.', // not confirmed
     'Each card now says itself which part of the game its effect goes to, and one place delivers it, instead of a line written for every card in the ship and weapon code; every card does exactly what it did, so nobody notices.', // not confirmed
+    "The 3D renderer's loading-screen warm-up moves to a file of its own, so the renderer can be changed again without passing its line limit; it prepares the same things in the same order at the same moment, so nobody notices.", // not confirmed
+    "The recorded matches are now also checked against a recording made on GitHub's own machines, an empty error handler fails the code check, three unused developer scripts are gone, and a test address holding a card that is spent when picked (Hull Patch, Salvage Cache) no longer hangs the page.", // not confirmed
   ],
 };
 

@@ -1,0 +1,34 @@
+name: Record golden trace (x64)
+
+# Push to a golden/** branch to record tests/__fixtures__/golden-trace.x64.json
+# on GitHub's x64 machines; download the artifact `golden-trace-x64` afterwards.
+on:
+  push:
+    branches: ['golden/**']
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Node pinned in .nvmrc, the one the tests run on at home too.
+      - name: Use the Node pinned in .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Record the golden trace
+        run: GOLDEN_UPDATE=1 npm test -- tests/integration/golden-trace.test.js
+
+      - name: Upload the recording
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-trace-x64
+          path: tests/__fixtures__/golden-trace.x64.json
+          if-no-files-found: error
