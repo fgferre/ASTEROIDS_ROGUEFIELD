@@ -130,7 +130,6 @@ class PlayerSystem extends BaseSystem {
       'maxSpeed',
       'acceleration',
       'brakingDamping',
-      'linearDamping',
     ]);
 
     // === STATS DO JOGADOR ===
@@ -165,7 +164,7 @@ class PlayerSystem extends BaseSystem {
       getLocalDirection: (dx, dy) => this.getLocalDirection(dx, dy),
       getAccent: () => this.currentHull.visual.accent,
     });
-    exposeFields(this, this.thrusters, ['lastThrusterState', 'thrusterVisual']);
+    exposeFields(this, this.thrusters, ['lastThrusterState']);
 
     // === WEAPON RECOIL ===
     this.recoilOffset = { x: 0, y: 0 };
