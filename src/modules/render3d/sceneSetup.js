@@ -24,7 +24,12 @@ import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { ChestMirror } from './chestMirror.js';
 import { PlayerMirror } from './playerMirror.js';
-import { buildHullEnvironment, useHullEnvironment } from './hullModel.js';
+import {
+  buildHullEnvironment,
+  retakeSceneSky,
+  takeSceneSky,
+  useHullEnvironment,
+} from './hullModel.js';
 import { Blasts } from './blasts.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
@@ -334,6 +339,7 @@ export function setupThree(seeded) {
   // softboxes vivid blue, 22/11)
   const hullMaterials = [...player.hullMaterials, player.canopyMaterial];
   useHullEnvironment(hullMaterials, skies.hull);
+  takeSceneSky(scene, player.turretMaterials);
   watchContextRestore(THREE, renderer, scene, space, hullMaterials, seeded);
   const pickups = new PickupMirror(THREE, scene);
   const chests = new ChestMirror(THREE, scene);
@@ -473,6 +479,7 @@ export function watchContextRestore(
       hullMaterials[0].envMap?.dispose();
       const skies = buildSkies(THREE, renderer);
       scene.environment = skies.scene;
+      retakeSceneSky(scene);
       useHullEnvironment(hullMaterials, skies.hull);
       space.invalidateBakes();
     })

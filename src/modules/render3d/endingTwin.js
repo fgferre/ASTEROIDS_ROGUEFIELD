@@ -12,6 +12,7 @@
 
 import { ENDING_SHOTS, ENDING_WAKE, easeInOut } from '../../core/cinematics.js';
 import { colorOf } from './batches.js';
+import { takeSceneSky } from './hullModel.js';
 
 const CRUCIBLE = 'the-crucible';
 // How far from its target the key light is laid (only its direction counts).
@@ -80,6 +81,9 @@ export class LastImage {
     const t = this.t;
     const set = t.backdrop.places.built.get(CRUCIBLE);
     this.slip = set.slip(this.story.wake);
+    const materials = [];
+    this.slip.object.traverse((part) => materials.push(part.material ?? []));
+    takeSceneSky(t.scene, materials.flat());
     const shown = set.object.visible;
     set.object.visible = true;
     this.slip.object.visible = true;

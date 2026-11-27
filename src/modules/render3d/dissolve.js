@@ -326,7 +326,11 @@ export class DissolvePool {
 
   twinOf(parts, source) {
     let twin = parts.twins.get(source);
-    if (twin) return twin;
+    if (twin) {
+      // the source's sky may have been rebuilt since (retakeSceneSky)
+      twin.envMap = source.envMap;
+      return twin;
+    }
     // userData stays shared (the rock patch reads live uniforms from it, and
     // Material.copy would JSON-serialise its textures)
     const data = source.userData;

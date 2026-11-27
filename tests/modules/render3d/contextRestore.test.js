@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { QUALITY_PRESETS } from '../../../src/core/qualityPresets.js';
+import { takeSceneSky } from '../../../src/modules/render3d/hullModel.js';
 import { watchContextRestore } from '../../../src/modules/render3d/sceneSetup.js';
 import {
   CAMERA_FAR,
@@ -45,6 +46,12 @@ describe('a restored graphics context', () => {
     scene.environment = first;
     const hullFirst = { dispose: vi.fn() };
     const hull = [{ envMap: hullFirst }, { envMap: hullFirst }];
+    // a material that takes the scene's sky at its own strength carries it
+    const steel = new THREE.MeshStandardMaterial({ envMapIntensity: 1.2 });
+    const paint = new THREE.MeshStandardMaterial();
+    takeSceneSky(scene, [steel, paint]);
+    expect(steel.envMap).toBe(first);
+    expect(paint.envMap).toBe(null);
     watchContextRestore(fake, renderer, scene, space, hull, seeded);
 
     const camera = new THREE.PerspectiveCamera(50, 16 / 9, 10, CAMERA_FAR);
@@ -66,6 +73,8 @@ describe('a restored graphics context', () => {
     expect(first.dispose).toHaveBeenCalled();
     expect(hull.every((m) => m.envMap.fresh)).toBe(true);
     expect(hullFirst.dispose).toHaveBeenCalled();
+    expect(steel.envMap).toBe(scene.environment);
+    expect(paint.envMap).toBe(null);
     // One generator for both skies: a second one after a dispose in the same
     // renderer frame drew the shared blur planes unsent, black (sceneSetup.js)
     expect(pmrem).toHaveBeenCalledTimes(1);

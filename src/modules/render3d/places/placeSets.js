@@ -10,6 +10,7 @@
 // update?(seconds, wake) }.
 // A look with no backdrop (the Descent) shows none.
 
+import { takeSceneSky } from '../hullModel.js';
 import { createPlaceKit } from './kit.js';
 import { PLACE_SETS } from './index.js';
 
@@ -17,6 +18,7 @@ export class PlaceSets {
   /** `haze`: the broken Ring's haze colour, which every set sinks into. */
   constructor(THREE, scene, haze) {
     this.THREE = THREE;
+    this.scene = scene;
     this.haze = haze;
     this.built = new Map();
     this.list = [];
@@ -144,6 +146,7 @@ export class PlaceSets {
     });
     const set = { id, ...build(this.THREE, kit) };
     set.materials = [...kit.materials.values()];
+    takeSceneSky(this.scene, set.materials);
     set.object = new this.THREE.Group();
     set.layers.forEach((layer) => {
       layer.holder = new this.THREE.Group();

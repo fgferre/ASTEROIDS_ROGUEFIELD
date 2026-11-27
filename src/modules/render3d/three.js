@@ -33,16 +33,6 @@ export function pointStrength(light, strength) {
   );
 }
 
-// Since r163 a material's envMapIntensity scales only its own envMap, and
-// the scene's sky (Scene.environment) takes Scene.environmentIntensity. The
-// game's materials set their own strength against the scene's sky, as r128
-// read it: each hands it to the scene as it is drawn (three reads it then).
-core.MeshStandardMaterial.prototype.onBeforeRender = function (_r, scene) {
-  if (this.envMap === null && scene.isScene) {
-    scene.environmentIntensity = this.envMapIntensity;
-  }
-};
-
 // After a lost context comes back, three keeps the dead context's handles on
 // all it had uploaded and frees them when the game disposes those things
 // (the stopped menu shrinking its buffers as a run starts): the browser warns

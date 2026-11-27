@@ -247,6 +247,37 @@ export function useHullEnvironment(materials, texture) {
   });
 }
 
+// Since r163 a material's envMapIntensity scales only its own envMap: the
+// scene's sky (Scene.environment) comes in at the scene's
+// environmentIntensity, left at 1, the strength most materials take it at.
+// The others carry that sky as their own map (takeSceneSky), so their
+// envMapIntensity scales it, and take it again when it is rebuilt.
+const SKY_TAKERS = new WeakMap();
+
+/**
+ * Of `materials`, the standard ones whose envMapIntensity is not 1 take
+ * `scene`'s sky as their own map (none where the scene has none, the
+ * menu's). After their strength is set, before any copy of them is made.
+ */
+export function takeSceneSky(scene, materials) {
+  if (!SKY_TAKERS.has(scene)) SKY_TAKERS.set(scene, new Set());
+  const takers = SKY_TAKERS.get(scene);
+  materials.forEach((material) => {
+    if (!material.isMeshStandardMaterial || material.envMapIntensity === 1) {
+      return;
+    }
+    material.envMap = scene.environment;
+    takers.add(material);
+  });
+}
+
+/** After `scene`'s sky was rebuilt: what took the old one takes it. */
+export function retakeSceneSky(scene) {
+  SKY_TAKERS.get(scene)?.forEach((material) => {
+    material.envMap = scene.environment;
+  });
+}
+
 /**
  * A MeshStandardMaterial's onBeforeCompile (set it before addRimLight, which
  * chains after it): the specular cap, and a part's own SHINE class where
