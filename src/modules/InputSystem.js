@@ -528,10 +528,17 @@ class InputSystem {
     this.inputSource = source || null;
   }
 
-  /** The device input for this step: held movement + presses since last step. */
+  /** The device input for this step: held movement + presses since last
+   * step. Under a screen (input/inputLayers.js) nothing held reaches the
+   * ship: no key, stick or touch stick moves it while one is up. */
   sampleInputFrame() {
-    const held = { ...this.getMovementBinaryState(), ...this.padSticks };
-    const frame = createInputFrame(this.touch ? this.touch.merge(held) : held);
+    const covered = Boolean(inputLayers.top());
+    const held = covered
+      ? {}
+      : { ...this.getMovementBinaryState(), ...this.padSticks };
+    const frame = createInputFrame(
+      this.touch && !covered ? this.touch.merge(held) : held
+    );
     this.pendingStepPresses.forEach((field) => {
       frame[field] = true;
     });

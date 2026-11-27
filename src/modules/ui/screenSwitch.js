@@ -127,6 +127,10 @@ export function showScreen(ui, screenName, options = {}) {
     if (emitEvent) {
       ui.eventBus?.emit?.('screen-changed', { screen: screenName });
     }
+
+    // Back in play under Settings (the cards closed, a Retry's countdown
+    // ended, any way): the run waits paused for it.
+    if (screenName === 'playing') ui.settingsPanel.holdRun();
   } catch (error) {
     console.error('[UISystem] Failed to show screen:', error);
   }
@@ -155,7 +159,6 @@ export function showGameUI(ui, options = {}) {
   }
   ui.showScreen('playing', options);
   ui.tacticalHud.refreshHudFromServices(true);
-  ui.settingsPanel.holdRun();
 }
 
 /** A cinematic holds the run or lets it go: the session's pause flag alone

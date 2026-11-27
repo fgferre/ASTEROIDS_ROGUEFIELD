@@ -23,10 +23,12 @@
 // confirm; `passes` lists the game's actions that still reach the game
 // under it. `staysOnTop` (Settings): a screen that opens while it is up goes
 // under it; `noSettings`: Settings does not open over it (the loading
-// screen: the game is not ready, the gate wakes on any key); `pointer`: the
-// pad's pointer
-// works over it without `element` (ui/padPointer.js). All but `name` and
-// `passes` may be left out.
+// screen: the game is not ready, the gate wakes on any key; the HUD editor:
+// Settings' own page, drawn above it; the link into a run, drawn over every
+// screen); `pointer`: the pad's pointer works
+// over it without `element` (ui/padPointer.js). All but `name` and `passes`
+// may be left out. While any layer is up, nothing held moves the ship
+// (InputSystem.sampleInputFrame).
 
 // Settings opens over any screen but the ending's acts: they do not hold the
 // run and play on wall-clock time (their beats, the renderer's beat

@@ -1912,6 +1912,13 @@ html[data-motion='reduced'] .opening__brand * {
   transition: opacity 0.15s;
 }
 
+/* A screen over the scene (Settings): the hint goes at once, so a touch in
+   its corner reaches the screen on top. */
+.skip-hold.is-covered {
+  visibility: hidden;
+  transition: none;
+}
+
 body.motion-reduced .skip-hold {
   transition: none;
 }
