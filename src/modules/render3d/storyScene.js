@@ -172,7 +172,7 @@ export class StoryScene {
     this.wake.group.updateMatrixWorld(true);
     this.rig = lightWake(THREE, this.wake, -1);
     Object.entries(RIG).forEach(([name, [color, intensity]]) => {
-      this.rig[name].color.set(color).convertSRGBToLinear();
+      this.rig[name].color.set(color);
       this.rig[name].intensity = intensity * Math.PI;
     });
     this.rig.rim.position

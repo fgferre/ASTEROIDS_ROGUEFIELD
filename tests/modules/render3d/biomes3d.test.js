@@ -7,7 +7,7 @@ import {
 import { BiomeController } from '../../../src/modules/render3d/biomes3d.js';
 import THREE from '../../../src/modules/render3d/three.js';
 
-const linear = (css) => new THREE.Color(css).convertSRGBToLinear();
+const linear = (css) => new THREE.Color(css);
 
 describe('BiomeController', () => {
   it('fades lights, bloom, nebula and dust onto the next biome in 2 s', () => {

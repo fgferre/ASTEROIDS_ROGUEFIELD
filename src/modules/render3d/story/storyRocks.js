@@ -35,7 +35,7 @@ export function buildFieldRocks(THREE) {
   }
   geometry.computeVertexNormals();
   const material = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(FIELD_ROCKS.color).convertSRGBToLinear(),
+    color: new THREE.Color(FIELD_ROCKS.color),
     roughness: 0.95,
     metalness: 0.05,
   });

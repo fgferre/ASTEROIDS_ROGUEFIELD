@@ -14,10 +14,6 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { UnrealBloomPass as BloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 
-// Colours as r128 read them: a hex or a Color is used as given, never
-// converted from sRGB (r152 turned that conversion on). Before any Color.
-core.ColorManagement.enabled = false;
-
 // Lights in three's units (r155 made r128's optional, r165 removed them):
 // each light's r128 strength is set × Math.PI where the game sets it. A
 // point light also fades otherwise: r128 linearly to nothing at its distance
