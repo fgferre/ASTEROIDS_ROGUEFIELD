@@ -36,13 +36,6 @@ const EXCUSED = [
     reason:
       'the bot pilot hears the same announcement and answers the briefing',
   },
-  {
-    file: 'src/modules/EnemySystem.js',
-    event: 'upgrade-no-heart-drops',
-    owner: 'enemies',
-    reason:
-      "EnemySystem belongs to another conversation (26/11): Blood Ledger's card routes to 'enemies', whose own listener stays until that file calls the router",
-  },
 ];
 
 const sources = files('src')

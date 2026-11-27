@@ -29,6 +29,7 @@ import { HealthComponent } from './enemies/components/HealthComponent.js';
 import { MovementComponent } from './enemies/components/MovementComponent.js';
 import { WeaponComponent } from './enemies/components/WeaponComponent.js';
 import { createFallbackHandler } from '../utils/StateManager.js';
+import { routeCardEffects } from './cardEffectRoutes.js';
 
 // === CLASSE ENEMYSYSTEM ===
 // Asteroid class moved to: ./enemies/types/Asteroid.js
@@ -232,9 +233,17 @@ class EnemySystem extends BaseSystem {
       this.heartDropsBlocked = false;
     });
 
-    this.registerEventListener('upgrade-no-heart-drops', () => {
-      this.heartDropsBlocked = true;
-    });
+    routeCardEffects(
+      this,
+      'enemies',
+      (event, fn) => this.registerEventListener(event, fn),
+      {
+        // Blood Ledger: no heart drops for the rest of the run.
+        'upgrade-no-heart-drops': () => {
+          this.heartDropsBlocked = true;
+        },
+      }
+    );
 
     this.registerEventListener('world-reset', () => {
       this.refreshServiceState({ force: true });
