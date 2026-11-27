@@ -37,7 +37,10 @@ import { PadPointer } from '../../src/modules/ui/padPointer.js';
 import { HangarScreen } from '../../src/modules/ui/HangarScreen.js';
 import { CampaignMap } from '../../src/modules/ui/CampaignMap.js';
 import { CodexScreen } from '../../src/modules/ui/CodexScreen.js';
-import { setSkipPad } from '../../src/modules/ui/skipHold.js';
+import { HOLD_MS, setSkipPad } from '../../src/modules/ui/skipHold.js';
+import { MenuButtons } from '../../src/services/session/menuButtons.js';
+import { setupLoadingScreen } from '../../src/modules/menu/loadingScreen.js';
+import { getActiveSlot } from '../../src/core/storage.js';
 
 /** The pad's buttons by name (standard mapping). */
 export const PAD = Object.freeze({
@@ -150,8 +153,26 @@ function buildPage(dom) {
   button('hangar-back-btn', hangar);
   el('p', { id: 'hangar-hull-lock' }, hangar);
 
-  screen('gameover', 'screen screen--overlay end-screen hidden');
-  screen('victory', 'screen screen--overlay end-screen hidden');
+  const gameOver = screen(
+    'gameover',
+    'screen screen--overlay end-screen hidden'
+  );
+  ['gameover-body', 'gameover-invite', 'gameover-seed'].forEach((id) =>
+    el('div', { id }, gameOver)
+  );
+  button('gameover-copy-seed-btn', gameOver);
+  // The run buttons in the order the page has them; ⏎ / A on New Mission.
+  ['retry-game-btn', 'restart-game-btn', 'quit-game-btn'].forEach((id) =>
+    button(id, gameOver)
+  );
+  el('kbd', {}, document.getElementById('restart-game-btn'));
+  const victory = screen('victory', 'screen screen--overlay end-screen hidden');
+  ['victory-body', 'victory-invite'].forEach((id) =>
+    el('div', { id }, victory)
+  );
+  ['continue', 'next', 'restart', 'quit', 'menu'].forEach((name) =>
+    button(`victory-${name}-btn`, victory)
+  );
   const endCredits = screen(
     'end-credits',
     'screen screen--overlay end-credits hidden',
@@ -211,6 +232,9 @@ export function mountScreens() {
     ],
     now: 1_000_000,
   });
+  // The page's clock runs with the fake one (the skip hold times by it).
+  const t0 = Date.now();
+  vi.spyOn(performance, 'now').mockImplementation(() => Date.now() - t0 + 1);
   const dom = installDomEvents();
   const gamepad = installFakeGamepad();
   const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -254,11 +278,21 @@ export function mountScreens() {
     banishUpgrade: vi.fn(),
     holdUpgrade: vi.fn(() => true),
     openNextLevelUpOffer: () => false,
+    getSynergySnapshot: () => ({ families: {}, synergies: [] }),
+    getUpgradeProgressSnapshot: () => [],
   };
   const combat = {
-    getWeaponState: () => ({ weaponId: 'lance', chip: 'LANCE' }),
+    getWeaponState: () => ({
+      weaponId: 'lance',
+      chip: 'LANCE',
+      evolutions: [],
+    }),
   };
   const headStart = { progress: () => null, equipRest: () => [] };
+  const difficulty = {
+    runLabel: () => 'Seed 1',
+    shareLink: () => 'http://localhost/?seed=1',
+  };
 
   const settings = new SettingsSystem({ eventBus: bus });
   const input = new InputSystem({
@@ -375,7 +409,7 @@ export function mountScreens() {
     showScreen: (name, options) => ui.showScreen(name, options),
     progression: () => null,
     combat: () => combat,
-    difficulty: () => null,
+    difficulty: () => difficulty,
     layer: () => 1,
     settingsOpenHere: () => ui.settingsPanel.isOpenFrom('pause'),
     closeSettings: () => ui.settingsPanel.closeSettingsPanel(),
@@ -386,8 +420,8 @@ export function mountScreens() {
     showScreen: (name, options) => ui.showScreen(name, options),
     progression: () => progression,
     combat: () => combat,
-    difficulty: () => null,
-    hangar: () => null,
+    difficulty: () => difficulty,
+    hangar: () => ({ lastAward: null }),
     lastTransmission: () => null,
     cinematics: ui.cinematics,
     announceOverlay: (...args) => ui.emitOverlayVisibilityChanged(...args),
@@ -496,7 +530,42 @@ export function mountScreens() {
     state.sessionState = state.paused ? 'paused' : 'running';
     pauseChanged();
   });
+  // The session's run buttons (one document click listener), its flows
+  // recorded.
+  const flows = [];
+  const flow =
+    (name) =>
+    (options = {}) => {
+      flows.push(options.source ? `${name}:${options.source}` : name);
+      return true;
+    };
+  new MenuButtons({
+    eventBus: bus,
+    startNewRun: flow('newRun'),
+    requestRetry: flow('retry'),
+    exitToMenu: flow('exit'),
+    continueBeyondVictory: flow('continue'),
+  }).setupDomEventListeners();
 
+  // A key with the browser's button default, approximated: Enter clicks
+  // the focused enabled button on keydown, Space on keyup (still focused),
+  // unless a listener prevented it.
+  const pressButton = (code) => {
+    const down = dom.keyDown(code);
+    const button = down.target.tagName === 'BUTTON' ? down.target : null;
+    if (code === 'Enter' && button && !down.defaultPrevented) button.click();
+    const up = dom.keyUp(code);
+    if (
+      code === 'Space' &&
+      button &&
+      !down.defaultPrevented &&
+      !up.defaultPrevented &&
+      dom.document.activeElement === button
+    ) {
+      button.click();
+    }
+    return down;
+  };
   const count = (name) => sent.filter((entry) => entry.name === name).length;
   const levelUp = () => ui.levelUpScreen.levelUpState;
   const watched = {};
@@ -525,6 +594,8 @@ export function mountScreens() {
     codex: ui.codexScreen.codexState.isOpen && ui.codexScreen.codexState.tab,
     hangar: ui.hangarScreen.hangarState.isOpen,
     credits: ui.creditsOverlay.creditsState.isOpen,
+    changelog: ui.changelogOverlay.creditsState.isOpen,
+    session: flows.join(),
     map: mapMoves.join(),
     pad: padMoves.join(),
     capturing: ui.settingsPanel.capturing,
@@ -567,8 +638,12 @@ export function mountScreens() {
       });
     },
     /**
-     * One input by name: a key code ('Enter', 'KeyS', 'Digit1'), 'pad:A'
-     * (a button of PAD) or 'bus:confirm' (an 'input-confirmed' straight on
+     * One input by name: a key code tapped ('Enter', 'KeyS', 'Digit1');
+     * 'down:' or 'up:' and a code, that half only; 'hold:' and a code, held
+     * past the skip hold's time (a frame runs) then let go; a code and
+     * '+click', tapped with the browser's button default (Enter clicks the
+     * focused button on keydown, Space on keyup, unless prevented); 'pad:A'
+     * (a button of PAD); 'bus:confirm' (an 'input-confirmed' straight on
      * the bus). Returns the keydown event for a key.
      */
     send(input) {
@@ -576,6 +651,17 @@ export function mountScreens() {
       if (input === 'bus:confirm') {
         return bus.emit('input-confirmed', { source: 'test' });
       }
+      const [half, code] = input.split(':');
+      if (half === 'down') return dom.keyDown(code);
+      if (half === 'up') return dom.keyUp(code);
+      if (half === 'hold') {
+        const event = dom.keyDown(code);
+        rig.wait(HOLD_MS + 100);
+        dom.frame();
+        dom.keyUp(code);
+        return event;
+      }
+      if (input.endsWith('+click')) return pressButton(input.split('+')[0]);
       return dom.tap(input);
     },
     /** The screens' 400 ms lockout and any reveal, passed. */
@@ -687,6 +773,33 @@ export function mountScreens() {
         ui.creditsOverlay.openCreditsOverlay();
         return ui.creditsOverlay;
       },
+      /**
+       * Boot's way to the menu: the opening, its press, the PRESS START
+       * gate, its press, then the pilots (skipped unless `pilots`: the
+       * entry a choice reloaded into), and the menu the gate watches. The
+       * pad's B on the menu goes back to the gate as MenuBackgroundSystem
+       * wires it.
+       */
+      gate({ pilots = false } = {}) {
+        dom.document
+          .getElementById('loading-screen')
+          .classList.remove('hidden');
+        if (!pilots) {
+          dom.window.sessionStorage.setItem(
+            'roguefield:pilot-chosen',
+            String(getActiveSlot())
+          );
+        }
+        let loaded;
+        const gate = setupLoadingScreen((_progress, done) => (loaded = done));
+        bus.on('gamepad-menu-back', () => gate.leaveMenu());
+        loaded();
+        dom.tap('Enter'); // leaves the opening
+        rig.wait(700);
+        dom.tap('Enter'); // PRESS START
+        rig.wait(1000);
+        return gate;
+      },
     },
     /** Run at destroy (a cinematic's skip listener, say). */
     cleanups: [],
@@ -723,5 +836,17 @@ export function pinTable(name, open, rows) {
         }
       });
     });
+  });
+}
+
+/**
+ * Lays `elements` out for the pad's moves: a column (or a row, `across`)
+ * of 200 x 40 boxes from `at` px.
+ */
+export function layOut(elements, { across = false, at = 0 } = {}) {
+  [...elements].forEach((el, i) => {
+    el.rect = across
+      ? { left: i * 240, top: at, width: 200, height: 40 }
+      : { left: 0, top: at + i * 60, width: 200, height: 40 };
   });
 }

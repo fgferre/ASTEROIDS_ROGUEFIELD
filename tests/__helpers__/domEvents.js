@@ -6,8 +6,8 @@
  * bubble (up to window), and honours stopPropagation (the rest of that node
  * and phase still runs), stopImmediatePropagation and preventDefault. Each
  * node and phase runs the listeners it had when the step began.
- * No layout (every rect is 0) and no default actions: Enter or Space on a
- * focused button does not click it. innerHTML builds elements from simple
+ * No layout (an element's rect is 0 unless a test sets `el.rect`) and no
+ * default actions: Enter or Space on a focused button does not click it. innerHTML builds elements from simple
  * markup (tags and attributes; text lands in textContent).
  * This file imports nothing from src/.
  */
@@ -293,6 +293,8 @@ export class FakeElement extends FakeEventTarget {
     this.type = '';
     this.textValue = '';
     this.markup = '';
+    // Where a test lays it out ({ left, top, width, height }); none: 0.
+    this.rect = null;
   }
 
   get className() {
@@ -453,16 +455,29 @@ export class FakeElement extends FakeEventTarget {
     for (let up = this; up; up = up.parentElement) {
       if (up.hidden || up.classList.contains('hidden')) return [];
     }
-    return this.isConnected ? [RECT] : [];
+    return this.isConnected ? [this.getBoundingClientRect()] : [];
   }
   checkVisibility() {
     return this.getClientRects().length > 0;
   }
   getBoundingClientRect() {
-    return RECT;
+    if (!this.rect) return RECT;
+    const { left, top, width, height } = this.rect;
+    return {
+      left,
+      top,
+      width,
+      height,
+      x: left,
+      y: top,
+      right: left + width,
+      bottom: top + height,
+    };
   }
   scrollIntoView() {}
   scrollBy() {}
+  setPointerCapture() {}
+  releasePointerCapture() {}
 }
 
 class FakeDocument extends FakeEventTarget {
@@ -494,6 +509,10 @@ class FakeDocument extends FakeEventTarget {
     const node = this.createElement('#text');
     node.textContent = text;
     return node;
+  }
+  /** No layout: nothing stands at a point. */
+  elementFromPoint() {
+    return null;
   }
   getElementById(id) {
     return this.querySelector(`#${id}`);
@@ -544,6 +563,7 @@ const GLOBALS = [
   'document',
   'localStorage',
   'sessionStorage',
+  'Element',
   'HTMLElement',
   'HTMLInputElement',
   'HTMLTextAreaElement',
@@ -553,6 +573,8 @@ const GLOBALS = [
   'requestAnimationFrame',
   'cancelAnimationFrame',
   'getComputedStyle',
+  'innerWidth',
+  'innerHeight',
 ];
 
 /**
@@ -606,6 +628,7 @@ export function installDomEvents() {
     document,
     localStorage: window.localStorage,
     sessionStorage: window.sessionStorage,
+    Element: FakeElement,
     HTMLElement: FakeElement,
     HTMLInputElement: InputElementStandIn,
     HTMLTextAreaElement: TextAreaStandIn,
@@ -615,6 +638,8 @@ export function installDomEvents() {
     requestAnimationFrame: requestFrame,
     cancelAnimationFrame: cancelFrame,
     getComputedStyle: window.getComputedStyle,
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
   };
   for (const [name, value] of Object.entries(values)) {
     Object.defineProperty(globalThis, name, {

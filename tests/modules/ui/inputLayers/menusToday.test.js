@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mountScreens, pinTable } from '../../../__helpers__/screenRig.js';
-import { setupLoadingScreen } from '../../../../src/modules/menu/loadingScreen.js';
-import { getActiveSlot } from '../../../../src/core/storage.js';
 
 // What the keyboard, the pad and a confirm on the bus do TODAY on the menus
 // (the campaign map, Settings, Codex, Hangar, Credits, the title gate and
@@ -11,29 +9,6 @@ import { getActiveSlot } from '../../../../src/core/storage.js';
 // the screen below; every other row must come out the same.
 const LEAK = true;
 const focus = (rig, id) => rig.dom.document.getElementById(id).focus();
-
-// Boot's way to the menu: the opening, its press, the PRESS START gate, its
-// press, then the pilots (skipped when `pilots` is false: the entry a
-// choice reloaded into), and the menu the gate watches. The pad's B on the
-// menu goes back to the gate as MenuBackgroundSystem wires it.
-function throughTheGate(rig, { pilots = false } = {}) {
-  const { document, window } = rig.dom;
-  document.getElementById('loading-screen').classList.remove('hidden');
-  if (!pilots) {
-    window.sessionStorage.setItem(
-      'roguefield:pilot-chosen',
-      String(getActiveSlot())
-    );
-  }
-  let loaded;
-  const gate = setupLoadingScreen((_progress, done) => (loaded = done));
-  rig.bus.on('gamepad-menu-back', () => gate.leaveMenu());
-  loaded();
-  rig.tap('Enter'); // leaves the opening
-  rig.wait(700);
-  rig.tap('Enter'); // PRESS START
-  rig.wait(1000);
-}
 
 // Heard on the way down (capture), and only on a focused chapter or row.
 pinTable(
@@ -299,7 +274,7 @@ pinTable(
 // Escape (or the pad's B) on the menu with nothing over it: back to the
 // gate. Its check runs first (window capture) and asks whether any screen
 // is on top; with one, that screen's own Escape closes it, and only that.
-pinTable('the title gate watching the menu', throughTheGate, [
+pinTable('the title gate watching the menu', (rig) => rig.open.gate(), [
   [
     'Escape',
     {
@@ -326,7 +301,7 @@ pinTable('the title gate watching the menu', throughTheGate, [
 pinTable(
   'the title gate, Codex open',
   (rig) => {
-    throughTheGate(rig);
+    rig.open.gate();
     rig.open.codex();
   },
   [
@@ -346,7 +321,7 @@ pinTable(
 pinTable(
   'the title gate, Settings open',
   (rig) => {
-    throughTheGate(rig);
+    rig.open.gate();
     rig.open.settings();
   },
   [
@@ -366,7 +341,7 @@ pinTable(
 pinTable(
   'the title gate, Hangar open',
   (rig) => {
-    throughTheGate(rig);
+    rig.open.gate();
     rig.open.hangar();
   },
   [
@@ -388,7 +363,7 @@ pinTable(
 pinTable(
   'the title gate, back on it',
   (rig) => {
-    throughTheGate(rig);
+    rig.open.gate();
     rig.tap('Escape');
   },
   [
@@ -404,7 +379,7 @@ pinTable(
 // read by its own frame loop.
 pinTable(
   'pilots over the gated menu',
-  (rig) => throughTheGate(rig, { pilots: true }),
+  (rig) => rig.open.gate({ pilots: true }),
   [
     [
       'Enter',
