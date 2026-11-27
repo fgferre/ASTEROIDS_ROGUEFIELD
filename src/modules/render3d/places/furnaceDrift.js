@@ -108,7 +108,8 @@ export function buildFurnaceDrift(THREE, kit) {
         sides: 16,
       }),
       heat,
-      [x, y + 6, z],
+      // on the cap's top (y + 10), under the grille's bars
+      [x, y + 11, z],
       r * 0.95
     );
   });
