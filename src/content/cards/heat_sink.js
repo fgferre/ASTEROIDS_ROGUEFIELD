@@ -33,13 +33,27 @@ export default {
       },
     ],
   },
-  // The Halo fires nothing: its "fire rate" is how soon a blade may cut the
-  // same enemy again, and a blade cuts only while it touches (measured
-  // 25/11: +3% to +23% more cuts by the enemy's size, not +11% to +37%).
+  // Damage in 30 s measured 26/11 (cumulative): Harmonic x1.08/1.17/1.26 (the
+  // beam's 0.25 s wait does not shrink); Halo x1.04/1.08/1.13 (it fires
+  // nothing: its "fire rate" is how soon a blade may cut the same enemy
+  // again, and a blade cuts only while it touches).
   weaponText: {
+    harmonic: {
+      levels: [
+        [11, 8],
+        [23, 17],
+        [37, 26],
+      ].map(([rate, gain]) => ({
+        description: `Fire rate +${rate}%, but the beam's own wait does not shrink: damage +${gain}%.`,
+      })),
+    },
     'shard-halo': {
-      levels: [11, 23, 37].map((gain) => ({
-        description: `The blades may cut the same enemy again ${gain}% sooner: big, slow enemies feel it most.`,
+      levels: [
+        [11, 4],
+        [23, 8],
+        [37, 13],
+      ].map(([sooner, gain]) => ({
+        description: `The blades may cut the same enemy again ${sooner}% sooner, but a blade cuts only while it touches: damage +${gain}%.`,
       })),
     },
   },

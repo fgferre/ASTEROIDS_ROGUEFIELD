@@ -56,6 +56,26 @@ import {
   lockReach,
 } from './cardMeasures.js';
 
+// Fire-rate cards on the weapons whose damage does not follow the shot clock
+// one for one (the cards' weaponText): the beam's own 0.25 s wait does not
+// shrink (Harmonic), and a Halo blade cuts only while it touches. Cumulative
+// damage over rank 0, as measured 26/11 over 30 s.
+const FIRE_RATE_DAMAGE = {
+  heat_sink: {
+    harmonic: [1, 1.08, 1.17, 1.26],
+    'shard-halo': [1, 1.04, 1.08, 1.13],
+  },
+  overclocked_core: { harmonic: [1, 1.25], 'shard-halo': [1, 1.13] },
+};
+const fireRateDamage =
+  (id, cum) =>
+  (rank, below, { weapon }) => {
+    const own = FIRE_RATE_DAMAGE[id][weapon];
+    return own
+      ? (below * own[rank]) / own[rank - 1]
+      : (below * cum[rank]) / cum[rank - 1];
+  };
+
 export const PROBES = {
   plasma: [
     {
@@ -157,7 +177,7 @@ export const PROBES = {
       metric: 'damage dealt in 30 s',
       axes: 'weapons',
       measure: (s) => dps(s, { seconds: 30 }),
-      expect: mult([1, 1 / 0.9, 1 / 0.81, 1 / 0.729]),
+      expect: fireRateDamage('heat_sink', [1, 1 / 0.9, 1 / 0.81, 1 / 0.729]),
     },
   ],
   afterburn_lance: [
@@ -348,7 +368,7 @@ export const PROBES = {
       metric: 'damage dealt in 30 s',
       axes: 'weapons',
       measure: (s) => dps(s, { seconds: 30 }),
-      expect: mult([1, 1 / 0.74]),
+      expect: fireRateDamage('overclocked_core', [1, 1 / 0.74]),
     },
     {
       metric: 'hull lost in 8.5 s',

@@ -27,6 +27,7 @@ export const NEXT = {
   improved: [
     'Sovereign, beaten, no longer breaks into pieces: it stays whole for the ending (with reduced motion it burns away where it fell).', // not confirmed
     "With the Scatter Coil, the Targeting Matrix's second rank now gives +20% damage to elites, heralds and bosses, as it does for the weapons that never aim; its lead added nothing to a fan that bursts so close.", // not confirmed
+    "Heat Sink and Overclocked Core now tell, on the Harmonic and the Shard Halo, what they really add: the beam's own wait does not shrink and a Halo blade cuts only while it touches, so their damage grows less than the fire rate.", // not confirmed
   ],
   fixed: [
     "On a phone held sideways, the ending's choice now fits the screen: both options show every line, with no scrolling.", // not confirmed

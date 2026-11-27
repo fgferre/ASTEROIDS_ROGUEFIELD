@@ -27,14 +27,21 @@ export default {
       },
     ],
   },
-  // The Halo fires nothing: what it speeds is how soon a blade may cut the
-  // same enemy again (see heat_sink.js).
+  // Damage in 30 s measured 26/11 (see heat_sink.js).
   weaponText: {
+    harmonic: {
+      levels: [
+        {
+          description:
+            "Fire rate +35%, but the beam's own wait does not shrink: damage +25%. The hull loses 1 HP every 4 s, down to 20% of max.",
+        },
+      ],
+    },
     'shard-halo': {
       levels: [
         {
           description:
-            'The blades may cut the same enemy again 35% sooner: big, slow enemies feel it most. The hull loses 1 HP every 4 s, down to 20% of max.',
+            'The blades may cut the same enemy again 35% sooner, but a blade cuts only while it touches: damage +13%. The hull loses 1 HP every 4 s, down to 20% of max.',
         },
       ],
     },

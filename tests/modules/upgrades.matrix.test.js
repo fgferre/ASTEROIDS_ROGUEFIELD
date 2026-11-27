@@ -43,42 +43,8 @@ const FLIGHTS = ['classic', 'modern'];
 // === Excuses: the only way a failing cell is allowed to stay ===
 // { card, rank, weapon, reason }. `rank` and `weapon` may be '*'.
 const NOT_A_DEFECT = 'judged "not a defect" in the findings (25/11)';
-// Hidden under the shot clock's excuse until the clock was fixed (card
-// decision 6, 26/11); not the clock, and not judged yet.
-const FOUND_UNDER_CLOCK =
-  'found 26/11 once the shot clock was fixed, not judged yet';
-const HARMONIC_WAIT = `${FOUND_UNDER_CLOCK}: the beam's own 0.25 s wait does not shrink with the fire rate, so 3 lances and a beam come round less sooner than the text says (x1.08 for +11%)`;
-const HALO_RECUT = `${FOUND_UNDER_CLOCK}: the text promises sooner re-cuts, and the damage in 30 s grows about a third of that (x1.04 for 11% sooner); probe or card`;
 // `metric` (optional): only the probes whose metric text contains it.
 const EXCUSES = [
-  {
-    card: 'heat_sink',
-    rank: '*',
-    weapon: 'harmonic',
-    metric: 'damage',
-    reason: HARMONIC_WAIT,
-  },
-  {
-    card: 'overclocked_core',
-    rank: '*',
-    weapon: 'harmonic',
-    metric: 'damage',
-    reason: HARMONIC_WAIT,
-  },
-  {
-    card: 'heat_sink',
-    rank: '*',
-    weapon: 'shard-halo',
-    metric: 'damage',
-    reason: HALO_RECUT,
-  },
-  {
-    card: 'overclocked_core',
-    rank: '*',
-    weapon: 'shard-halo',
-    metric: 'damage',
-    reason: HALO_RECUT,
-  },
   {
     card: 'targeting_suite',
     rank: 2,
