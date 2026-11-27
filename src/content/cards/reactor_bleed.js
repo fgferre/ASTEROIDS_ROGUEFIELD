@@ -19,17 +19,19 @@ export default {
     levels: [
       {
         title: 'Open Valve',
-        description: 'While no movement key is held, damage +30%.',
-        highlights: ['Let go to hit harder; move and the bonus is gone.'],
+        description: 'While you are not thrusting, damage +30%.',
+        highlights: [
+          'Turning and strafing keep it; thrust and the bonus is gone.',
+        ],
       },
       {
         title: 'Bypass Line',
-        description: 'While no movement key is held, damage +60%.',
+        description: 'While you are not thrusting, damage +60%.',
         highlights: ['Drifting counts: the ship need not be still.'],
       },
       {
         title: 'Core Tap',
-        description: 'While no movement key is held, damage +100%.',
+        description: 'While you are not thrusting, damage +100%.',
         highlights: ['A dash cuts the bleed until it ends.'],
       },
     ],

@@ -154,7 +154,9 @@ describe('Harmonic Plasma Lance', () => {
     expect(combat.bullets).toHaveLength(3);
     expect(combat.beams).toHaveLength(0);
 
-    combat.handleShooting(1, stats);
+    // On the cooldown exactly: the clock carries nothing past it.
+    combat.lastShotTime = combat.shootCooldown;
+    combat.handleShooting(0, stats);
     expect(combat.bullets).toHaveLength(3);
     expect(combat.beams).toHaveLength(1);
     expect(beamFired).toHaveBeenCalledTimes(1);
@@ -230,7 +232,10 @@ describe('Harmonic Plasma Lance', () => {
     lockOnMany(combat, eventBus, 3);
 
     const stats = { multishot: 3, damage: DAMAGE };
-    for (let shot = 0; shot < 4; shot += 1) combat.handleShooting(1, stats);
+    for (let shot = 0; shot < 3; shot += 1) combat.handleShooting(1, stats);
+    // On the cooldown exactly: the clock carries nothing past it.
+    combat.lastShotTime = combat.shootCooldown;
+    combat.handleShooting(0, stats);
 
     expect(combat.beams).toHaveLength(3);
     expect(beamFired).toHaveBeenCalledTimes(3);
@@ -615,7 +620,9 @@ describe('Scatter Coil', () => {
     const fired = vi.fn();
     eventBus.on('weapon-fired', fired);
 
-    combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
+    // On the cooldown exactly: the clock carries nothing past it.
+    combat.lastShotTime = combat.shootCooldown;
+    combat.handleShooting(0, { multishot: 1, damage: DAMAGE });
     expect(combat.bullets).toHaveLength(FAN.bolts);
     const angles = combat.bullets.map((bolt) => Math.atan2(bolt.vy, bolt.vx));
     const half = (FAN.fan * Math.PI) / 360;

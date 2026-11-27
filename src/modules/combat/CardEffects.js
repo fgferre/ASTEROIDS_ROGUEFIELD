@@ -58,8 +58,9 @@ export class CardEffects {
     this.targeting = targeting;
     this.weapons = weapons;
     this.hits = hits;
-    // dev-only `?freio=A`: the brake's shove is not cut by the enemy's top speed
-    this.brakeShoveFree = devChoice('freio') === 'A';
+    // The brake's shove is not cut by the enemy's top speed for 0.5 s (card
+    // decision 8, not confirmed; dev-only `?freio=hoje`: it is cut at once)
+    this.brakeShoveFree = devChoice('freio') !== 'HOJE';
 
     this.resetWeaponTuning();
     this.resetCardState();
@@ -406,7 +407,8 @@ export class CardEffects {
     });
   }
 
-  // Pushes every enemy within `radius` straight away from `origin`.
+  // Pushes every enemy within `radius` straight away from `origin`, free of
+  // its own top speed for 0.5 s (MovementComponent's clamps).
   shoveFrom(origin, radius, speed) {
     if (!origin) return;
     this.weapons().forEachSolidEnemy((enemy) => {

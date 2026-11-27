@@ -143,7 +143,9 @@ class PlayerSystem extends BaseSystem {
     this.hullDrainTimer = 0;
     this.resetCardStats();
     // No thrust key held and no dash this step (updateMovement): Reactor
-    // Bleed and Grav Anchor read it.
+    // Bleed and Grav Anchor read it; turning and strafing keep it, as their
+    // text says (card decision 7, not confirmed; dev-only `?bleed=B`: they
+    // cancel it).
     this.enginesIdle = true;
     this.bleedChoice = devChoice('bleed');
     this.currentHull = null;
@@ -507,7 +509,7 @@ class PlayerSystem extends BaseSystem {
       !thrust.isMainManual &&
       !thrust.isAuxManual &&
       !(this.maneuvers.dashTimer > 0) &&
-      // dev-only `?bleed=B`: turning and strafing also cancel the bonus
+      // dev-only `?bleed=B` (option B): turning and strafing cancel it too
       !(this.bleedChoice === 'B' && thrust.isSideManual);
     this.updateTurret(deltaTime);
     this.thrusters.emitThrusterEffects(thrust);

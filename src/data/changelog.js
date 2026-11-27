@@ -26,6 +26,7 @@ export const NEXT = {
   ],
   improved: [
     'Sovereign, beaten, no longer breaks into pieces: it stays whole for the ending (with reduced motion it burns away where it fell).', // not confirmed
+    "With the Scatter Coil, the Targeting Matrix's second rank now gives +20% damage to elites, heralds and bosses, as it does for the weapons that never aim; its lead added nothing to a fan that bursts so close.", // not confirmed
   ],
   fixed: [
     "On a phone held sideways, the ending's choice now fits the screen: both options show every line, with no scrolling.", // not confirmed
@@ -49,6 +50,9 @@ export const NEXT = {
     "A flying tip (the dash, the shield, the first moves) still on screen when Sovereign falls no longer stays over the ending's scenes or dim behind its choice: it leaves at the last blow, and since it was not used the next run teaches it again.", // not confirmed
     'A flying tip still on screen when a sector is won or the ship is lost no longer shows faintly through the victory or game-over screen, across its title; it is back with the ship on a Retry.', // not confirmed
     'Settings opened over the flight briefing, the end credits or the Codex no longer lets a key act on the screen underneath: Enter closed the briefing or the credits, and the arrows changed the Codex tab, without you seeing it.', // not confirmed
+    'Every weapon now fires as fast as its numbers say: the shot clock threw away what was left over at each shot, so weapons fired a little slower than written (the Lance about 3.75 shots a second instead of 4) and fire-rate cards gave more or less than they promised (Heat Sink 3 gave the Lance +45% instead of +37%).', // not confirmed
+    'Reactor Bleed and Grav Anchor now say what they do: their bonus holds while you are not thrusting, so turning and strafing keep it; the cards said any movement key ended it.', // not confirmed
+    "The emergency brake's shove now throws enemies at its full strength for half a second before their own top speed holds them again: a slow enemy was held at once, so against a Husk the Reactive Brake's stronger shove made no difference.", // not confirmed
   ],
   unseen: [
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",
@@ -66,7 +70,7 @@ export const NEXT = {
     'The garbage-collection manager is gone: the pools already trim themselves on the same schedule, so nothing in the game changes.', // not confirmed
     'The 3D engine (three.js) moves from r128, of 2021, to r187, of October 2026, and comes with the game in a file of its own that a returning player keeps until the engine changes again; every kind of scene was compared frame by frame with the old engine and looks the same, a frame costs about 5% more on this Mac and the game is ready a little sooner, so nobody notices.', // not confirmed
     'While a run plays, the menu behind it no longer keeps its full-size picture in the graphics card: about 380 MB freed on a 2560×1600 screen (less on a phone), and the menu is back as before when the run ends; nobody sees it, the game just holds less memory.', // not confirmed
-    'Development-only switches in the address (?cadencia, ?bleed, ?freio, ?matriz9) let Felipe play each option of four pending card decisions on the test server; the published game never reads them, and they go once he chooses.', // not confirmed
+    'Development-only switches in the address let Felipe compare four card decisions on the test server with the way before them (?cadencia=hoje, ?freio=hoje, ?matriz9=hoje) or with their other option (?cadencia=B, ?bleed=B); the published game never reads them, and they go once he confirms.', // not confirmed
     "A development-only address (?final=1) starts the last sector straight at Sovereign, one hit from down after its entrance, a real run whose last shot is the pilot's, so the ending and its choice can be checked on a phone or a tablet in about a minute; the published game never reads it.", // not confirmed
     "Five error catches that hid real bugs now say why they ignore an error or let it show (a boss blast that fails on one enemy logs it, a thruster sound's volume node goes back to its pool even if already disconnected); nothing changes while nothing breaks.", // not confirmed
     "Three small clean-ups with nothing to notice: the run's session no longer loads the screen code of the link into a run (the game hands it over), the Retries left are a number the session keeps instead of the button's text, and the death snapshot loses fallbacks to methods no system has.", // not confirmed

@@ -46,8 +46,9 @@ export class HitResolution {
     this.weapons = weapons;
     this.cards = cards;
     this.emit = emit;
-    // dev-only `?matriz9=A`: Targeting Matrix 2 gives the Scatter its threat focus
-    this.matrixScatter = devChoice('matriz9') === 'A';
+    // Targeting Matrix 2 gives the Scatter its threat focus (card decision 9,
+    // not confirmed; dev-only `?matriz9=hoje`: it gives it nothing)
+    this.matrixScatter = devChoice('matriz9') !== 'HOJE';
 
     this.resetProspectorCarry();
   }
@@ -120,6 +121,8 @@ export class HitResolution {
     ) {
       requestedDamage *= execute.damageMultiplier;
     }
+    // Targeting Matrix from rank 2: the Scatter's bolts and bursts hit elites,
+    // heralds and bosses harder.
     const focus = cards.cardEffects.threatFocus;
     if (
       this.matrixScatter &&

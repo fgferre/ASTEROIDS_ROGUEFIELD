@@ -42,71 +42,42 @@ const FLIGHTS = ['classic', 'modern'];
 
 // === Excuses: the only way a failing cell is allowed to stay ===
 // { card, rank, weapon, reason }. `rank` and `weapon` may be '*'.
-const PENDING = "pending the owner's choice";
 const NOT_A_DEFECT = 'judged "not a defect" in the findings (25/11)';
-const SHOT_CLOCK = `${PENDING}: the shot clock (finding 6, the cadence comes in whole steps)`;
-const TURNING_OR_STRAFING = `${PENDING}: no-movement-key cards while turning or strafing (finding 5)`;
+// Hidden under the shot clock's excuse until the clock was fixed (card
+// decision 6, 26/11); not the clock, and not judged yet.
+const FOUND_UNDER_CLOCK =
+  'found 26/11 once the shot clock was fixed, not judged yet';
+const HARMONIC_WAIT = `${FOUND_UNDER_CLOCK}: the beam's own 0.25 s wait does not shrink with the fire rate, so 3 lances and a beam come round less sooner than the text says (x1.08 for +11%)`;
+const HALO_RECUT = `${FOUND_UNDER_CLOCK}: the text promises sooner re-cuts, and the damage in 30 s grows about a third of that (x1.04 for 11% sooner); probe or card`;
 // `metric` (optional): only the probes whose metric text contains it.
 const EXCUSES = [
-  { card: 'heat_sink', rank: '*', weapon: '*', reason: SHOT_CLOCK },
-  { card: 'overclocked_core', rank: '*', weapon: '*', reason: SHOT_CLOCK },
   {
-    card: 'targeting_suite',
-    rank: 3,
-    weapon: 'lance',
-    reason: `${SHOT_CLOCK} (its rank 3 fire rate +9%)`,
+    card: 'heat_sink',
+    rank: '*',
+    weapon: 'harmonic',
+    metric: 'damage',
+    reason: HARMONIC_WAIT,
   },
   {
-    card: 'targeting_suite',
-    rank: 3,
+    card: 'overclocked_core',
+    rank: '*',
+    weapon: 'harmonic',
+    metric: 'damage',
+    reason: HARMONIC_WAIT,
+  },
+  {
+    card: 'heat_sink',
+    rank: '*',
     weapon: 'shard-halo',
-    reason: `${SHOT_CLOCK} (its rank 3 fire rate +9%)`,
+    metric: 'damage',
+    reason: HALO_RECUT,
   },
   {
-    card: 'overcharge_coil',
+    card: 'overclocked_core',
     rank: '*',
-    weapon: 'arc-caster',
-    reason: SHOT_CLOCK,
-  },
-  {
-    card: 'overcharge_coil',
-    rank: '*',
-    weapon: 'furnace-corona',
-    reason: SHOT_CLOCK,
-  },
-  {
-    card: 'reactor_bleed',
-    rank: '*',
-    weapon: '*',
-    metric: 'D held',
-    reason: TURNING_OR_STRAFING,
-  },
-  {
-    card: 'reactor_bleed',
-    rank: '*',
-    weapon: '*',
-    metric: 'strafe held',
-    reason: TURNING_OR_STRAFING,
-  },
-  {
-    card: 'grav_anchor',
-    rank: '*',
-    weapon: '*',
-    metric: 'D held',
-    reason: TURNING_OR_STRAFING,
-  },
-  {
-    card: 'grav_anchor',
-    rank: '*',
-    weapon: '*',
-    metric: 'strafe held',
-    reason: TURNING_OR_STRAFING,
-  },
-  {
-    card: 'targeting_suite',
-    rank: 2,
-    weapon: 'scatter',
-    reason: `${PENDING}: Targeting Matrix rank 2 adds nothing to the Scatter Coil's fan (finding 3)`,
+    weapon: 'shard-halo',
+    metric: 'damage',
+    reason: HALO_RECUT,
   },
   {
     card: 'targeting_suite',

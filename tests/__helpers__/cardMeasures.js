@@ -685,7 +685,10 @@ export function dangerShare(scene, scale = 1) {
     extra: { variant: far.variant },
   };
 }
-// A rock crossing 260 px ahead at 160 px/s, put back every 1.5 s: hits per shot.
+// A rock crossing `out` px ahead at 300 px/s, put back every 61 steps: hits
+// per shot. 61 shares no factor with a cadence of 15 or 16 steps, so the shots
+// meet the rock at every point of its crossing (put back every 60 steps, a
+// Lance firing every 15 met it at the same four points every second).
 export function crossingHits(scene, out = 300) {
   const rock = scene.spawn('asteroid', {
     x: SHIP.x + out,
@@ -696,7 +699,7 @@ export function crossingHits(scene, out = 300) {
   let aim = 0;
   scene.run(20, (sc, frame) => {
     sc.park();
-    if (frame % 60 === 0) {
+    if (frame % 61 === 0) {
       rock.x = SHIP.x + out;
       rock.y = SHIP.y - 150;
     }
@@ -777,6 +780,9 @@ export function recoilMeasure(scene, weapon) {
   scene.run(1, (sc) => {
     sc.park();
     hold(sc, rocks);
+    // The Harmonic's lances only: its beam (every 4th shot) already crosses
+    // the whole line, and at 15 steps a shot the 4th lands inside the second.
+    if (weapon === 'harmonic') sc.combat.weapons.shots = 0;
   });
   return {
     value: Math.max(0, ...casts.map((c) => c.size)),
