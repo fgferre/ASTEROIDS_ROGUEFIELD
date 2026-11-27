@@ -28,6 +28,7 @@ import { getViewport } from '../../core/viewport.js';
 import { BiomeTransition } from '../../data/biomes.js';
 import { resolveService } from '../../core/serviceUtils.js';
 import { PALETTE } from '../../data/constants/palette.js';
+import { ENDING_SECTOR } from '../../data/story.js';
 import { HALF_H, HALF_W } from './batches.js';
 import { CameraRig } from './cameraRig.js';
 import { EndingScene, isRevelationBeat } from './endingScene.js';
@@ -62,7 +63,7 @@ import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, SCENE_FOV, setupThree } from './sceneSetup.js';
 import { StoryScene } from './storyScene.js';
 import { TravelScene } from './travelScene.js';
-import { warmUp } from './warmUp.js';
+import { warmEnding, warmUp } from './warmUp.js';
 
 // proposta 18/10: Settings > Bloom Intensity scales the preset's strength
 // (Bloom off is the toggle, which drops the pass).
@@ -240,10 +241,11 @@ class Renderer3D extends BaseSystem {
     });
     this.registerEventListener('wave-started', (payload = {}) => {
       // A sector run shows its sector's look (the run's mode).
-      this.biome.enterLayer(
-        payload.wave,
-        this.cachedEnemies?.waveManager?.mode.sector
-      );
+      const sector = this.cachedEnemies?.waveManager?.mode.sector;
+      this.biome.enterLayer(payload.wave, sector);
+      // The last sector reached with no journey (the dev ?final=1 door):
+      // the ending warms before the fight, as the journey would have.
+      if (sector?.id === ENDING_SECTOR) warmEnding(this);
       this.camera.trigger('waveStart');
     });
     // What opens the camera director's wide view (core/cameraDirector.js).
@@ -475,6 +477,11 @@ class Renderer3D extends BaseSystem {
       this.cachedPlayer,
       freeze?.kind === 'travel' ? freeze.t : null
     );
+    // The way to the Crucible warms its ending (warmUp.js) at the cut into
+    // the journey (one held frame, ~80 ms, once a page). Not at the story's
+    // start: its lights key other programs, and the warm compiled a hundred
+    // more there, holding 0.35 to 2.5 s.
+    if (to === ENDING_SECTOR) warmEnding(this);
     return true;
   }
 
