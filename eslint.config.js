@@ -68,7 +68,7 @@ export default [
           caughtErrors: 'none',
         },
       ],
-      'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-empty': ['error', { allowEmptyCatch: false }],
       'no-extra-boolean-cast': 'error',
       // Line cap (PLAN.md, Rodada 0): no file over 1,200 lines, no exceptions.
       // The 17 files over it when it arrived were split by subject (19/10/2026);
