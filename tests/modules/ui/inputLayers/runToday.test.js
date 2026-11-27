@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountScreens, pinTable } from '../../../__helpers__/screenRig.js';
 import { listenForHold } from '../../../../src/modules/ui/skipHold.js';
+import { inputLayers } from '../../../../src/modules/input/inputLayers.js';
 
 // What the keyboard, the pad and a confirm on the bus do TODAY on the run's
 // other screens (pause, Settings over the run, end credits, HUD editor, a
@@ -94,9 +95,10 @@ pinTable(
   ]
 );
 
-// Settings takes Escape on the document's way down: the pause under it
-// never hears it. The pause key (P, Start) is a game action, not a screen's
-// key: it reaches the session under Settings and resumes the run.
+// Settings, on top of the layer stack, takes Escape: the pause under it
+// never hears it. The pause key (P, Start) passes only under a layer that
+// lets it: not Settings (before the stack it resumed the run under it).
+const NO_PAUSE = 'Settings passes no pause, the run stays paused';
 pinTable(
   'Settings over the pause',
   (rig) => {
@@ -114,17 +116,7 @@ pinTable(
         prevented: true,
       },
     ],
-    [
-      'KeyP',
-      {
-        top: null,
-        focus: 'pause-resume-btn',
-        pause: false,
-        settings: false,
-        sent: { 'toggle-pause': 1 },
-        prevented: false,
-      },
-    ],
+    ['KeyP', { sent: {}, prevented: false }, NO_PAUSE],
     ['Enter', { sent: { 'input-confirmed': 1 }, prevented: false }],
     ['pad:A', { pad: 'press:settings', sent: { 'input-confirmed': 1 } }],
     [
@@ -137,16 +129,7 @@ pinTable(
         sent: {},
       },
     ],
-    [
-      'pad:START',
-      {
-        top: null,
-        focus: 'pause-resume-btn',
-        pause: false,
-        settings: false,
-        sent: { 'toggle-pause': 1 },
-      },
-    ],
+    ['pad:START', { sent: {} }, NO_PAUSE],
   ]
 );
 
@@ -301,8 +284,9 @@ pinTable("a cinematic's skip hold over the flight", startCinematic, [
   ['pad:A', { sent: { 'input-confirmed': 1 } }],
 ]);
 
-// The skip hold swallows Escape before Settings hears it: only the pad's B
-// closes Settings while the scene plays.
+// Settings is on top of the layer stack, which hears a key before the skip
+// hold swallows it: Escape closes Settings (before the stack only the pad's
+// B did), and goes no further.
 pinTable(
   'Settings (opened by the pad) over a cinematic',
   (rig) => {
@@ -310,7 +294,11 @@ pinTable(
     rig.send('pad:VIEW');
   },
   [
-    ['Escape', { sent: {}, prevented: true }],
+    [
+      'Escape',
+      { top: null, focus: 'body', settings: false, sent: {}, prevented: true },
+      'Settings, on top of the stack, closes',
+    ],
     [
       'pad:B',
       {
@@ -346,13 +334,16 @@ describe("the run's screens, hidden rules today", () => {
     expect(rig.ui.pauseScreen.currentPauseState).toBe(false);
   });
 
-  it("the skip hold swallows keys only after the window listeners bound before it (the pause screen's Escape check)", () => {
-    const pauseHeard = vi.spyOn(rig.ui.pauseScreen, 'cancelQuitConfirm');
+  // Before the stack, the pause screen's own Escape check heard it there
+  // (bound before the hold): with nothing armed it did nothing, as now.
+  it('the skip hold swallows keys only after the window listeners bound before it: the layer stack hands each to the screen on top', () => {
     startCinematic(rig);
+    const onKey = vi.fn(() => false);
+    inputLayers.push({ name: 'probe', element: null, passes: [], onKey });
     const after = vi.fn();
     rig.dom.window.addEventListener('keydown', after, true);
     rig.tap('Escape');
-    expect(pauseHeard).toHaveBeenCalledTimes(1);
+    expect(onKey).toHaveBeenCalledTimes(1);
     expect(after).not.toHaveBeenCalled();
   });
 

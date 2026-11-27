@@ -130,6 +130,22 @@ pinTable(
   ]
 );
 
+// Escape disarms an armed Quit (the death screen's layer); it goes on to
+// the game as before.
+pinTable(
+  'game over, Quit armed',
+  (rig) => {
+    gameOver(rig);
+    byId(rig, 'quit-game-btn').click();
+  },
+  [
+    [
+      'Escape',
+      { quitArmed: false, sent: { 'toggle-pause': 1 }, prevented: false },
+    ],
+  ]
+);
+
 pinTable(
   'Settings over the game over',
   (rig) => {

@@ -5,6 +5,7 @@
 // its buttons, a backdrop click or Escape and gives the focus back.
 
 import { adjacentCodexTab, codexTabView } from './codexTabs.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 export class CodexScreen {
   /**
@@ -21,6 +22,25 @@ export class CodexScreen {
     this.codex = codex;
     this.achievements = achievements;
     this.codexState = { isOpen: false, trigger: null, tab: 'enemies' };
+    // Open, on the input layer stack: Escape closes it, the arrows switch
+    // tabs. The pause key still goes to the game, which ignores it on the menu.
+    this.inputLayer = {
+      name: 'codex',
+      element: refs.overlay,
+      passes: ['pause'],
+      onKey: (event) => this.handleCodexKey(event),
+    };
+  }
+
+  handleCodexKey(event) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.closeCodex();
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      this.cycleTab(event.key === 'ArrowLeft' ? -1 : 1);
+    }
+    return false;
   }
 
   /** Arrow keys or LB/RB: the previous or next tab, its button focused. */
@@ -45,18 +65,6 @@ export class CodexScreen {
         this.showCodexTab(button.dataset.codexTab)
       )
     );
-    document.addEventListener('keydown', (event) => {
-      if (!this.codexState.isOpen) return;
-      // Not under Settings: its keys are Settings' own.
-      if (document.body?.classList.contains('is-settings-open')) return;
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        this.closeCodex();
-      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-        event.preventDefault();
-        this.cycleTab(event.key === 'ArrowLeft' ? -1 : 1);
-      }
-    });
   }
 
   showCodexTab(tab, { focusTab = false } = {}) {
@@ -85,6 +93,7 @@ export class CodexScreen {
       trigger: document.activeElement,
       tab: 'enemies',
     };
+    inputLayers.push(this.inputLayer);
     this.showCodexTab('enemies');
     this.showScreen('codex', { overlay: true, show: true });
     refs.overlay.setAttribute('aria-hidden', 'false');
@@ -100,5 +109,6 @@ export class CodexScreen {
     this.announceVisibility(false, { source: 'menu' });
     this.codexState.trigger?.focus?.({ preventScroll: true });
     this.codexState = { isOpen: false, trigger: null, tab: 'enemies' };
+    inputLayers.remove(this.inputLayer);
   }
 }

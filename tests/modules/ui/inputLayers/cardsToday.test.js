@@ -170,7 +170,10 @@ pinTable("the ending's choice over the run", (rig) => rig.open.choice(), [
 // The refusal keeps Settings shut over the cards (rows F10 and pad:VIEW
 // above); opened past it, as it would open without the refusal (the source
 // the request carries off flight). The pick leaves Settings open but hidden
-// (showGameUI hides every screen): the original defect.
+// (showGameUI hides every screen): the original defect. Since the layer
+// stack, the bus confirm stops at Settings (Enter, A); the cards' own keys
+// still reach them until they are a layer.
+const CONFIRM_STOPS = 'the confirm stops at Settings, on top: nothing taken';
 pinTable(
   'Settings forced open over the level-up',
   (rig) => {
@@ -181,8 +184,8 @@ pinTable(
     ['Digit1', { ...picked('a'), sent: {}, prevented: true }, LEAK],
     [
       'Enter',
-      { ...picked('a'), sent: { 'input-confirmed': 1 }, prevented: false },
-      LEAK,
+      { sent: { 'input-confirmed': 1 }, prevented: false },
+      CONFIRM_STOPS,
     ],
     [
       'ArrowRight',
@@ -207,8 +210,8 @@ pinTable(
     ],
     [
       'pad:A',
-      { ...picked('a'), pad: 'press:settings', sent: { 'input-confirmed': 1 } },
-      LEAK,
+      { pad: 'press:settings', sent: { 'input-confirmed': 1 } },
+      CONFIRM_STOPS,
     ],
     [
       'pad:B',
@@ -226,7 +229,7 @@ pinTable(
       { focus: 'card:b', card: 1, pad: 'press:settings', sent: {} },
       LEAK,
     ],
-    ['bus:confirm', { ...picked('a'), sent: { 'input-confirmed': 1 } }, LEAK],
+    ['bus:confirm', { sent: { 'input-confirmed': 1 } }, CONFIRM_STOPS],
   ]
 );
 
@@ -239,13 +242,8 @@ pinTable(
   [
     [
       'Enter',
-      {
-        top: null,
-        ...CHEST_DONE,
-        sent: { 'input-confirmed': 1 },
-        prevented: false,
-      },
-      LEAK,
+      { sent: { 'input-confirmed': 1 }, prevented: false },
+      CONFIRM_STOPS,
     ],
     [
       'Escape',
@@ -259,13 +257,8 @@ pinTable(
     ],
     [
       'pad:A',
-      {
-        top: null,
-        ...CHEST_DONE,
-        pad: 'press:settings',
-        sent: { 'input-confirmed': 1 },
-      },
-      LEAK,
+      { pad: 'press:settings', sent: { 'input-confirmed': 1 } },
+      CONFIRM_STOPS,
     ],
     [
       'pad:B',
@@ -277,11 +270,7 @@ pinTable(
         sent: {},
       },
     ],
-    [
-      'bus:confirm',
-      { top: null, ...CHEST_DONE, sent: { 'input-confirmed': 1 } },
-      LEAK,
-    ],
+    ['bus:confirm', { sent: { 'input-confirmed': 1 } }, CONFIRM_STOPS],
   ]
 );
 

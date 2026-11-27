@@ -50,6 +50,7 @@ import {
 import { GamepadMenuNav } from './ui/gamepadNav.js';
 import { PadPointer } from './ui/padPointer.js';
 import { setSkipPad } from './ui/skipHold.js';
+import { inputLayers } from './input/inputLayers.js';
 
 // The overlays that pause a run over its HUD: cards, chest, flight briefing.
 const CARD_OVERLAYS = ['levelup', 'chest', 'flight'];
@@ -219,6 +220,7 @@ class UISystem extends BaseSystem {
       hangar: () => resolveService('hangar', this.dependencies),
       lastTransmission: () => this.lastTransmission,
       cinematics: this.cinematics,
+      cancelQuit: () => this.pauseScreen.cancelQuitConfirm(),
       announceOverlay: (...args) => this.emitOverlayVisibilityChanged(...args),
     });
     this.creditsOverlay = new CreditsOverlay({
@@ -832,6 +834,7 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('input-confirmed', () => {
+      if (inputLayers.top()) return; // a screen on the stack takes it
       this.levelUpScreen.handleLevelUpConfirm();
       this.chestCeremony.continue();
     });
@@ -1030,6 +1033,7 @@ class UISystem extends BaseSystem {
 
       this.codexScreen.closeCodex();
       this.hangarScreen.closeHangar();
+      this.runEndScreens.markGameOverClosed();
 
       if (screenName === 'menu') {
         this.mainMenu.requestMenuShipSelectorRefresh();

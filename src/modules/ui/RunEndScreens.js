@@ -28,6 +28,7 @@ import {
 import { asArray } from '../upgradeCatalog.js';
 import { FIRST_RUN_MODE } from '../../core/runMode.js';
 import { EndCredits } from './EndCredits.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 const ENDINGS = Object.keys(STORY.ending);
 
@@ -81,7 +82,7 @@ function runNumbers(data, outcome) {
 
 export class RunEndScreens {
   /**
-   * `refs`: { gameOver: { body, invite, seed, copySeedBtn, retryBtn, restartBtn, quitBtn, hints }, victory: { body, invite, continueBtn, nextBtn, restartBtn, quitBtn, menuBtn, choiceOptions, field } }.
+   * `refs`: { gameOver: { screen, body, invite, seed, copySeedBtn, retryBtn, restartBtn, quitBtn, hints }, victory: { body, invite, continueBtn, nextBtn, restartBtn, quitBtn, menuBtn, choiceOptions, field } }.
    * A sector run's screens (`data.sector`, runEnd.js) speak of its chapter;
    * what depends on the kind of run asks `data.mode` (src/core/runMode.js).
    * `showScreen(name, options)`: shows the gameover or victory overlay.
@@ -91,6 +92,7 @@ export class RunEndScreens {
    * `hangar()`: the hangar service; its lastAward is the salvage line.
    * `lastTransmission()`: the line shown since the death or the win, or null.
    * `cinematics`: the run's cinematics (playEnding).
+   * `cancelQuit()`: disarms the death screen's Quit (PauseScreen asks twice).
    */
   constructor({
     refs,
@@ -101,6 +103,7 @@ export class RunEndScreens {
     hangar,
     lastTransmission,
     cinematics,
+    cancelQuit,
     announceOverlay = () => {},
   }) {
     this.refs = refs;
@@ -124,6 +127,24 @@ export class RunEndScreens {
     this.replay = false;
     // The won run's victory payload while the choice is on screen.
     this.choice = null;
+    // The death screen, on the input layer stack: Escape disarms its Quit.
+    // Its other keys, and the pause key, go on as before (the game ignores
+    // the pause there).
+    this.gameOverLayer = {
+      name: 'gameover',
+      element: refs.gameOver.screen,
+      passes: ['pause'],
+      onKey: (event) => {
+        if (event.key === 'Escape') cancelQuit();
+        return false;
+      },
+    };
+  }
+
+  /** A full screen change left the death screen (a new run, a retry's
+   * end, the menu). */
+  markGameOverClosed() {
+    inputLayers.remove(this.gameOverLayer);
   }
 
   /** A run starts ('game-started' payload): the best layer it plays against. */
@@ -232,6 +253,7 @@ export class RunEndScreens {
   showGameOverScreen(payload) {
     // Show gameover as overlay so game canvas stays visible with asteroids wandering
     this.showScreen('gameover', { overlay: true, show: true });
+    inputLayers.push(this.gameOverLayer);
 
     const data = payload?.data || {};
     const refs = this.refs.gameOver;

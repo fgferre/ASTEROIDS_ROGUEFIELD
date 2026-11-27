@@ -7,7 +7,11 @@
 // the buttons that work on the screen. Driven by UISystem's 'gamepad-ui-nav'
 // and 'gamepad-ui-scroll' (InputSystem).
 
-/** Screens a pad can navigate, topmost first (`#<id>-screen`). */
+import { inputLayers } from '../input/inputLayers.js';
+
+/** Screens a pad can navigate, topmost first (`#<id>-screen`), under the
+ * top layer of the input layer stack: the screens not on it yet go by this
+ * list. */
 export const GAMEPAD_NAV_SCREENS = Object.freeze([
   'settings',
   'end-credits',
@@ -201,20 +205,23 @@ export class GamepadMenuNav {
     this.hints = null;
   }
 
-  /** The topmost visible screen a pad can navigate, or null (also while the
-   * PRESS START gate or the pilots cover the menu: they read the pad; and
-   * while the remote link covers it, inert: the run is starting). */
+  /** The topmost visible screen a pad can navigate: the input layer
+   * stack's top (input/inputLayers.js), else the first of the list, or null
+   * (also while the PRESS START gate or the pilots cover the menu: they read
+   * the pad; and while the remote link covers it, inert: the run is
+   * starting). */
   screen() {
+    const shown = (element) =>
+      element &&
+      !element.inert &&
+      !element.classList.contains('hidden') &&
+      !element.classList.contains('menu-screen--gated');
+    const layer = inputLayers.top();
+    if (shown(layer?.element))
+      return { id: layer.name, element: layer.element };
     for (const id of GAMEPAD_NAV_SCREENS) {
       const element = document.getElementById(`${id}-screen`);
-      if (
-        element &&
-        !element.inert &&
-        !element.classList.contains('hidden') &&
-        !element.classList.contains('menu-screen--gated')
-      ) {
-        return { id, element };
-      }
+      if (shown(element)) return { id, element };
     }
     return null;
   }

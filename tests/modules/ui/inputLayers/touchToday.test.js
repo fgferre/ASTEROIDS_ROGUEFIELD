@@ -125,6 +125,12 @@ const SCREENS = {
 // `queued` a press the next fixed step takes, `strafing` STRAFE held,
 // `paused` the run's pause when the press changed it.
 const PAUSED_BY_TOUCH = { reachable: false, queued: '', strafing: false };
+// Rows the layer stack changed, by screen and button: what is now true.
+const NOW = {
+  'Settings opened in flight': {
+    PAUSE: 'Settings passes no pause, the run stays paused',
+  },
+};
 const ROWS = {
   pause: {
     DASH: PAUSED_BY_TOUCH,
@@ -137,7 +143,7 @@ const ROWS = {
     DASH: PAUSED_BY_TOUCH,
     SHIELD: PAUSED_BY_TOUCH,
     STRAFE: { ...PAUSED_BY_TOUCH, strafing: true },
-    PAUSE: { ...PAUSED_BY_TOUCH, paused: false },
+    PAUSE: PAUSED_BY_TOUCH,
     'AIM mode word': { ...PAUSED_BY_TOUCH, reachable: null },
   },
   'HUD editor over the pause': {
@@ -173,7 +179,12 @@ describe('touch buttons tapped with a screen on top, today', () => {
 
   Object.entries(ROWS).forEach(([screen, buttons]) => {
     describe(screen, () => {
-      it.each(Object.entries(buttons))('%s', async (name, expected) => {
+      const rows = Object.entries(buttons).map(([name, expected]) => [
+        NOW[screen]?.[name] ? `${name}: ${NOW[screen][name]}` : name,
+        name,
+        expected,
+      ]);
+      it.each(rows)('%s', async (_title, name, expected) => {
         const { touch, targets } = touchOn(rig);
         SCREENS[screen](rig);
         const target = targets[name];

@@ -264,7 +264,7 @@ describe('Settings panel', () => {
 
   it('closes on Esc from every screen, but not during binding capture', () => {
     const escFor = (state) => {
-      const panel = new SettingsPanel({ schema: SETTINGS_SCHEMA });
+      const panel = new SettingsPanel({ refs: {}, schema: SETTINGS_SCHEMA });
       Object.assign(panel.settingsState, { isOpen: true, ...state });
       panel.closeSettingsPanel = vi.fn();
       const event = {
@@ -371,7 +371,7 @@ describe('Accessibility settings on the page', () => {
   afterEach(() => restoreDom());
 
   it('sets text scale, contrast, flashing and subtitle hooks, and clears them live', () => {
-    const panel = new SettingsPanel({ schema: SETTINGS_SCHEMA });
+    const panel = new SettingsPanel({ refs: {}, schema: SETTINGS_SCHEMA });
     const apply = (values) => panel.applyAccessibilitySettings(values);
     const { body, documentElement: root } = document;
 

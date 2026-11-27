@@ -5,9 +5,9 @@ import { mountScreens, pinTable } from '../../../__helpers__/screenRig.js';
 // (the campaign map, Settings, Codex, Hangar, Credits, the title gate and
 // the pilots), before one layer stack takes the input from the screens'
 // global listeners. Each row: the input, then what changed (see
-// screenRig.js `effects`). Rows named "LEAK today" are the input reaching
-// the screen below; every other row must come out the same.
-const LEAK = true;
+// screenRig.js `effects`). The one leak here (Escape, while a binding
+// waited, reached the Hangar under Settings) is gone with the layer stack:
+// its row says what is now true; every other row must come out the same.
 const focus = (rig, id) => rig.dom.document.getElementById(id).focus();
 
 // Heard on the way down (capture), and only on a focused chapter or row.
@@ -243,8 +243,9 @@ pinTable(
   ]
 );
 
-// Settings lets Escape go while a binding waits for its key: it becomes the
-// binding, and the Hangar under Settings hears it too and closes.
+// A binding waiting for its key takes every key (Settings, on top of the
+// layer stack): Escape becomes the binding, and the Hangar under it no
+// longer hears it (it closed too, before the stack).
 pinTable(
   'Settings waiting for a key, over the Hangar',
   (rig) => {
@@ -258,16 +259,14 @@ pinTable(
   [
     [
       'Escape',
-      {
-        focus: 'body',
-        hangar: false,
-        capturing: false,
-        sent: {},
-        prevented: true,
-      },
-      LEAK,
+      { capturing: false, sent: {}, prevented: true },
+      'the binding takes it, the Hangar stays open',
     ],
-    ['Enter', { capturing: false, sent: {}, prevented: false }],
+    [
+      'Enter',
+      { capturing: false, sent: {}, prevented: true },
+      'the binding takes it, no button pressed by default',
+    ],
   ]
 );
 

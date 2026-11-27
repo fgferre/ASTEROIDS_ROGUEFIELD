@@ -13,6 +13,9 @@ import { showReplayNotice } from '../../../../src/bootstrap/replaySession.js';
 // stopPropagation still lets the later listeners run, stopImmediatePropagation
 // does not). Each listener is bound here after the consumer opened; where
 // boot binds it earlier on the same node and phase, the answer is the same.
+// Settings and the pause screen take their keys through the layer stack,
+// which stops none: every listener hears them since.
+const NOW = 'true, since the layer stack (it stops no key)';
 
 // The screens that consume a key today, and that key.
 const CONSUMERS = {
@@ -40,9 +43,9 @@ const CONSUMERS = {
   ],
   // document capture, its keys, stopPropagation
   pilots: ['Enter', (rig) => rig.open.gate({ pilots: true })],
-  // document capture, Escape, stopPropagation
+  // the layer stack (window capture), Escape, taken but not stopped
   Settings: ['Escape', (rig) => rig.open.settings()],
-  // window capture, Escape, stopImmediatePropagation
+  // the layer stack (window capture), Escape, taken but not stopped
   'pause with a quit armed': [
     'Escape',
     (rig) => {
@@ -70,8 +73,8 @@ const LISTENERS = {
       'skip hold': false,
       'HUD editor': false,
       pilots: false,
-      Settings: false,
-      'pause with a quit armed': false,
+      Settings: NOW,
+      'pause with a quit armed': NOW,
     },
   },
   'audio unlock (AudioSystem, document, capture; gone after the first key)': {
@@ -85,7 +88,7 @@ const LISTENERS = {
       'HUD editor': false,
       pilots: true,
       Settings: true,
-      'pause with a quit armed': false,
+      'pause with a quit armed': NOW,
     },
   },
   // Bound with the UI, before the skip hold, the editor and Pause's check.
@@ -134,8 +137,8 @@ const LISTENERS = {
       'skip hold': false,
       'HUD editor': false,
       pilots: false,
-      Settings: false,
-      'pause with a quit armed': false,
+      Settings: NOW,
+      'pause with a quit armed': NOW,
     },
   },
 };
@@ -155,7 +158,7 @@ describe('global listeners under a screen that consumes the key, today', () => {
         open(rig);
         const didHear = bind(rig);
         rig.keyDown(key ?? consumedKey);
-        expect(didHear()).toBe(expected);
+        expect(didHear()).toBe(expected === NOW || expected);
         rig.keyUp(key ?? consumedKey);
       });
     });

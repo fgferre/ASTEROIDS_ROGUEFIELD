@@ -45,6 +45,7 @@ export function cacheStaticNodes() {
       continueBtn: document.getElementById('flight-continue-btn') || null,
     },
     gameOver: {
+      screen: document.getElementById('gameover-screen') || null,
       body: document.getElementById('gameover-body') || null,
       invite: document.getElementById('gameover-invite') || null,
       seed: document.getElementById('gameover-seed') || null,

@@ -3,7 +3,8 @@
  * (domEvents.js), for the input-layer tests: the real InputSystem, the real
  * screens built and bound in UISystem.initialize's order, the bus wired by
  * the real UISystem.setupEventListeners, and the page's screen nodes read by
- * the real cacheStaticNodes, the real SettingsSystem. Stood in for: the
+ * the real cacheStaticNodes, the real SettingsSystem, the input layer stack
+ * (the InputSystem installs it, empty, at each mount). Stood in for: the
  * session (a game state that follows 'screen-changed' and answers
  * 'toggle-pause' as GameSessionService does), the HUD, the main menu's own
  * controls (no key listener), the cinematics (the skip hold is listened for
@@ -424,6 +425,7 @@ export function mountScreens() {
     hangar: () => ({ lastAward: null }),
     lastTransmission: () => null,
     cinematics: ui.cinematics,
+    cancelQuit: () => ui.pauseScreen.cancelQuitConfirm(),
     announceOverlay: (...args) => ui.emitOverlayVisibilityChanged(...args),
   });
   ui.creditsOverlay = new CreditsOverlay({
@@ -818,14 +820,21 @@ export function mountScreens() {
 
 /**
  * One describe per pair, one test per input: `open(rig)` sets the screens
- * up, each row is `[input, effects, leak]` (see `rig.send` and
- * `rig.effects`). A row marked `leak` is today's leak: an input reaching the
- * screen below; its name says so, for the layer stack to flip it.
+ * up, each row is `[input, effects, mark]` (see `rig.send` and
+ * `rig.effects`). A row marked `true` is today's leak: an input reaching the
+ * screen below; its name says so, for the layer stack to flip it. A row the
+ * stack flipped is marked with what is now true, which its name gives.
  */
 export function pinTable(name, open, rows) {
   describe(name, () => {
-    rows.forEach(([input, expected, leak]) => {
-      it(`${leak ? 'LEAK today: ' : ''}${input}`, async () => {
+    rows.forEach(([input, expected, mark]) => {
+      const title =
+        mark === true
+          ? `LEAK today: ${input}`
+          : mark
+            ? `${input}: ${mark}`
+            : input;
+      it(title, async () => {
         const rig = mountScreens();
         try {
           open(rig);

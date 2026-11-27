@@ -23,6 +23,7 @@ import {
 } from './settings/settingsGroups.js';
 import { asArray } from '../upgradeCatalog.js';
 import { resolveService } from '../../core/serviceUtils.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 export class SettingsPanel {
   /**
@@ -71,6 +72,13 @@ export class SettingsPanel {
       folds: {},
       capture: null,
       previousFocus: null,
+    };
+    // Open, on top of the input layer stack: the game's actions pass none.
+    this.inputLayer = {
+      name: 'settings',
+      element: refs.overlay,
+      passes: [],
+      onKey: (event) => this.handleSettingsKeyDown(event),
     };
     this.initializeSettingsMetadata();
   }
@@ -217,12 +225,6 @@ export class SettingsPanel {
           this.closeSettingsPanel();
         }
       });
-      // Capture phase: before InputSystem's listener commits Esc as a binding.
-      document.addEventListener(
-        'keydown',
-        (event) => this.handleSettingsKeyDown(event),
-        true
-      );
     }
 
     asArray(settingsRefs.closeButtons).forEach((button) => {
@@ -616,6 +618,7 @@ export class SettingsPanel {
 
     this.settingsState.isOpen = true;
     this.settingsState.source = source;
+    inputLayers.push(this.inputLayer);
     // Capture focus before opening
     this.settingsState.previousFocus = document.activeElement;
 
@@ -635,15 +638,19 @@ export class SettingsPanel {
     }
   }
 
-  // Escape closes Settings without also reaching the game's pause binding.
+  // A key on top of the stack (input/inputLayers.js). A binding waiting for its
+  // input takes every key (InputSystem's key-pressed makes it the binding),
+  // none for the screens under it or the game; else Escape closes Settings
+  // without also reaching the game's pause binding.
   handleSettingsKeyDown(event) {
-    const state = this.settingsState;
-    if (event.key !== 'Escape' || !state.isOpen || state.capture) {
-      return;
+    if (this.settingsState.capture) {
+      event.preventDefault();
+      return true;
     }
+    if (event.key !== 'Escape') return false;
     event.preventDefault();
-    event.stopPropagation();
     this.closeSettingsPanel();
+    return true;
   }
 
   closeSettingsPanel({ resumeRun = true } = {}) {
@@ -680,6 +687,7 @@ export class SettingsPanel {
     document.body?.classList.remove('is-settings-open');
     this.cancelBindingCapture();
     this.settingsState.isOpen = false;
+    inputLayers.remove(this.inputLayer);
     this.announceVisibility(false, { source });
     if (resumeRun && source === 'playing') this.emit('toggle-pause');
   }

@@ -29,6 +29,7 @@ import {
   rumble,
   startMenuPadPolling,
 } from './input/gamepadReading.js';
+import { inputLayers } from './input/inputLayers.js';
 
 const PASSWORD_MANAGER_GUARD_CODES = new Set(['KeyS', 'ArrowDown']);
 // Gameplay presses are applied at the next fixed step (not in the DOM handler)
@@ -128,6 +129,11 @@ class InputSystem {
   }
 
   setupEventListeners() {
+    // The screens' layer stack hears each key first (window capture): only
+    // the screen on top acts on it. This system still hears every key and
+    // asks the stack whether a game action passes (emitActionEvent).
+    inputLayers.install(this.getEventBus());
+
     this.handleKeyDownCapture = (event) => {
       if (!this.shouldBlockPasswordManager(event)) {
         return;
@@ -191,11 +197,6 @@ class InputSystem {
       eventBus.on('game-started', (payload = {}) => {
         this.replaying = Boolean(payload.replay);
       });
-
-      // A cinematic holds the run (ui/runCinematics.js): Start is its skip
-      // key, never the pause; the ending's acts (they play on) no Settings.
-      eventBus.on('cinematic-started', (e) => (this.cinematic = e?.kind));
-      eventBus.on('cinematic-ended', () => (this.cinematic = null));
 
       eventBus.on('player-took-damage', (payload = {}) => {
         if ((payload.healthDamage ?? payload.damage) > 0) {
@@ -485,12 +486,14 @@ class InputSystem {
     }
 
     switch (action) {
+      // The screen on top and the cinematic playing decide (input/inputLayers.js).
       case 'pause':
-        if (!this.cinematic || ['epilogue', 'arrival'].includes(this.cinematic))
+        if (inputLayers.passes('pause', context.event)) {
           eventBus?.emit?.('toggle-pause');
+        }
         break;
       case 'openSettings':
-        if (['revelation', 'ending'].includes(this.cinematic)) break;
+        if (!inputLayers.passes('openSettings', context.event)) break;
         eventBus?.emit?.('settings-menu-requested', {
           source: context.device || source || 'input',
         });

@@ -24,6 +24,7 @@ import { MORPH_MS, morphIntoTitle } from './openingMorph.js';
 import { openPilotSelect } from './pilotSelect.js';
 import { isPilotStale } from '../../core/storage.js';
 import { menuHome } from '../ui/gamepadNav.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 const WAKE_HINT = 'Press any key';
 // By touch (UISystem's data-input-device) the hints name the tap instead.
@@ -140,7 +141,12 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
       (event) => {
         input();
         // A held Escape's repeats: its first press closed a panel, only that.
-        if (event.key === 'Escape' && !event.repeat && onMenu() && !panelOpen())
+        if (
+          event.key === 'Escape' &&
+          !event.repeat &&
+          onMenu() &&
+          !panelOpen(event)
+        )
           backToGate();
       },
       true
@@ -371,9 +377,12 @@ function padActive() {
   );
 }
 
-// Something over the menu that Escape closes first: a panel (Settings,
-// Credits, Codex, Hangar), a dialog, the pilots or the phone's Wake log.
-function panelOpen() {
+// Something over the menu that Escape closes first: a screen on the input
+// layer stack (Settings, Credits, Codex, Hangar; for a key, the one on top
+// when it came, which its Escape may have closed already), a dialog, the
+// pilots or the phone's Wake log.
+function panelOpen(event) {
+  if (inputLayers.layerFor(event)) return true;
   if (document.querySelector('.pilot-screen, .is-log-open')) return true;
   return Array.from(
     document.querySelectorAll('.screen--overlay, [aria-modal="true"]')
