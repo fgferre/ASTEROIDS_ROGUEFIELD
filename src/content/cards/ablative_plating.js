@@ -44,6 +44,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-hull-armor',
+          to: 'player',
+          lands: { hullArmor: 'armor' },
           payload: { armor: 3 }, // proposta 20/10
         },
       ],
@@ -54,6 +56,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-hull-armor',
+          to: 'player',
+          lands: { hullArmor: 'armor' },
           payload: { armor: 6 }, // proposta 20/10
         },
       ],
@@ -64,6 +68,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-hull-armor',
+          to: 'player',
+          lands: { hullArmor: 'armor' },
           payload: { armor: 9 }, // proposta 20/10
         },
       ],

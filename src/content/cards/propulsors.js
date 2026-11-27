@@ -50,16 +50,19 @@ export default {
         {
           type: 'event',
           event: 'upgrade-acceleration-boost',
+          to: 'player',
           payload: { multiplier: 1.12 },
         },
         {
           type: 'event',
           event: 'upgrade-speed-boost',
+          to: 'player',
           payload: { multiplier: 1.1 },
         },
         {
           type: 'event',
           event: 'upgrade-thruster-visual',
+          to: 'player',
           payload: { level: 1 },
         },
       ],
@@ -70,16 +73,19 @@ export default {
         {
           type: 'event',
           event: 'upgrade-acceleration-boost',
+          to: 'player',
           payload: { multiplier: 1.116 }, // Total: 1.25
         },
         {
           type: 'event',
           event: 'upgrade-speed-boost',
+          to: 'player',
           payload: { multiplier: 1.109 }, // Total: 1.22
         },
         {
           type: 'event',
           event: 'upgrade-thruster-visual',
+          to: 'player',
           payload: { level: 2 },
         },
       ],
@@ -90,16 +96,19 @@ export default {
         {
           type: 'event',
           event: 'upgrade-acceleration-boost',
+          to: 'player',
           payload: { multiplier: 1.16 }, // Total: 1.45
         },
         {
           type: 'event',
           event: 'upgrade-speed-boost',
+          to: 'player',
           payload: { multiplier: 1.131 }, // Total: 1.38
         },
         {
           type: 'event',
           event: 'upgrade-thruster-visual',
+          to: 'player',
           payload: { level: 3 },
         },
       ],
@@ -110,16 +119,19 @@ export default {
         {
           type: 'event',
           event: 'upgrade-acceleration-boost',
+          to: 'player',
           payload: { multiplier: 1.207 }, // Total: 1.75
         },
         {
           type: 'event',
           event: 'upgrade-speed-boost',
+          to: 'player',
           payload: { multiplier: 1.159 }, // Total: 1.60
         },
         {
           type: 'event',
           event: 'upgrade-thruster-visual',
+          to: 'player',
           payload: { level: 4 },
         },
       ],
@@ -130,21 +142,26 @@ export default {
         {
           type: 'event',
           event: 'upgrade-acceleration-boost',
+          to: 'player',
           payload: { multiplier: 1.2 }, // Total: 2.10
         },
         {
           type: 'event',
           event: 'upgrade-speed-boost',
+          to: 'player',
           payload: { multiplier: 1.156 }, // Total: 1.85
         },
         {
           type: 'event',
           event: 'upgrade-thruster-visual',
+          to: 'player',
           payload: { level: 5 },
         },
         {
           type: 'event',
           event: 'upgrade-ion-trail',
+          to: 'combat',
+          lands: 'cards.cardEffects.ionTrail',
           // proposta 18/10: machines only (rocks pass), bosses take half.
           payload: {
             damage: 8,

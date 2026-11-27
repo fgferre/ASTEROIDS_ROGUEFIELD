@@ -23,6 +23,7 @@ import {
   TURRET_TURN_RATE,
 } from '../data/constants/physics.js';
 import { UPGRADE_FAMILIES } from '../data/upgrades/families.js';
+import { routeCardEffects } from './cardEffectRoutes.js';
 import {
   DASH_COOLDOWN,
   MAGNETISM_RADIUS,
@@ -220,123 +221,142 @@ class PlayerSystem extends BaseSystem {
         payload?.values?.stickSensitivity ?? this.stickSensitivity;
     });
 
-    // The piloting cards: the turret turns on its own (CombatSystem goes
-    // back to auto aim on the same event)...
-    this.registerEventListener('upgrade-auto-aim', () => {
-      this.noseAim = false;
-    });
-    // ...and, once the pilot has read the briefing (UISystem), today's flight.
+    // Once the pilot has read the Flight Computer's briefing (UISystem),
+    // today's flight.
     this.registerEventListener('modern-flight-engaged', () => {
       this.setFlightScheme('modern', false);
     });
 
-    this.registerEventListener('upgrade-damage-boost', (data) => {
-      this.damage = Math.floor(this.damage * data.multiplier);
-      console.log('[PlayerSystem] Damage boosted to', this.damage);
-    });
+    // The card effects routed to the player (src/modules/cardEffectRoutes.js):
+    // the ones that land where their card says, and these.
+    routeCardEffects(
+      this,
+      'player',
+      (event, fn) => this.registerEventListener(event, fn),
+      {
+        // The piloting cards: the turret turns on its own (CombatSystem goes
+        // back to auto aim on the same event).
+        'upgrade-auto-aim': () => {
+          this.noseAim = false;
+        },
 
-    this.registerEventListener('upgrade-speed-boost', (data) => {
-      this.flight.maxSpeed = Math.floor(this.flight.maxSpeed * data.multiplier);
-      console.log('[PlayerSystem] Speed boosted to', this.flight.maxSpeed);
-    });
+        'upgrade-damage-boost': (data) => {
+          this.damage = Math.floor(this.damage * data.multiplier);
+          console.log('[PlayerSystem] Damage boosted to', this.damage);
+        },
 
-    this.registerEventListener('upgrade-acceleration-boost', (data) => {
-      this.flight.acceleration = this.flight.acceleration * data.multiplier;
-      console.log(
-        '[PlayerSystem] Acceleration boosted to',
-        this.flight.acceleration
-      );
-    });
+        'upgrade-speed-boost': (data) => {
+          this.flight.maxSpeed = Math.floor(
+            this.flight.maxSpeed * data.multiplier
+          );
+          console.log('[PlayerSystem] Speed boosted to', this.flight.maxSpeed);
+        },
 
-    // RCS System: snappier thrust, same top speed (flight.js).
-    this.registerEventListener('upgrade-thrust-agility', (data) => {
-      this.flight.agility = data.multiplier;
-    });
+        'upgrade-acceleration-boost': (data) => {
+          this.flight.acceleration = this.flight.acceleration * data.multiplier;
+          console.log(
+            '[PlayerSystem] Acceleration boosted to',
+            this.flight.acceleration
+          );
+        },
 
-    this.registerEventListener('upgrade-linear-damping', (data) => {
-      // FIX-02: mutate brakingDamping only. baseLinearDamping is invariant.
-      // Formula preserves the upgrade catalog's intent: "multiplier 1.30" means
-      // "+30% damping during stops" — applied to the cumulative effective total,
-      // then projected back onto the braking-only component.
-      const previousTotal =
-        this.flight.baseLinearDamping + this.flight.brakingDamping;
-      const newTotal = previousTotal * data.multiplier;
-      this.flight.brakingDamping = Math.max(
-        0,
-        newTotal - this.flight.baseLinearDamping
-      );
-      console.log(
-        '[PlayerSystem] Braking damping adjusted to',
-        this.flight.brakingDamping
-      );
-    });
+        'upgrade-linear-damping': (data) => {
+          // FIX-02: mutate brakingDamping only. baseLinearDamping is invariant.
+          // Formula preserves the upgrade catalog's intent: "multiplier 1.30" means
+          // "+30% damping during stops" — applied to the cumulative effective total,
+          // then projected back onto the braking-only component.
+          const previousTotal =
+            this.flight.baseLinearDamping + this.flight.brakingDamping;
+          const newTotal = previousTotal * data.multiplier;
+          this.flight.brakingDamping = Math.max(
+            0,
+            newTotal - this.flight.baseLinearDamping
+          );
+          console.log(
+            '[PlayerSystem] Braking damping adjusted to',
+            this.flight.brakingDamping
+          );
+        },
 
-    this.registerEventListener('upgrade-thruster-visual', (data) => {
-      this.thrusters.thrusterVisualLevel = data.level || 0;
-      console.log(
-        '[PlayerSystem] Thruster visual level:',
-        this.thrusters.thrusterVisualLevel
-      );
-    });
+        'upgrade-thruster-visual': (data) => {
+          this.thrusters.thrusterVisualLevel = data.level || 0;
+          console.log(
+            '[PlayerSystem] Thruster visual level:',
+            this.thrusters.thrusterVisualLevel
+          );
+        },
 
-    this.registerEventListener('upgrade-rcs-visual', (data) => {
-      this.thrusters.rcsVisualLevel = data.level || 0;
-      console.log(
-        '[PlayerSystem] RCS visual level:',
-        this.thrusters.rcsVisualLevel
-      );
-    });
+        'upgrade-rcs-visual': (data) => {
+          this.thrusters.rcsVisualLevel = data.level || 0;
+          console.log(
+            '[PlayerSystem] RCS visual level:',
+            this.thrusters.rcsVisualLevel
+          );
+        },
 
-    this.registerEventListener('upgrade-braking-visual', (data) => {
-      this.thrusters.brakingVisualLevel = data.level || 0;
-      console.log(
-        '[PlayerSystem] Braking visual level:',
-        this.thrusters.brakingVisualLevel
-      );
-    });
+        'upgrade-braking-visual': (data) => {
+          this.thrusters.brakingVisualLevel = data.level || 0;
+          console.log(
+            '[PlayerSystem] Braking visual level:',
+            this.thrusters.brakingVisualLevel
+          );
+        },
 
-    // `bonus` adds hull and repairs it; `multiplier` (Glass Cannon) scales it.
-    this.registerEventListener('upgrade-health-boost', (data) => {
-      const bonus = data.bonus ?? 0;
-      this.maxHealth = Math.round(
-        (this.maxHealth + bonus) * (data.multiplier ?? 1)
-      );
-      this.health = Math.min(this.health + bonus, this.maxHealth);
-      console.log('[PlayerSystem] Health boosted to', this.maxHealth);
-    });
+        // `bonus` adds hull and repairs it; `multiplier` (Glass Cannon) scales it.
+        'upgrade-health-boost': (data) => {
+          const bonus = data.bonus ?? 0;
+          this.maxHealth = Math.round(
+            (this.maxHealth + bonus) * (data.multiplier ?? 1)
+          );
+          this.health = Math.min(this.health + bonus, this.maxHealth);
+          console.log('[PlayerSystem] Health boosted to', this.maxHealth);
+        },
 
-    // Cards that change what a hit does to the hull or the shot's damage
-    // (takeDamage, getStats); each keeps its latest rank's number.
-    this.registerEventListener('upgrade-reactor-bleed', (data) => {
-      this.idleDamageMultiplier = data.idleDamageMultiplier;
-    });
-    // Momentum Rounds: damage while at 60% of the top speed flown right now.
-    this.registerEventListener('upgrade-momentum-rounds', (data) => {
-      this.speedDamageMultiplier = data.speedDamageMultiplier;
-    });
-    // Close Quarters: CombatSystem scans for enemies within `radius` once per
-    // frame and scales the stats it hands the weapons.
-    this.registerEventListener('upgrade-close-quarters', (data) => {
-      this.closeDamageMultiplier = data.closeDamageMultiplier;
-      this.closeRadius = data.radius;
-    });
-    this.registerEventListener('upgrade-idle-guard', (data) => {
-      this.idleDamageReduction = data.damageReduction;
-    });
-    this.registerEventListener('upgrade-hull-armor', (data) => {
-      this.hullArmor = data.armor;
-    });
+        // Hull Patch: an instant repair of a fraction of the max hull.
+        'upgrade-hull-repair': (data) => {
+          this.heal(this.maxHealth * data.fraction);
+        },
+
+        // Maneuver cards. Afterburner: on top of the hull × Hangar cooldown.
+        'upgrade-dash-cooldown': (data) => {
+          this.maneuvers.dashCooldown *= data.multiplier;
+        },
+        // Inertial Dampers: a faster dash under a higher cap goes further.
+        'upgrade-dash-distance': (data) => {
+          this.maneuvers.dashDistanceMultiplier *= data.multiplier;
+        },
+
+        'upgrade-multishot': (data) => {
+          this.multishot += data.bonus;
+          console.log('[PlayerSystem] Multishot boosted to', this.multishot);
+        },
+
+        'upgrade-magnetism': (data) => {
+          this.magnetismRadius = Math.floor(
+            this.magnetismRadius * data.multiplier
+          );
+          console.log(
+            '[PlayerSystem] Magnetism boosted to',
+            this.magnetismRadius
+          );
+        },
+
+        'upgrade-deflector-shield': (data = {}) => {
+          const level = Number(data.level);
+          if (!Number.isFinite(level) || level <= 0) {
+            return;
+          }
+
+          this.shield.applyShieldLevel(level);
+          console.log(
+            '[PlayerSystem] Deflector shield upgraded to level',
+            level
+          );
+        },
+      }
+    );
+
     // Scrap Compactor and Blood Ledger: repairs on a level-up, on a Warden.
-    this.registerEventListener('upgrade-level-up-repair', (data) => {
-      this.levelUpRepair = data.repair;
-    });
-    this.registerEventListener('upgrade-boss-repair', (data) => {
-      this.bossRepairFraction = data.fraction;
-    });
-    // Hull Patch: an instant repair of a fraction of the max hull.
-    this.registerEventListener('upgrade-hull-repair', (data) => {
-      this.heal(this.maxHealth * data.fraction);
-    });
     this.registerEventListener('player-leveled-up', () => {
       if (this.levelUpRepair > 0) this.heal(this.levelUpRepair);
     });
@@ -346,68 +366,11 @@ class PlayerSystem extends BaseSystem {
       }
     });
 
-    // Phase Skin: invulnerability for `duration` s after a dash ends.
-    this.registerEventListener('upgrade-phase-skin', (data) => {
-      this.maneuvers.dashAfterInvulnerability = data.duration;
-    });
-
-    // Braking System 3: the hold-S emergency brake (updateEmergencyBrake).
-    this.registerEventListener('upgrade-emergency-brake', (data) => {
-      this.maneuvers.emergencyBrake = data;
-    });
-
-    // Maneuver cards. Afterburner: on top of the hull × Hangar cooldown.
-    this.registerEventListener('upgrade-dash-cooldown', (data) => {
-      this.maneuvers.dashCooldown *= data.multiplier;
-    });
-    // Ram Plating: PhysicsSystem hits each enemy a dash touches once.
-    this.registerEventListener('upgrade-ram-plating', (data) => {
-      this.maneuvers.dashContactDamage = data.damage;
-    });
-    this.registerEventListener('upgrade-reactive-brake', (data) => {
-      this.maneuvers.reactiveBrake = data;
-    });
-    // Inertial Dampers: a faster dash under a higher cap goes further.
-    this.registerEventListener('upgrade-dash-distance', (data) => {
-      this.maneuvers.dashDistanceMultiplier *= data.multiplier;
-    });
-    // Ghost Drive: spare dash charges, ready at once.
-    this.registerEventListener('upgrade-phase-dash', (data) => {
-      this.maneuvers.dashSpareMax = data.extraCharges;
-      this.maneuvers.dashSpare = data.extraCharges;
-      this.maneuvers.dashGhostLinger = data.ghostLinger;
-    });
     // Maneuver's Apex has no weapon: the dash becomes Blink (startDash).
     this.registerEventListener('apex-unlocked', ({ family } = {}) => {
       if (family === UPGRADE_FAMILIES.maneuver.id) {
         this.maneuvers.blink = UPGRADE_FAMILIES.maneuver.apex;
       }
-    });
-
-    // Overclocked Core: the hull loses `amount` every `interval` s, never
-    // below `floorFraction` of max.
-    this.registerEventListener('upgrade-hull-drain', (data) => {
-      this.hullDrain = data;
-    });
-
-    this.registerEventListener('upgrade-multishot', (data) => {
-      this.multishot += data.bonus;
-      console.log('[PlayerSystem] Multishot boosted to', this.multishot);
-    });
-
-    this.registerEventListener('upgrade-magnetism', (data) => {
-      this.magnetismRadius = Math.floor(this.magnetismRadius * data.multiplier);
-      console.log('[PlayerSystem] Magnetism boosted to', this.magnetismRadius);
-    });
-
-    this.registerEventListener('upgrade-deflector-shield', (data = {}) => {
-      const level = Number(data.level);
-      if (!Number.isFinite(level) || level <= 0) {
-        return;
-      }
-
-      this.shield.applyShieldLevel(level);
-      console.log('[PlayerSystem] Deflector shield upgraded to level', level);
     });
 
     this.registerEventListener('weapon-fired', (data) => {
@@ -930,7 +893,8 @@ class PlayerSystem extends BaseSystem {
     this.shield.resetShieldState();
   }
 
-  // What the hull and shot cards above change, back to none.
+  // What the hull and shot cards change (their cards' `lands`; takeDamage and
+  // getStats read them), back to none.
   resetCardStats() {
     this.idleDamageMultiplier = 1;
     this.speedDamageMultiplier = 1;

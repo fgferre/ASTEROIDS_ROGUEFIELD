@@ -47,6 +47,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-kill-spark',
+          to: 'combat',
+          lands: 'cards.cardEffects.killSpark',
           payload: { range: RANGE, damageFraction: 0.6, links: 1 }, // proposta 20/10
         },
       ],
@@ -57,6 +59,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-kill-spark',
+          to: 'combat',
+          lands: 'cards.cardEffects.killSpark',
           payload: { range: RANGE, damageFraction: 0.8, links: 2 }, // proposta 20/10
         },
       ],
@@ -67,6 +71,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-kill-spark',
+          to: 'combat',
+          lands: 'cards.cardEffects.killSpark',
           payload: { range: RANGE, damageFraction: 1, links: 4 }, // proposta 20/10
         },
       ],

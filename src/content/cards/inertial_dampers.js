@@ -36,6 +36,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-distance',
+          to: 'player',
           payload: { multiplier: 1.25 }, // proposta 20/10
         },
       ],
@@ -46,6 +47,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-distance',
+          to: 'player',
           payload: { multiplier: 1.2 }, // proposta 20/10; total 1.50
         },
       ],

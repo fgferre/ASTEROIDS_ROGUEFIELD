@@ -48,6 +48,11 @@ export default {
         {
           type: 'event',
           event: 'upgrade-close-quarters',
+          to: 'player',
+          lands: {
+            closeDamageMultiplier: 'closeDamageMultiplier',
+            closeRadius: 'radius',
+          },
           payload: { closeDamageMultiplier: 1.2, radius: 150 }, // proposta 16/11
         },
       ],
@@ -58,6 +63,11 @@ export default {
         {
           type: 'event',
           event: 'upgrade-close-quarters',
+          to: 'player',
+          lands: {
+            closeDamageMultiplier: 'closeDamageMultiplier',
+            closeRadius: 'radius',
+          },
           payload: { closeDamageMultiplier: 1.4, radius: 150 }, // proposta 16/11
         },
       ],
@@ -68,6 +78,11 @@ export default {
         {
           type: 'event',
           event: 'upgrade-close-quarters',
+          to: 'player',
+          lands: {
+            closeDamageMultiplier: 'closeDamageMultiplier',
+            closeRadius: 'radius',
+          },
           payload: { closeDamageMultiplier: 1.6, radius: 150 }, // proposta 16/11
         },
       ],

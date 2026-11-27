@@ -400,6 +400,10 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   `reformas/retry-chefes`: o chefe e cada inimigo voltam como estavam na morte, o ataque em curso incluído, e um teste
   falha se um chefe ou inimigo novo voltar diferente. Fica mais duro que no jogo publicado. Fecha quando ele aprovar
   jogando.
+- **(65)** As cartas falam com o jogo por um caminho só (26/11, ponto B6 da auditoria de fora 8). À pergunta se as duas
+  reformas grandes ficavam para depois de publicar: _"Não, antes"_; com o que ele já tinha dito em 25/11: _"vamos
+  resolver tudo antes de publicar,,,"_. Em curso no ramo `cartas/ligacao-unica`: cada carta diz a que parte do jogo o
+  efeito vai, e um ponto só o entrega; nada muda no jogo.
 
 ## Som (palavras dele, 19/11)
 

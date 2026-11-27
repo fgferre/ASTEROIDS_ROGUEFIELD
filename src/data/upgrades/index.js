@@ -24,7 +24,12 @@ const WEAPON_CARDS = armed.map(({ id, card }) => ({
     {
       rank: 1,
       effects: [
-        { type: 'event', event: 'upgrade-weapon', payload: { weaponId: id } },
+        {
+          type: 'event',
+          event: 'upgrade-weapon',
+          to: 'combat',
+          payload: { weaponId: id },
+        },
       ],
     },
   ],

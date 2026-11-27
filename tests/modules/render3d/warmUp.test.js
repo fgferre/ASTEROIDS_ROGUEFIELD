@@ -14,6 +14,7 @@ import {
   VARIANT_LOOKS,
 } from '../../../src/modules/render3d/enemyMirror.js';
 import { PlayerMirror } from '../../../src/modules/render3d/playerMirror.js';
+import { compileScene } from '../../../src/modules/render3d/warmUp.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
 import { createCanvasDocumentStub } from '../../__helpers__/stubs.js';
 import {
@@ -188,7 +189,7 @@ describe('Renderer3D.warmUp', () => {
 
   it('compiles every preset program variant, the current preset last', () => {
     const { renderer, variants } = warmable();
-    renderer.compileScene();
+    compileScene(renderer);
     // scene and overlay per variant; ultra (shadows, maps) last
     expect(variants.filter((_, i) => i % 2 === 0)).toEqual([
       'false/true',

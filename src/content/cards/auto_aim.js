@@ -57,7 +57,14 @@ export default {
   levels: [
     {
       rank: 1,
-      effects: [{ type: 'event', event: 'upgrade-auto-aim', payload: {} }],
+      effects: [
+        {
+          type: 'event',
+          event: 'upgrade-auto-aim',
+          to: ['player', 'combat'],
+          payload: {},
+        },
+      ],
     },
   ],
 };

@@ -30,10 +30,7 @@
     "capture": "node scripts/capture.mjs",
     "cartao": "node scripts/cartao.mjs",
     "analyze:deps": "node scripts/analyze-dependencies.js && node scripts/generate-mermaid-graph.js",
-    "analyze:deps:watch": "nodemon --watch src --exec npm run analyze:deps",
-    "validate:deps": "node scripts/analyze-dependencies.js --validate-only",
-    "test:benchmark": "node scripts/benchmark-tests.js",
-    "test:validate-optimizations": "node scripts/validate-test-optimizations.js"
+    "validate:deps": "node scripts/analyze-dependencies.js --validate-only"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

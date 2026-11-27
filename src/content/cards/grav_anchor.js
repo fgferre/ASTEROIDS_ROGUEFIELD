@@ -44,6 +44,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-idle-guard',
+          to: 'player',
+          lands: { idleDamageReduction: 'damageReduction' },
           payload: { damageReduction: 0.2 }, // proposta 20/10
         },
       ],
@@ -54,6 +56,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-idle-guard',
+          to: 'player',
+          lands: { idleDamageReduction: 'damageReduction' },
           payload: { damageReduction: 0.35 }, // proposta 20/10
         },
       ],
@@ -64,6 +68,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-idle-guard',
+          to: 'player',
+          lands: { idleDamageReduction: 'damageReduction' },
           payload: { damageReduction: 0.5 }, // proposta 20/10
         },
       ],

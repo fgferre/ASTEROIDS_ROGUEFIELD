@@ -186,6 +186,17 @@ describe('content scene on a live run', () => {
     expect(services.player.controlScheme).toBe('modern');
   });
 
+  it('applies a fallback card from cards= once and returns', () => {
+    const applyUpgrade = vi.spyOn(game.services.progression, 'applyUpgrade');
+    play('hulls', getItem('hulls', 'default-hull'), {
+      cards: [{ id: 'hull_patch', level: 1 }],
+    });
+
+    expect(
+      applyUpgrade.mock.calls.filter(([id]) => id === 'hull_patch')
+    ).toHaveLength(1);
+  });
+
   describe.each(idsOf('stages'))('stage %s', (id, item) => {
     it('plays the layer, its spawner running', () => {
       const { services } = play('stages', item);

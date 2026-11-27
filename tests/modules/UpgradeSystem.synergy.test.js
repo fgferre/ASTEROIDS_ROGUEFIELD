@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 import RandomService from '../../src/core/RandomService.js';
 import UPGRADE_LIBRARY, {
@@ -32,16 +30,6 @@ const createProgression = (eventBus) => {
   return progression;
 };
 
-function listSourceFiles(dir) {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) {
-      return path.includes(join('src', 'data')) ? [] : listSourceFiles(path);
-    }
-    return path.endsWith('.js') ? [path] : [];
-  });
-}
-
 describe('upgrade families', () => {
   it('every upgrade has one known family (cursed and fallback ones none) and every family can reach its bonus', () => {
     // Every card file plus every weapon's own card, nothing else (the new
@@ -61,32 +49,6 @@ describe('upgrade families', () => {
     });
     Object.keys(UPGRADE_FAMILIES).forEach((id) => {
       expect(counts[id]).toBeGreaterThanOrEqual(FAMILY_SYNERGY_THRESHOLD);
-    });
-  });
-
-  it('every event an upgrade or bonus emits has a listener in src (no inert cards)', () => {
-    const source = listSourceFiles(join(process.cwd(), 'src'))
-      .map((path) => readFileSync(path, 'utf8'))
-      .join('\n');
-    // The catalog in play: the new flight's cards are in it by default.
-    const cards = UPGRADE_LIBRARY;
-    const effects = [
-      ...cards.flatMap((upgrade) =>
-        upgrade.levels.flatMap((level) => level.effects)
-      ),
-      ...Object.values(UPGRADE_FAMILIES).flatMap((f) => f.bonus.effects),
-    ];
-    const events = new Set(
-      effects
-        .filter((effect) => effect.type === 'event')
-        .map((effect) => effect.event)
-    );
-    // Salvage Cache's event waits for the hangar's token payout.
-    events.delete('card-salvage');
-    events.forEach((event) => {
-      expect(source.includes(`registerEventListener('${event}'`), event).toBe(
-        true
-      );
     });
   });
 

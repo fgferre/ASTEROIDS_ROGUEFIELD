@@ -43,6 +43,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-tow-pulse',
+          to: 'xp-orbs',
           payload: { interval: 20 }, // proposta 20/10
         },
       ],
@@ -53,6 +54,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-tow-pulse',
+          to: 'xp-orbs',
           payload: { interval: 15 }, // proposta 20/10
         },
       ],
@@ -63,6 +65,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-tow-pulse',
+          to: 'xp-orbs',
           payload: { interval: 10 }, // proposta 20/10
         },
       ],

@@ -41,6 +41,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-reactor-bleed',
+          to: 'player',
+          lands: { idleDamageMultiplier: 'idleDamageMultiplier' },
           payload: { idleDamageMultiplier: 1.3 }, // proposta 20/10
         },
       ],
@@ -51,6 +53,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-reactor-bleed',
+          to: 'player',
+          lands: { idleDamageMultiplier: 'idleDamageMultiplier' },
           payload: { idleDamageMultiplier: 1.6 }, // proposta 20/10
         },
       ],
@@ -61,6 +65,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-reactor-bleed',
+          to: 'player',
+          lands: { idleDamageMultiplier: 'idleDamageMultiplier' },
           payload: { idleDamageMultiplier: 2 }, // proposta 20/10
         },
       ],

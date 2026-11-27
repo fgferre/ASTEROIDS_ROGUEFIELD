@@ -43,6 +43,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-static-shell',
+          to: 'combat',
+          lands: 'cards.cardEffects.staticShell',
           payload: { radius: 90, damage: 20 },
         },
       ],
@@ -53,6 +55,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-static-shell',
+          to: 'combat',
+          lands: 'cards.cardEffects.staticShell',
           payload: { radius: 90, damage: 40 },
         },
       ],
@@ -63,6 +67,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-static-shell',
+          to: 'combat',
+          lands: 'cards.cardEffects.staticShell',
           payload: { radius: 90, damage: 60 },
         },
       ],

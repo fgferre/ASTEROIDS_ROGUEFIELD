@@ -23,11 +23,7 @@ import {
   StepInterpolator,
   interpolationDisabledByUrl,
 } from '../../core/interpolation.js';
-import {
-  AutoQuality,
-  QUALITY_PRESETS,
-  qualityFromUrl,
-} from '../../core/qualityPresets.js';
+import { AutoQuality, qualityFromUrl } from '../../core/qualityPresets.js';
 import { getViewport } from '../../core/viewport.js';
 import { BiomeTransition } from '../../data/biomes.js';
 import { resolveService } from '../../core/serviceUtils.js';
@@ -35,7 +31,7 @@ import { PALETTE } from '../../data/constants/palette.js';
 import { HALF_H, HALF_W } from './batches.js';
 import { CameraRig } from './cameraRig.js';
 import { EndingScene, isRevelationBeat } from './endingScene.js';
-import { VIEW_KINDS, markShadowCasters } from './enemyMirror.js';
+import { markShadowCasters } from './enemyMirror.js';
 import {
   mirrorEffects,
   mirrorPickups,
@@ -61,10 +57,12 @@ import {
   mirrorOverlays,
   WardLinks,
 } from './overlayMirror.js';
+import { SHIP_MIN_CASTER } from './playerMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, SCENE_FOV, setupThree } from './sceneSetup.js';
 import { StoryScene } from './storyScene.js';
 import { TravelScene } from './travelScene.js';
+import { warmUp } from './warmUp.js';
 
 // proposta 18/10: Settings > Bloom Intensity scales the preset's strength
 // (Bloom off is the toggle, which drops the pass).
@@ -81,9 +79,6 @@ const DASH_ZOOM_PULSE = 0.94;
 const DASH_ZOOM_PULSE_SECONDS = 0.3;
 const BRAKE_ZOOM_PULSE = 1.04;
 const BRAKE_ZOOM_PULSE_SECONDS = 0.25;
-// The ship's hull panels cast; its turret, nozzles and canopy (radius under
-// this, world units) only receive.
-const SHIP_MIN_CASTER = 5;
 // Point sizes of the star layers are authored for a frame this tall.
 const STAR_FRAME_HEIGHT = 900;
 // The journey's rig holds the intro's first pose under its own camera.
@@ -773,96 +768,9 @@ class Renderer3D extends BaseSystem {
 
   // --- warm-up ---------------------------------------------------------------
 
-  /**
-   * Loading screen (app.js): builds the scene (maps baked) and compiles every
-   * program a run can draw with — each enemy view kind in all its looks and
-   * burning, both hulls, the bosses' danger looks, then one frame of everything through the composer
-   * (post passes, texture and buffer uploads). One chunk per task, so the
-   * bar repaints; `onProgress(done)` after each, 0..1.
-   */
-  async warmUp(onProgress) {
-    const compile = () => this.compileScene();
-    const steps = [
-      () => this.ready(),
-      () => this.three.player.warm(this.cachedPlayer, compile),
-      ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
-      () => this.three.enemies.kit.warmLooks(compile),
-      () => this.drawEverything(),
-      // The story's freighter (seconds): every campaign launch tells it.
-      () => this.warmStory(),
-      // The ending's last image, on the story's Wake (seeded: three names
-      // programs with Math.random).
-      () =>
-        this.seeded(() =>
-          this.ending.warm(compile, this.graphics.postProcessing)
-        ),
-      // The ending's beats at home, in the story's scene.
-      () => this.seeded(() => this.ending.warmHome(this.three.camera)),
-    ];
-    for (let i = 0; i < steps.length; i += 1) {
-      if (!this.failed) steps[i]();
-      onProgress((i + 1) / steps.length);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-  }
-
-  // Programs for the scene's materials (pooled views included) as the
-  // frame draws them: into the composer's target, or the screen without it.
-  // Once per program variant the presets use (shadows on/off, surface maps
-  // on/off), the current preset's last: a quality step in a fight then finds
-  // its programs built (compiling them there froze a frame 150 ms, seconds
-  // on a cold shader cache). Programs keep the uniforms of their last build.
-  compileScene() {
-    const q = this.quality.settings;
-    const variants = new Map();
-    Object.values(QUALITY_PRESETS).forEach((p) =>
-      variants.set(`${p.shadows > 0}/${p.surfaceMaps}`, p)
-    );
-    variants.delete(`${q.shadows > 0}/${q.surfaceMaps}`);
-    [...variants.values(), q].forEach((p) => {
-      this.compileVariant(p.shadows > 0, p.surfaceMaps);
-    });
-  }
-
-  compileVariant(shadows, surfaceMaps) {
-    const t = this.three;
-    t.renderer.shadowMap.enabled = shadows;
-    t.key.castShadow = shadows;
-    t.enemies.setSurfaceMaps(surfaceMaps);
-    t.player.setSurfaceMaps(surfaceMaps);
-    markShadowCasters(t.player.group, SHIP_MIN_CASTER);
-    t.renderer.setRenderTarget(
-      this.graphics.postProcessing ? t.composer.readBuffer : null
-    );
-    t.renderer.compile(t.scene, t.camera);
-    t.renderer.setRenderTarget(null);
-    t.renderer.compile(t.overlay, t.camera);
-  }
-
-  // One frame with every object shown and unculled (lights as they are, so
-  // the light count programs are keyed on stays the run's) and every pass on.
-  drawEverything() {
-    const t = this.three;
-    const saved = [];
-    t.scene.traverse((object) => {
-      if (object.isLight) return;
-      saved.push(object, object.visible, object.frustumCulled);
-      object.visible = true;
-      object.frustumCulled = false;
-    });
-    t.bloomPass.enabled = true;
-    t.smaaPass.enabled = true;
-    t.impactPass.enabled = true;
-    // Seeded: the shadow pass names its depth material with a Math.random
-    // UUID the first time it draws.
-    this.seeded(() => t.composer.render(0));
-    t.renderer.render(t.overlay, t.camera);
-    for (let i = 0; i < saved.length; i += 3) {
-      saved[i].visible = saved[i + 1];
-      saved[i].frustumCulled = saved[i + 2];
-    }
-    t.impactPass.enabled = false;
-    this.syncPasses();
+  /** Loading screen (app.js): warmUp.js. */
+  warmUp(onProgress) {
+    return warmUp(this, onProgress);
   }
 
   // --- frame -----------------------------------------------------------------

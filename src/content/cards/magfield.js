@@ -45,6 +45,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-magnetism',
+          to: 'player',
           payload: { multiplier: 1.4 },
         },
       ],
@@ -61,6 +62,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-magnetism',
+          to: 'player',
           payload: { multiplier: 1.25 },
         },
       ],
@@ -77,6 +79,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-magnetism',
+          to: 'player',
           payload: { multiplier: 1.15 },
         },
       ],
