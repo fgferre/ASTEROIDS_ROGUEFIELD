@@ -7,6 +7,7 @@
 
 import { colorOf } from '../batches.js';
 import { SHINE } from '../hullModel.js';
+import { writeOwnAlpha } from '../ownAlpha.js';
 import { RING, RING_LOOK } from './ringShape.js';
 
 // The victory epilogue's "wake" (FieldBackdrop.setWake): the seams, conduits,
@@ -83,7 +84,7 @@ export function ringMaterial(THREE) {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>${RING_VERTEX_HEAD}`)
       .replace('#include <fog_vertex>', `#include <fog_vertex>${RING_VERTEX}`);
-    shader.fragmentShader = shader.fragmentShader
+    shader.fragmentShader = writeOwnAlpha(THREE, shader.fragmentShader)
       .replace('#include <common>', `#include <common>${RING_FRAGMENT_HEAD}`)
       .replace(
         '#include <color_fragment>',
