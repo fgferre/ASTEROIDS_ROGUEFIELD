@@ -82,12 +82,13 @@ export function openingShotFromUrl() {
 // How much the frame's edges darken (the game's soft vignette, NORTE §2).
 const VIGNETTE = 0.5;
 
-// Linear → sRGB after the bloom, as the game's composer ends.
+// Three's ACES and linear → sRGB after the bloom, as the game's composer ends.
 const OUTPUT_SHADER = {
   uniforms: {
     tDiffuse: { value: null },
     uVignette: { value: 0 },
     uAspect: { value: 1 },
+    toneMappingExposure: { value: 1 },
   },
   vertexShader: `
 varying vec2 vUv;
@@ -96,6 +97,7 @@ void main() {
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`,
   fragmentShader: `
+#include <tonemapping_pars_fragment>
 uniform sampler2D tDiffuse;
 uniform float uVignette;
 uniform float uAspect;
@@ -103,7 +105,8 @@ varying vec2 vUv;
 void main() {
   vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
   float edge = smoothstep(0.35, 1.1, length(p));
-  vec3 color = texture2D(tDiffuse, vUv).rgb * (1.0 - uVignette * edge);
+  vec3 color = ACESFilmicToneMapping(texture2D(tDiffuse, vUv).rgb)
+    * (1.0 - uVignette * edge);
   gl_FragColor = sRGBTransferOETF(vec4(color, 1.0));
 }`,
 };
@@ -161,8 +164,8 @@ export function createOpeningScene(menu, random, shotName = null) {
     space.invalidateBakes()
   );
 
-  // The post chain: the world in linear HDR, the game's bloom, sRGB out,
-  // then the menu's scene over it and the edges smoothed.
+  // The post chain: the world in linear HDR, the game's bloom, three's ACES
+  // and sRGB out, then the menu's scene over it and the edges smoothed.
   const size = renderer.getDrawingBufferSize(new THREE.Vector2());
   const target = new THREE.WebGLRenderTarget(size.x, size.y, {
     minFilter: THREE.LinearFilter,
@@ -175,33 +178,21 @@ export function createOpeningScene(menu, random, shotName = null) {
   // the renderer's, the device's, and would draw the chain at twice the
   // screen's width and height.
   composer.setPixelRatio(1);
-  const worldPass = new THREE.RenderPass(world, camera);
-  const renderWorld = worldPass.render.bind(worldPass);
-  worldPass.render = (...args) => {
-    const toneMapping = renderer.toneMapping;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderWorld(...args);
-    renderer.toneMapping = toneMapping;
-  };
-  composer.addPass(worldPass);
+  composer.addPass(new THREE.RenderPass(world, camera));
   const bloomPass = new THREE.UnrealBloomPass(
     new THREE.Vector2(size.x, size.y),
     BLOOM.strength,
     BLOOM.radius,
     BLOOM.threshold
   );
-  [
-    bloomPass.renderTargetBright,
-    ...bloomPass.renderTargetsHorizontal,
-    ...bloomPass.renderTargetsVertical,
-  ].forEach((rt) => {
-    rt.texture.type = THREE.HalfFloatType;
-    rt.depthBuffer = false;
-  });
   composer.addPass(bloomPass);
   const output = new THREE.ShaderPass(OUTPUT_SHADER);
   output.uniforms.uVignette.value = VIGNETTE;
   output.uniforms.uAspect.value = size.x / size.y;
+  // The world's exposure is the menu renderer's (it tone-maps nothing itself).
+  Object.defineProperty(output.uniforms.toneMappingExposure, 'value', {
+    get: () => renderer.toneMappingExposure,
+  });
   composer.addPass(output);
   const overlayPass = new THREE.RenderPass(overlayScene, overlayCamera);
   overlayPass.clear = false;
