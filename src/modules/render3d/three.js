@@ -53,6 +53,31 @@ core.ShaderChunk.lights_pars_begin = legacyLights(
   core.ShaderChunk.lights_pars_begin
 );
 
+// An opaque material writes its own alpha, as in r128: three now forces it
+// to 1, decided when the program is built, and the game fades the
+// Ring and the places' surfaces by turning `transparent` on as they go (no
+// rebuild, which would compile mid-play): built opaque, a Ring fading to
+// nothing stood whole on the journey's arrivals.
+const opaqueChunk = core.ShaderChunk.opaque_fragment.replace(
+  /#ifdef OPAQUE\s*diffuseColor\.a = 1\.0;\s*#endif/,
+  ''
+);
+if (opaqueChunk === core.ShaderChunk.opaque_fragment) {
+  throw new Error('three.js: the opaque chunk changed');
+}
+core.ShaderChunk.opaque_fragment = opaqueChunk;
+
+// An instanced mesh is never culled, as in r128: three now culls it by one
+// sphere round all its instances, worked out once and never again as they
+// move, and the backdrop's far fragments, which grow in and out with each
+// place, went missing at the edge of the ending's views.
+class InstancedMesh extends core.InstancedMesh {
+  constructor(...args) {
+    super(...args);
+    this.frustumCulled = false;
+  }
+}
+
 // Since r163 a material's envMapIntensity scales only its own envMap, and
 // the scene's sky (Scene.environment) takes Scene.environmentIntensity. The
 // game's materials set their own strength against the scene's sky, as r128
@@ -62,6 +87,60 @@ core.MeshStandardMaterial.prototype.onBeforeRender = function (_r, scene) {
     scene.environmentIntensity = this.envMapIntensity;
   }
 };
+
+// r128 ordered what it draws by each object's origin (see-through ones back
+// to front, solid ones front to back within a material); three now uses the
+// centre of the geometry's bounding sphere, which for an arc or a merged set
+// lies far from the origin, and flips pairs the game layered by that order:
+// a dark band drawn over its own lit rim, halving it, and the Ring's chunks,
+// whose pieces meet at the seams, showing a lamp r128 drew the hull over.
+// The renderers sort as r128 did: its depth key, projected the same way.
+const projected = new core.Vector3();
+const screen = new core.Matrix4();
+class WebGLRenderer extends core.WebGLRenderer {
+  constructor(...args) {
+    super(...args);
+    const depths = new Map();
+    let camera = null;
+    const render = this.render;
+    this.render = (scene, view) => {
+      camera = view;
+      depths.clear();
+      return render.call(this, scene, view);
+    };
+    const depth = (object) => {
+      if (depths.size === 0) {
+        screen.multiplyMatrices(
+          camera.projectionMatrix,
+          camera.matrixWorldInverse
+        );
+      }
+      let z = depths.get(object);
+      if (z === undefined) {
+        z = projected
+          .setFromMatrixPosition(object.matrixWorld)
+          .applyMatrix4(screen).z;
+        depths.set(object, z);
+      }
+      return z;
+    };
+    this.setOpaqueSort(
+      (a, b) =>
+        a.groupOrder - b.groupOrder ||
+        a.renderOrder - b.renderOrder ||
+        a.material.id - b.material.id ||
+        depth(a.object) - depth(b.object) ||
+        a.id - b.id
+    );
+    this.setTransparentSort(
+      (a, b) =>
+        a.groupOrder - b.groupOrder ||
+        a.renderOrder - b.renderOrder ||
+        depth(b.object) - depth(a.object) ||
+        a.id - b.id
+    );
+  }
+}
 
 // Since r154 three tone-maps only what it draws to the screen (or to a WebXR
 // target). The composers draw the scene into their targets and its materials
@@ -112,6 +191,9 @@ class SMAAPass extends EdgePass {
 // The bloom's blur and composite as r128 to r178 drew them, which the game's
 // glows are tuned on: r187 doubled the kernels, narrowed the Gaussian to a
 // third of them and tripled the composite, so every halo came out tighter.
+// Its bright pass weighs light as r128's did (0.299, 0.587, 0.114): three's
+// luminance since (0.2126, 0.7152, 0.0722) kept a strong red or blue lamp
+// under the threshold and its halo went out, and let more greens through.
 const QUAD_VERTEX = `varying vec2 vUv;
 void main() {
   vUv = uv;
@@ -195,6 +277,15 @@ class UnrealBloomPass extends BloomPass {
     const own = this.compositeMaterial;
     this.compositeMaterial = compositeMaterial(this.nMips, own.uniforms);
     own.dispose();
+    const bright = this.materialHighPassFilter;
+    const weighed = bright.fragmentShader.replace(
+      'float v = luminance( texel.xyz );',
+      'float v = dot( texel.xyz, vec3( 0.299, 0.587, 0.114 ) );'
+    );
+    if (weighed === bright.fragmentShader) {
+      throw new Error('three.js: the bloom bright pass changed');
+    }
+    bright.fragmentShader = weighed;
   }
 
   render(renderer, ...rest) {
@@ -217,6 +308,8 @@ class UnrealBloomPass extends BloomPass {
 
 const THREE = {
   ...core,
+  WebGLRenderer,
+  InstancedMesh,
   EffectComposer,
   RenderPass,
   ShaderPass,
