@@ -53,6 +53,31 @@ core.ShaderChunk.lights_pars_begin = legacyLights(
   core.ShaderChunk.lights_pars_begin
 );
 
+// An opaque material writes its own alpha, as in r128: three now forces it
+// to 1, decided when the program is built, and the game fades the
+// Ring and the places' surfaces by turning `transparent` on as they go (no
+// rebuild, which would compile mid-play): built opaque, a Ring fading to
+// nothing stood whole on the journey's arrivals.
+const opaqueChunk = core.ShaderChunk.opaque_fragment.replace(
+  /#ifdef OPAQUE\s*diffuseColor\.a = 1\.0;\s*#endif/,
+  ''
+);
+if (opaqueChunk === core.ShaderChunk.opaque_fragment) {
+  throw new Error('three.js: the opaque chunk changed');
+}
+core.ShaderChunk.opaque_fragment = opaqueChunk;
+
+// An instanced mesh is never culled, as in r128: three now culls it by one
+// sphere round all its instances, worked out once and never again as they
+// move, and the backdrop's far fragments, which grow in and out with each
+// place, went missing at the edge of the ending's views.
+class InstancedMesh extends core.InstancedMesh {
+  constructor(...args) {
+    super(...args);
+    this.frustumCulled = false;
+  }
+}
+
 // Since r163 a material's envMapIntensity scales only its own envMap, and
 // the scene's sky (Scene.environment) takes Scene.environmentIntensity. The
 // game's materials set their own strength against the scene's sky, as r128
@@ -284,6 +309,7 @@ class UnrealBloomPass extends BloomPass {
 const THREE = {
   ...core,
   WebGLRenderer,
+  InstancedMesh,
   EffectComposer,
   RenderPass,
   ShaderPass,
