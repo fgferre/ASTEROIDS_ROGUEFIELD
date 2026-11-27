@@ -8,7 +8,7 @@
 // swaps MathUtils on it.
 
 import * as core from 'three';
-import { EffectComposer as Composer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { UnrealBloomPass as BloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -102,30 +102,6 @@ class WebGLRenderer extends core.WebGLRenderer {
   constructor(...args) {
     super(...args);
     forgetDeadHandles(this.getContext(), this.domElement);
-  }
-}
-
-// Since r154 three tone-maps only what it draws to the screen (or to a WebXR
-// target). The composers draw the scene into their targets and its materials
-// expect ACES there, as r128 gave it, a glow with toneMapped false left out
-// (one full-screen pass after the scene could not leave it out): their two
-// targets count as an output, in linear.
-function asOutput(target) {
-  target.isXRRenderTarget = true;
-  target.texture.colorSpace = core.LinearSRGBColorSpace;
-}
-
-class EffectComposer extends Composer {
-  constructor(renderer, target) {
-    super(renderer, target);
-    asOutput(this.renderTarget1);
-    asOutput(this.renderTarget2);
-  }
-
-  reset(target) {
-    super.reset(target);
-    asOutput(this.renderTarget1);
-    asOutput(this.renderTarget2);
   }
 }
 

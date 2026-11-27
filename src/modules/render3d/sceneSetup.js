@@ -41,8 +41,8 @@ export const FOV = 20;
 export const SCENE_FOV = 38;
 const KEY_ELEVATION = (40 * Math.PI) / 180;
 export const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
-// proposta 17/10: ACES on lit surfaces, sRGB on the way out (emissives are
-// toneMapped:false, so they stay hot enough to bloom).
+// The scene draws in linear HDR and is bloomed there; three's ACES at this
+// exposure and sRGB come once, at the composer's end (toneAtEnd).
 const EXPOSURE = 1;
 const WARDEN_LIGHT_DISTANCE = 420;
 const MAX_SHOCKWAVES = 25;
@@ -61,14 +61,16 @@ export const KEY_SHADOW = {
   normalBias: 0.6,
 };
 
-// Last linear → sRGB step of the composer (the passes work in linear; the
-// renderer's outputEncoding only applies when drawing to the screen), on
-// frames the impact pass, which ends in the same step, does not run.
+// Last step of the composer, the tone curve (SCENE_READ) and linear → sRGB
+// (the passes work in linear HDR; three tone-maps and encodes only what it
+// draws to the screen), on frames the impact pass, which ends in the same
+// step, does not run.
 const OUTPUT_SHADER = {
   uniforms: {
     tDiffuse: { value: null },
     tBloom: { value: null },
     uBloom: { value: 0 },
+    toneMappingExposure: { value: 1 },
   },
   vertexShader: `
 varying vec2 vUv;
@@ -159,6 +161,20 @@ function foldBloom(bloomPass, passes) {
     uniforms.tBloom.value = bloomPass.renderTargetsHorizontal[0].texture;
     Object.defineProperty(uniforms.uBloom, 'value', {
       get: () => (bloomPass.enabled ? 1 : 0),
+    });
+  });
+}
+
+// The composer's end steps (`passes`) tone-map with three's ACES (SCENE_READ)
+// at the renderer's exposure, read every frame: the ending sets it per shot,
+// and what three draws to the screen itself (the travel veil) gets the same.
+// Left out of three's own tone mapping, which would define the curve a
+// second time in one that draws to the screen (SMAA off).
+function toneAtEnd(renderer, passes) {
+  passes.forEach(({ material, uniforms }) => {
+    material.toneMapped = false;
+    Object.defineProperty(uniforms.toneMappingExposure, 'value', {
+      get: () => renderer.toneMappingExposure,
     });
   });
 }
@@ -294,6 +310,7 @@ export function setupThree(seeded) {
   });
   composer.addPass(outputPass);
   foldBloom(bloomPass, [impactPass, outputPass]);
+  toneAtEnd(renderer, [impactPass, outputPass]);
   const smaaPass = new THREE.SMAAPass();
   // its weights read only the edges' red and green: two bytes a pixel, not
   // four (8-bit as in r128; three makes the target half-float since r158)
