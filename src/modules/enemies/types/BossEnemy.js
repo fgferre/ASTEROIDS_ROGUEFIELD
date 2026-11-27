@@ -447,8 +447,9 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
-    const now = Date.now();
-    if (!this._lastUpdateLog || now - this._lastUpdateLog > 2000) {
+    // Read only while the development log listens (every frame).
+    const now = GameDebugLogger.isEnabled && Date.now();
+    if (now && (!this._lastUpdateLog || now - this._lastUpdateLog > 2000)) {
       const velocity = {
         vx: Number.isFinite(this.vx) ? Number(this.vx.toFixed(2)) : 0,
         vy: Number.isFinite(this.vy) ? Number(this.vy.toFixed(2)) : 0,

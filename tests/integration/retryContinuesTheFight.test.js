@@ -638,6 +638,8 @@ describe('a Retry continues the fight where it stopped', () => {
     expectTheFightGoesOn('field', () => fight('field', onTheField));
   });
 
+  // Two whole layers played: 4 s alone, but over 20 s when the machine runs
+  // several suites at once, so this case has its own, generous limit.
   it('a layer played with cards, killed and retried', () => {
     const first = playedLayer();
     expect(first.kills).toBeGreaterThan(0);
@@ -646,5 +648,5 @@ describe('a Retry continues the fight where it stopped', () => {
     expect(first.shared).toEqual([]);
     expect(first.lost.join('\n')).toBe('');
     expect(differences(first.end, playedLayer().end).join('\n')).toBe('');
-  });
+  }, 90_000);
 });

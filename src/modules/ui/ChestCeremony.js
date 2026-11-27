@@ -19,6 +19,7 @@ import {
   cardState,
   familyColor,
 } from './upgradeCard.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 // A chest of this many cards is the Warden's jackpot.
 const JACKPOT_CARDS = 5;
@@ -51,6 +52,15 @@ export class ChestCeremony {
     this.collecting = [];
     this.queue = [];
     this.current = null;
+    // Up, on the input layer stack: the confirm continues (no keys of its
+    // own; nothing for the pad to move in, its A is the confirm); the pause
+    // key still goes to the game.
+    this.inputLayer = {
+      name: 'chest',
+      element: null,
+      passes: ['pause'],
+      onConfirm: () => this.continue(),
+    };
   }
 
   bindControls() {
@@ -109,11 +119,14 @@ export class ChestCeremony {
       timer: null,
       lockedUntil: Date.now() + SCREEN_INPUT_LOCKOUT_MS,
     };
+    inputLayers.push(this.inputLayer);
     continueBtn.classList.remove('is-ready');
     this.showScreen('chest', { overlay: true, show: true });
     liftHudInstruments(screen);
     // The screen holds the focus: Enter is the confirm key, not a click.
-    screen.focus({ preventScroll: true });
+    if (!inputLayers.covered(this.inputLayer)) {
+      screen.focus({ preventScroll: true });
+    }
     if (this.prefersReducedMotion()) this.revealAll();
     else this.revealNext();
   }
@@ -155,6 +168,7 @@ export class ChestCeremony {
   hide() {
     clearTimeout(this.current?.timer);
     this.current = null;
+    inputLayers.remove(this.inputLayer);
     this.showScreen('chest', { overlay: true, show: false, emitEvent: false });
   }
 

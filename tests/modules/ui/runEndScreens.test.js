@@ -98,6 +98,7 @@ describe('Run end screens', () => {
           quitBtn,
           hints,
         },
+        victory: {},
       },
       showScreen: () => {},
       progression: () => null,

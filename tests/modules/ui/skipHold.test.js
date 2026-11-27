@@ -6,9 +6,11 @@ import {
   padFamily,
   setSkipPad,
 } from '../../../src/modules/ui/skipHold.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 
 // Just enough page for the hint; window capture listeners run in the order
-// they were added, as in the browser.
+// they were added, as in the browser: the input layer stack's first, which
+// hands each key to the hold's layer.
 function node() {
   const classes = new Set();
   return {
@@ -37,15 +39,9 @@ describe('holding the skip key', () => {
     buttons: Array.from({ length: 17 }, () => ({ pressed: false })),
   };
   const fire = (type, code = 'Space', repeat = false) => {
-    const event = {
-      type,
-      code,
-      repeat,
-      preventDefault() {},
-      stopImmediatePropagation: vi.fn(),
-    };
+    const event = { type, code, repeat, preventDefault() {} };
     (listeners.get(type) ?? []).forEach((fn) => fn(event));
-    return event.stopImmediatePropagation.mock.calls.length > 0;
+    return inputLayers.took(event);
   };
   const bind = (onSkip = vi.fn(), onNext = vi.fn()) => {
     unbind = listenForHold(onSkip, onNext);
@@ -72,6 +68,7 @@ describe('holding the skip key', () => {
       requestAnimationFrame: (fn) => setTimeout(fn, 16),
       cancelAnimationFrame: (id) => clearTimeout(id),
     });
+    inputLayers.install(null);
     pad.buttons[PAD_BUTTON.START].pressed = false;
     setSkipPad(() => pad);
   });
@@ -173,12 +170,12 @@ describe('holding the skip key', () => {
     ).toBe('playstation');
   });
 
-  it("swallows a held key's repeats after the unbind until it is released", () => {
+  it('takes every key while bound; unbound, it leaves the stack and the keys go on to what is under it', () => {
     bind(() => unbind());
-    fire('keydown');
+    expect(fire('keydown')).toBe(true);
     vi.advanceTimersByTime(HOLD_MS + 50);
-    expect(fire('keydown', 'Space', true)).toBe(true);
+    expect(inputLayers.top()).toBe(null);
+    expect(fire('keydown', 'Space', true)).toBe(false);
     fire('keyup');
-    expect(listeners.get('keydown')).toEqual([]);
   });
 });

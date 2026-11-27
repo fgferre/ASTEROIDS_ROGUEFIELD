@@ -21,6 +21,7 @@ import {
 } from './hangar.js';
 import { isPilotStale } from '../../core/storage.js';
 import { getAllShipModels, getShipModelById } from '../../data/shipModels.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 export class HangarScreen {
   /**
@@ -58,6 +59,19 @@ export class HangarScreen {
     this.hangarState = { isOpen: false, trigger: null };
     this.purchaseLine = null;
     this.tab = 'ship';
+    // Open, on the input layer stack: Escape closes it. The pause key still
+    // goes to the game, which ignores it on the menu.
+    this.inputLayer = {
+      name: 'hangar',
+      element: refs.overlay,
+      passes: ['pause'],
+      onKey: (event) => {
+        if (event.key !== 'Escape') return false;
+        event.preventDefault();
+        this.closeHangar();
+        return false;
+      },
+    };
   }
 
   // The run's transmission banner is hidden in the menu: the Ring's line
@@ -215,12 +229,6 @@ export class HangarScreen {
         this.emit('hangar-hull-hovered', { hullId: null });
       })
     );
-    document.addEventListener('keydown', (event) => {
-      if (this.hangarState.isOpen && event.key === 'Escape') {
-        event.preventDefault();
-        this.closeHangar();
-      }
-    });
   }
 
   renderHangar() {
@@ -285,6 +293,7 @@ export class HangarScreen {
     this.renderHangar();
     refs.hullLock.hidden = true;
     this.hangarState = { isOpen: true, trigger: document.activeElement };
+    inputLayers.push(this.inputLayer);
     this.showScreen('hangar', { overlay: true, show: true });
     refs.overlay.setAttribute('aria-hidden', 'false');
     this.announceVisibility(true, { source: 'menu' });
@@ -301,5 +310,6 @@ export class HangarScreen {
     this.refreshShipSelector();
     this.hangarState.trigger?.focus?.({ preventScroll: true });
     this.hangarState = { isOpen: false, trigger: null };
+    inputLayers.remove(this.inputLayer);
   }
 }

@@ -22,6 +22,7 @@ import {
   weaponOfCard,
 } from './upgradeCard.js';
 import { asArray } from '../upgradeCatalog.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 // A card's detail arrow on the phone, held sideways (cardScreens.css).
 const DETAIL_ARROW =
@@ -68,7 +69,7 @@ export function liftHudInstruments(screen) {
 
 export class LevelUpScreen {
   /**
-   * `refs`: the screen's nodes { container, text, level, picks, rerollBtn, banishBtn, banishHint, holdBtn, holdHint, headStart, equipBtn, cancelBtn, run }.
+   * `refs`: the screen's nodes { screen, container, text, level, picks, rerollBtn, banishBtn, banishHint, holdBtn, holdHint, headStart, equipBtn, cancelBtn, run }.
    * `progression()`: the progression service (offers, rerolls, banishes, holds, picks), or none.
    * `headStart()`: the session's head start (session/headStart.js).
    * `combat()`: the combat service (the held weapon a card names).
@@ -116,6 +117,16 @@ export class LevelUpScreen {
       holdMode: false,
       exitTimer: null,
     };
+    // Up, on the input layer stack: its keys, the pad's X, Y, LB, RB and B,
+    // the confirm; the pause key still goes to the game.
+    this.inputLayer = {
+      name: 'levelup',
+      element: refs.screen,
+      passes: ['pause'],
+      onKey: (event) => this.handleLevelUpKey(event),
+      onPad: (action) => this.handleGamepadNav(action),
+      onConfirm: () => this.handleLevelUpConfirm(),
+    };
   }
 
   bindLevelUpControls() {
@@ -125,28 +136,25 @@ export class LevelUpScreen {
     holdBtn?.addEventListener('click', () => this.toggleHoldMode());
     equipBtn?.addEventListener('click', () => this.equipForMe());
     cancelBtn?.addEventListener('click', () => this.backOut());
+  }
 
-    // A card's key badge (1, 2, 3) picks it as a click on it would.
-    document.addEventListener('keydown', (event) => {
-      if (!this.levelUpState.isVisible || event.repeat) {
-        return;
-      }
-      const card = this.levelUpState.buttons[Number(event.key) - 1];
-      if (card) {
-        event.preventDefault();
-        this.selectUpgrade(card.dataset.upgradeId);
-      } else if (event.code === 'KeyR') {
-        this.rerollLevelUpOptions();
-      } else if (event.code === 'KeyB') {
-        this.toggleBanishMode();
-      } else if (event.code === 'KeyH') {
-        this.toggleHoldMode();
-      } else if (event.code === 'KeyQ') {
-        this.equipForMe();
-      } else if (event.key === 'Escape') {
-        this.backOut();
-      }
-    });
+  // A key on the cards (their layer). A card's key badge (1, 2, 3) picks it
+  // as a click on it would, and is theirs alone: a flight press bound to it
+  // does not fire in the run it resumes.
+  handleLevelUpKey(event) {
+    if (event.repeat) return false;
+    const card = this.levelUpState.buttons[Number(event.key) - 1];
+    if (card) {
+      event.preventDefault();
+      this.selectUpgrade(card.dataset.upgradeId);
+      return true;
+    }
+    if (event.code === 'KeyR') this.rerollLevelUpOptions();
+    else if (event.code === 'KeyB') this.toggleBanishMode();
+    else if (event.code === 'KeyH') this.toggleHoldMode();
+    else if (event.code === 'KeyQ') this.equipForMe();
+    else if (event.key === 'Escape') this.backOut();
+    return false;
   }
 
   /** A pad press here: reroll, banish, hold (LB), equip for me, or back out. */
@@ -184,6 +192,7 @@ export class LevelUpScreen {
         : null;
 
     this.levelUpState.isVisible = true;
+    inputLayers.push(this.inputLayer);
     this.levelUpState.level = levelValue;
     this.showScreen('levelup', { overlay: true, show: true });
     const screen = document.getElementById('levelup-screen');
@@ -406,8 +415,15 @@ export class LevelUpScreen {
     });
     button.addEventListener('mouseenter', () => {
       this.emit('ui-hover', { source: 'upgrade-selection', index });
-      // Keyboard focus follows: Enter and the highlight name the same card.
-      this.focusLevelUpOption(index);
+    });
+    // Keyboard focus follows the mouse that moves onto a card: Enter and the
+    // highlight name the same card. Only a move: a card that comes under a
+    // resting cursor (Settings closing over it) leaves the highlight where
+    // the pad or the keys put it.
+    button.addEventListener('mousemove', () => {
+      if (this.levelUpState.focusIndex !== index) {
+        this.focusLevelUpOption(index);
+      }
     });
     button.addEventListener('focus', () => this.focusLevelUpOption(index));
 
@@ -434,8 +450,13 @@ export class LevelUpScreen {
     );
   }
 
+  // One pick per offer, by key, confirm or click: once one is taken the
+  // cards are leaving (locked) or gone (with Reduce Motion), and a second
+  // press in the same keystroke (the confirm, then the browser's Enter
+  // default on the focused card) takes nothing; the next offer's cards are
+  // locked as they show.
   selectUpgrade(upgradeId) {
-    if (!upgradeId) {
+    if (!upgradeId || !this.levelUpState.isVisible) {
       return;
     }
 
@@ -523,7 +544,10 @@ export class LevelUpScreen {
       }
       if (idx === safeIndex) {
         button.classList.add('is-focused');
-        if (document.activeElement !== button) {
+        if (
+          document.activeElement !== button &&
+          !inputLayers.covered(this.inputLayer)
+        ) {
           button.focus({ preventScroll: true });
         }
       } else {
@@ -625,8 +649,10 @@ export class LevelUpScreen {
     this.focusLevelUpOption(currentIndex + direction);
   }
 
+  // The move keys and the stick (InputSystem's actions), while the cards
+  // are on top: not under Settings.
   handleLevelUpInputAction(payload = {}) {
-    if (!this.levelUpState.isVisible) {
+    if (inputLayers.layerFor(payload.context?.event) !== this.inputLayer) {
       return;
     }
 
@@ -697,6 +723,7 @@ export class LevelUpScreen {
     this.setBanishMode(false);
     this.setHoldMode(false);
     if (this.levelUpState.isVisible) this.hud()?.previewBuildCard(null);
+    inputLayers.remove(this.inputLayer);
 
     this.levelUpState = {
       isVisible: false,

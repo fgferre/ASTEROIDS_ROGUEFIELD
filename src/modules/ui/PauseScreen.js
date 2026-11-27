@@ -8,10 +8,11 @@
 import { collectBuild, endBuildMarkup, runLocationLine } from './runRecap.js';
 import { runTrayMarkup } from './upgradeCard.js';
 import { FIRST_RUN_MODE } from '../../core/runMode.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 export class PauseScreen {
   /**
-   * `refs`: the overlay's nodes { resumeBtn, settingsBtn, editHudBtn, exitBtn, location, build, tools, seed, run }.
+   * `refs`: the overlay's nodes { container, resumeBtn, settingsBtn, editHudBtn, exitBtn, location, build, tools, seed, run }.
    * `gameOverQuitBtn`: the death recap's Quit, which asks twice too.
    * `emit(name, payload)`: sends ui-hover, toggle-pause, settings-menu-requested, exit-to-menu-requested.
    * `showScreen(name, options)`: shows or hides the pause overlay.
@@ -54,6 +55,14 @@ export class PauseScreen {
     this.quitConfirm = { button: null, label: '', timeoutId: null };
     // The Escape held now disarmed a quit on the pause screen.
     this.escapeDisarms = false;
+    // Paused, on the input layer stack: the pause key (P, Start, Escape)
+    // still goes to the game, and resumes.
+    this.inputLayer = {
+      name: 'pause',
+      element: refs.container,
+      passes: ['pause'],
+      onKey: (event) => this.handlePauseKey(event),
+    };
   }
 
   bindPauseControls() {
@@ -131,22 +140,16 @@ export class PauseScreen {
         }
       });
     }
+  }
 
-    // Escape disarms a quit. On the pause screen that press, and its repeats
-    // while held, stop here: the game would read it as resume.
-    window.addEventListener(
-      'keydown',
-      (event) => {
-        if (event.key !== 'Escape') return;
-        if (!event.repeat) {
-          this.escapeDisarms =
-            this.currentPauseState && Boolean(this.quitConfirm.button);
-        }
-        if (this.escapeDisarms) event.stopImmediatePropagation();
-        this.cancelQuitConfirm();
-      },
-      true
-    );
+  // A key on the paused run (its layer, input/inputLayers.js). Escape disarms
+  // an armed quit, and that press and its repeats while held go no further:
+  // the game would read it as resume. Unarmed, the game resumes.
+  handlePauseKey(event) {
+    if (event.key !== 'Escape') return false;
+    if (!event.repeat) this.escapeDisarms = Boolean(this.quitConfirm.button);
+    this.cancelQuitConfirm();
+    return this.escapeDisarms;
   }
 
   confirmQuit(button) {
@@ -187,6 +190,8 @@ export class PauseScreen {
 
     this.currentPauseState = shouldPause;
     this.showScreen('pause', { overlay: true, show: shouldPause });
+    if (shouldPause) inputLayers.push(this.inputLayer);
+    else inputLayers.remove(this.inputLayer);
 
     const resumeBtn = this.refs.resumeBtn;
     if (shouldPause) {

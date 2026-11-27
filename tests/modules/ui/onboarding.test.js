@@ -471,7 +471,6 @@ describe('Onboarding', () => {
         menu: { tip: node(), hangarTip: node(), hangarBtn: node() },
         hangar: { tip: node() },
       },
-      showMenuTip: UISystem.prototype.showMenuTip,
     };
     const refresh = (open) => UISystem.prototype.refreshMenuTips.call(ui, open);
     const { menu, hangar } = ui.domRefs;

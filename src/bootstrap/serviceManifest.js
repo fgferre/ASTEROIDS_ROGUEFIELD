@@ -28,7 +28,8 @@ export function createServiceManifest(context = {}) {
       name: 'ui',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'settings', 'hangar', 'difficulty'],
+      // 'input' first: it installs the input layer stack the screens use.
+      dependencies: ['event-bus', 'settings', 'hangar', 'difficulty', 'input'],
       factory: ({ resolved, container }) => {
         const serviceResolver = createServiceResolver(container);
         return new UISystem({
