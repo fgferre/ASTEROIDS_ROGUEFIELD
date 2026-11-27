@@ -6038,6 +6038,7 @@ body.touch-play .hud-frame [data-touch-action]::after {
   left: 50%;
   z-index: 150;
   transform: translateX(-50%);
+  width: max-content;
   max-width: calc(100vw - 48px);
   margin: 0;
   padding: 8px 16px;
@@ -6051,6 +6052,13 @@ body.touch-play .hud-frame [data-touch-action]::after {
   text-align: center;
   color: var(--text);
   pointer-events: none;
+}
+
+/* A phone held sideways: two lines between the panel's title and its close button. */
+@media (max-width: 900px) {
+  .hud-editor-notice {
+    max-width: min(calc(100vw - 48px), 460px);
+  }
 }
 
 /* === Door notice (mobileGuard): turn sideways; on a phone in the browser,
