@@ -28,6 +28,7 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 import RandomService from '../../../core/RandomService.js';
+import { captureState, restoreState } from './enemyState.js';
 import { ELITE_AFFIXES } from '../../../data/enemies/affixes.js';
 import {
   absorbFrontalHit,
@@ -515,6 +516,19 @@ export class BaseEnemy {
    */
   addTag(tag) {
     this.tags.add(tag);
+  }
+
+  /** What a Retry brings back of it, copied at the death (enemyState.js). */
+  getSnapshotState() {
+    return captureState(this);
+  }
+
+  /**
+   * Sets getSnapshotState's copy back once it is rebuilt; `findEnemy(id)`
+   * links the enemies it named.
+   */
+  restoreSnapshotState(state, findEnemy) {
+    restoreState(this, state, findEnemy);
   }
 
   /**

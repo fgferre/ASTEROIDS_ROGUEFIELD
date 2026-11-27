@@ -13,23 +13,6 @@ import {
   validateSnapshot,
 } from '../../../utils/StateManager.js';
 
-// A behavior's `kept` fields, copied (lists are lists of numbers or names).
-const keptCopy = (state = {}) =>
-  Object.fromEntries(
-    Object.entries(state).map(([name, value]) => [
-      name,
-      Array.isArray(value) ? [...value] : value,
-    ])
-  );
-
-function keptState(enemy) {
-  const state = {};
-  for (const [behavior] of enemy.steps ?? []) {
-    for (const name of behavior.kept ?? []) state[name] = enemy[name];
-  }
-  return keptCopy(state);
-}
-
 export class EnemySnapshots {
   /**
    * @param {object} kit What a snapshot reads and restores on EnemySystem:
@@ -213,6 +196,7 @@ export class EnemySnapshots {
       visualState: asteroid.visualState
         ? deepClone(asteroid.visualState)
         : null,
+      state: asteroid.getSnapshotState(),
     };
 
     return snapshot;
@@ -243,6 +227,7 @@ export class EnemySnapshots {
       phaseCount: safeNumber(boss.phaseCount, null),
       invulnerable: Boolean(boss.invulnerable),
       invulnerabilityTimer: safeNumber(boss.invulnerabilityTimer, null),
+      state: boss.getSnapshotState(),
     };
   }
 
@@ -279,9 +264,7 @@ export class EnemySnapshots {
         ? enemy.shieldHealth
         : null,
       shieldBroken: Boolean(enemy.shieldBroken),
-      // What its behaviors keep (a behavior's `kept`): a Leech's meal, a
-      // Shade's phase (outside audit 8, verdict A8).
-      kept: keptState(enemy),
+      state: enemy.getSnapshotState(),
     };
   }
 
@@ -395,7 +378,8 @@ export class EnemySnapshots {
       rotationSpeed: safeNumber(snapshot.rotationSpeed, 0),
       currentHealth: safeNumber(snapshot.health, null),
       radius: safeNumber(snapshot.radius, null),
-      randomScope: 'snapshot',
+      // Its streams are set back where they stood with its state.
+      random: new RandomService(0),
       poolId: snapshot.poolId,
       bossKind: snapshot.bossKind || 'prime',
     };
@@ -546,7 +530,9 @@ export class EnemySnapshots {
       elite: snapshot.elite,
       affixes: snapshot.affixes,
       heraldKind: snapshot.heraldKind ?? undefined,
-      randomScope: 'snapshot',
+      // Its streams are set back where they stood with its state; no scope
+      // of the layer is drawn from or opened to rebuild it.
+      random: new RandomService(0),
       poolId: snapshot.poolId,
     };
 
@@ -604,7 +590,6 @@ export class EnemySnapshots {
       enemy.shieldHealth = snapshot.shieldHealth;
       enemy.shieldBroken = Boolean(snapshot.shieldBroken);
     }
-    Object.assign(enemy, keptCopy(snapshot.kept));
     if (snapshot.spawnedBy !== undefined) {
       enemy.spawnedBy = snapshot.spawnedBy;
     }
@@ -704,15 +689,19 @@ export class EnemySnapshots {
         this.reseedRandomScopes({ resetSequences: true });
       }
 
+      // Each enemy rebuilt, with the state it had at the death.
+      const rebuilt = [];
       for (let i = 0; i < asteroidSnapshots.length; i += 1) {
         const restored = this.applyAsteroidSnapshot(asteroidSnapshots[i]);
         if (restored) {
           this.registerActiveEnemy(restored, { skipDuplicateCheck: true });
+          rebuilt.push([restored, asteroidSnapshots[i].state]);
         }
       }
 
       for (let i = 0; i < supportSnapshots.length; i += 1) {
-        this.applySupportEnemySnapshot(supportSnapshots[i]);
+        const restored = this.applySupportEnemySnapshot(supportSnapshots[i]);
+        if (restored) rebuilt.push([restored, supportSnapshots[i].state]);
       }
 
       const restoredBosses = [];
@@ -720,7 +709,14 @@ export class EnemySnapshots {
         const restoredBoss = this.applyBossSnapshot(bossSnapshots[i]);
         if (restoredBoss) {
           restoredBosses.push(restoredBoss);
+          rebuilt.push([restoredBoss, bossSnapshots[i].state]);
         }
+      }
+
+      // Once the whole field is back, so an escort finds its mother.
+      const byId = new Map(rebuilt.map(([enemy]) => [enemy.id, enemy]));
+      for (const [enemy, state] of rebuilt) {
+        if (state) enemy.restoreSnapshotState(state, (id) => byId.get(id));
       }
 
       // After the field: registering its rocks counted them again.

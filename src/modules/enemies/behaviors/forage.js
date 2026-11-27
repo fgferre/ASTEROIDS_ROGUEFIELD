@@ -136,18 +136,6 @@ export default {
     ateEvent: 'string',
     burstEvent: 'string',
   },
-  // What it has eaten comes back with a Retry; init would take the grown
-  // radius for its base.
-  kept: [
-    'baseRadius',
-    'stored',
-    'storedPickups',
-    'eaten',
-    'meals',
-    'healthGain',
-    'full',
-    'digestTimer',
-  ],
   getters: {
     paceScale: (enemy) =>
       enemy.movementValue('maxSpeed') /
