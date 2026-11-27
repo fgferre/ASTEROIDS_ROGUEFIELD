@@ -22,6 +22,7 @@ import {
 import { WEAPON_APEX } from '../../data/weapons.js';
 import { ORB_VALUE } from '../../data/enemies/asteroid-configs.js';
 import { Chests } from './chests.js';
+import { routeCardEffects } from '../cardEffectRoutes.js';
 import { FIRST_RUN_MODE } from '../../core/runMode.js';
 
 const TWO_PI = Math.PI * 2;
@@ -109,9 +110,10 @@ export class PickupSystem extends BaseSystem {
       this.spawnPickup(this.rollKind(), x, y);
     });
 
-    this.registerEventListener('upgrade-lucky-fragment', (data) => {
-      this.rockDropChance = data.chance;
-    });
+    // The card effects routed to the pickups (src/modules/cardEffectRoutes.js).
+    routeCardEffects(this, 'pickups', (event, fn) =>
+      this.registerEventListener(event, fn)
+    );
     this.registerEventListener('progression-reset', () => {
       this.rockDropChance = 0;
     });

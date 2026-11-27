@@ -59,6 +59,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-deflector-shield',
+          to: 'player',
           payload: { level: 1 },
         },
       ],
@@ -69,6 +70,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-deflector-shield',
+          to: 'player',
           payload: { level: 2 },
         },
       ],
@@ -79,6 +81,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-deflector-shield',
+          to: 'player',
           payload: { level: 3 },
         },
       ],
@@ -89,6 +92,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-deflector-shield',
+          to: 'player',
           payload: { level: 4 },
         },
       ],
@@ -99,6 +103,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-deflector-shield',
+          to: 'player',
           payload: { level: 5 },
         },
       ],

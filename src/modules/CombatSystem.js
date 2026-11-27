@@ -6,6 +6,7 @@ import { Projectiles } from './combat/Projectiles.js';
 import { Weapons } from './combat/Weapons.js';
 import { HitResolution } from './combat/HitResolution.js';
 import { CardEffects } from './combat/CardEffects.js';
+import { routeCardEffects } from './cardEffectRoutes.js';
 import { burstFlak } from './combat/beamAndFan.js';
 import { kindledDied } from './combat/fanForms.js';
 import { thermiteDied } from './combat/missileForms.js';
@@ -144,63 +145,35 @@ class CombatSystem extends BaseSystem {
       this.projectiles.clearEnemyBullets();
     });
 
-    this.registerEventListener('upgrade-aiming-suite', (data) => {
-      this.cards.applyAimingUpgrade(data || {});
-    });
-
-    this.registerEventListener('upgrade-weapon-tuning', (data) => {
-      this.cards.applyWeaponTuning(data);
-    });
-
     this.registerEventListener('stasis-started', ({ duration } = {}) => {
       this.projectiles.freezeEnemyBullets(duration);
     });
 
-    // A weapon card names its weapon (src/content/weapons/).
-    this.registerEventListener('upgrade-weapon', (data = {}) => {
-      this.weapons.takeWeapon(data.weaponId);
-    });
-
-    // Cards that add a weapon behaviour keep the payload of their latest rank.
-    this.registerEventListener('upgrade-thermal-lens', (data) => {
-      this.cards.cardEffects.thermalLens = data;
-    });
-    this.registerEventListener('upgrade-chain-capacitor', (data) => {
-      this.cards.cardEffects.chainCapacitor = data;
-    });
-    this.registerEventListener('upgrade-static-shell', (data) => {
-      this.cards.cardEffects.staticShell = data;
-    });
-    this.registerEventListener('upgrade-gravity-brake', (data) => {
-      this.cards.cardEffects.gravityBrake = data;
-    });
-    this.registerEventListener('upgrade-cinder-trail', (data) => {
-      this.cards.cardEffects.cinderTrail = data;
-    });
-    this.registerEventListener('upgrade-ion-trail', (data) => {
-      this.cards.cardEffects.ionTrail = data;
-    });
-    this.registerEventListener('upgrade-afterburn', (data) => {
-      this.cards.cardEffects.afterburn = data;
-    });
-    this.registerEventListener('upgrade-long-burn', (data) => {
-      this.cards.cardEffects.longBurn = data;
-    });
-    this.registerEventListener('upgrade-threat-focus', (data) => {
-      this.cards.cardEffects.threatFocus = data;
-    });
-    this.registerEventListener('upgrade-execute-damage', (data) => {
-      this.cards.cardEffects.executeDamage = data;
-    });
-    this.registerEventListener('upgrade-kill-spark', (data) => {
-      this.cards.cardEffects.killSpark = data;
-    });
-    this.registerEventListener('upgrade-arc-lattice', (data) => {
-      this.cards.cardEffects.arcLattice = data;
-    });
-    this.registerEventListener('upgrade-dash-fire', (data) => {
-      this.cards.cardEffects.dashFire = data;
-    });
+    // The card effects routed to combat (src/modules/cardEffectRoutes.js): a
+    // card that adds a weapon behaviour keeps the payload of its latest rank
+    // where the card says; these compute.
+    routeCardEffects(
+      this,
+      'combat',
+      (event, fn) => this.registerEventListener(event, fn),
+      {
+        'upgrade-aiming-suite': (data) => {
+          this.cards.applyAimingUpgrade(data || {});
+        },
+        'upgrade-weapon-tuning': (data) => {
+          this.cards.applyWeaponTuning(data);
+        },
+        // A weapon card names its weapon (src/content/weapons/).
+        'upgrade-weapon': (data = {}) => {
+          this.weapons.takeWeapon(data.weaponId);
+        },
+        // The new flight's Auto Turret card: the cannon leaves the nose for the
+        // auto aim (PlayerSystem lifts noseAim on the same event).
+        'upgrade-auto-aim': () => {
+          this.targeting.setAimMode('auto');
+        },
+      }
+    );
 
     // Gyro Servos: every dash runs the cannon hot for a moment.
     this.registerEventListener('player-dashed', () => {
@@ -263,12 +236,6 @@ class CombatSystem extends BaseSystem {
         kind: 'spread',
         mode: next,
       });
-    });
-
-    // The new flight's Auto Turret card: the cannon leaves the nose for the
-    // auto aim (PlayerSystem lifts noseAim on the same event).
-    this.registerEventListener('upgrade-auto-aim', () => {
-      this.targeting.setAimMode('auto');
     });
 
     this.registerEventListener('toggle-aim-mode', (data = {}) => {

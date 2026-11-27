@@ -77,6 +77,7 @@ export const NEXT = {
     'A card matrix now runs with every test: every card and every rank must move the number its text promises (or be excused in the test with its reason), every new card needs a probe, and the level-up draw over a hundred seeds never offers a card at its top rank, without its prerequisites, dead for the weapon in hand, or a Hull Patch at full hull; nobody sees it, it stops a broken card from being made.', // not confirmed
     'The interface, the menu background, the reward code and the run session now find the services they use the one way the rest of the game does, instead of through shortcuts and nicknames of their own, and a test keeps those from coming back; each finds the same service as before, so nothing changes in play.', // not confirmed
     'The kind of run (the Descent, the Daily Field, the Boss Rush or a campaign sector) is now settled once when a run starts, in one place that every part of the game asks, instead of seven copies learnt at different moments; every layer, record, medal, Salvage, banner and recording comes out the same, so nobody notices.', // not confirmed
+    'Each card now says itself which part of the game its effect goes to, and one place delivers it, instead of a line written for every card in the ship and weapon code; every card does exactly what it did, so nobody notices.', // not confirmed
   ],
 };
 

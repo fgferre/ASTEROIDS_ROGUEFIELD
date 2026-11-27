@@ -63,6 +63,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { pierceBonus: 1 },
         },
       ],

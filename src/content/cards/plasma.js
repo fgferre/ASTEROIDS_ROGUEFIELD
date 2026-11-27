@@ -39,6 +39,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-damage-boost',
+          to: 'player',
           payload: { multiplier: 1.25 },
         },
       ],
@@ -49,6 +50,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-damage-boost',
+          to: 'player',
           payload: { multiplier: 1.2 },
         },
       ],
@@ -59,6 +61,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-damage-boost',
+          to: 'player',
           payload: { multiplier: 1.15 },
         },
       ],

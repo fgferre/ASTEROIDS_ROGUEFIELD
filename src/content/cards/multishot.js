@@ -105,6 +105,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-multishot',
+          to: 'player',
           payload: { bonus: 1 },
         },
       ],
@@ -115,6 +116,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-multishot',
+          to: 'player',
           payload: { bonus: 1 },
         },
       ],
@@ -125,6 +127,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-multishot',
+          to: 'player',
           payload: { bonus: 1 },
         },
       ],

@@ -93,6 +93,7 @@ describe('weapons', () => {
             {
               type: 'event',
               event: 'upgrade-weapon',
+              to: 'combat',
               payload: { weaponId: id },
             },
           ],

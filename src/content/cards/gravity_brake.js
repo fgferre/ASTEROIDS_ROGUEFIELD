@@ -42,6 +42,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-gravity-brake',
+          to: 'combat',
+          lands: 'cards.cardEffects.gravityBrake',
           payload: { radius: 140, slowFraction: 0.2 }, // proposta 20/10
         },
       ],
@@ -52,6 +54,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-gravity-brake',
+          to: 'combat',
+          lands: 'cards.cardEffects.gravityBrake',
           payload: { radius: 160, slowFraction: 0.35 }, // proposta 20/10
         },
       ],
@@ -62,6 +66,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-gravity-brake',
+          to: 'combat',
+          lands: 'cards.cardEffects.gravityBrake',
           payload: { radius: 180, slowFraction: 0.5 }, // proposta 20/10
         },
       ],

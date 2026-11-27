@@ -46,6 +46,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-arc-lattice',
+          to: 'combat',
+          lands: 'cards.cardEffects.arcLattice',
           // proposta 20/10
           payload: {
             interval: 1.2,
@@ -62,6 +64,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-arc-lattice',
+          to: 'combat',
+          lands: 'cards.cardEffects.arcLattice',
           // proposta 20/10
           payload: {
             interval: 1,
@@ -78,6 +82,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-arc-lattice',
+          to: 'combat',
+          lands: 'cards.cardEffects.arcLattice',
           // proposta 20/10
           payload: {
             interval: 0.8,

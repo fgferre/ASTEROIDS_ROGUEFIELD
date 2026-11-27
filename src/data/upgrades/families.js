@@ -46,11 +46,13 @@ export const UPGRADE_FAMILIES = deepFreeze({
         {
           type: 'event',
           event: 'upgrade-speed-boost',
+          to: 'player',
           payload: { multiplier: SYNERGY_MOMENTUM_SPEED_MULTIPLIER },
         },
         {
           type: 'event',
           event: 'upgrade-acceleration-boost',
+          to: 'player',
           payload: { multiplier: SYNERGY_MOMENTUM_ACCELERATION_MULTIPLIER },
         },
       ],
@@ -68,6 +70,7 @@ export const UPGRADE_FAMILIES = deepFreeze({
         {
           type: 'event',
           event: 'upgrade-damage-boost',
+          to: 'player',
           payload: { multiplier: SYNERGY_OVERHEAT_DAMAGE_MULTIPLIER },
         },
       ],
@@ -109,6 +112,7 @@ export const UPGRADE_FAMILIES = deepFreeze({
         {
           type: 'event',
           event: 'upgrade-health-boost',
+          to: 'player',
           payload: { bonus: SYNERGY_BULWARK_HULL_BONUS },
         },
       ],
@@ -144,6 +148,8 @@ export const UPGRADE_FAMILIES = deepFreeze({
         {
           type: 'event',
           event: 'upgrade-afterburn',
+          to: 'combat',
+          lands: 'cards.cardEffects.afterburn',
           payload: {
             damage: SYNERGY_AFTERBURN_DAMAGE,
             tickInterval: SYNERGY_AFTERBURN_TICK,

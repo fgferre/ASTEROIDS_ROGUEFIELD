@@ -145,6 +145,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-aiming-suite',
+          to: 'combat',
           payload: {
             resetWeights: true,
           },
@@ -152,6 +153,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-threat-focus',
+          to: 'combat',
+          lands: 'cards.cardEffects.threatFocus',
           payload: { damageMultiplier: 1.1 }, // proposta 16/11, Furnace only
         },
       ],
@@ -162,6 +165,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-aiming-suite',
+          to: 'combat',
           payload: {
             dynamicPrediction: {
               minLeadTime: 0.05,
@@ -173,6 +177,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-threat-focus',
+          to: 'combat',
+          lands: 'cards.cardEffects.threatFocus',
           payload: { damageMultiplier: 1.2 }, // proposta 16/11, Furnace only
         },
       ],
@@ -191,6 +197,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-aiming-suite',
+          to: 'combat',
           payload: {
             multiLockTargets: 4,
             cooldownMultiplier: MULTI_LOCK_COOLDOWN,

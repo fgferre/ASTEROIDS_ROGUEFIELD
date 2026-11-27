@@ -46,6 +46,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-momentum-rounds',
+          to: 'player',
+          lands: { speedDamageMultiplier: 'speedDamageMultiplier' },
           payload: { speedDamageMultiplier: 1.15 }, // proposta 16/11
         },
       ],
@@ -56,6 +58,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-momentum-rounds',
+          to: 'player',
+          lands: { speedDamageMultiplier: 'speedDamageMultiplier' },
           payload: { speedDamageMultiplier: 1.3 }, // proposta 16/11
         },
       ],
@@ -66,6 +70,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-momentum-rounds',
+          to: 'player',
+          lands: { speedDamageMultiplier: 'speedDamageMultiplier' },
           payload: { speedDamageMultiplier: 1.45 }, // proposta 16/11
         },
       ],

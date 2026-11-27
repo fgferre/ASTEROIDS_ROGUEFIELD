@@ -41,6 +41,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-ram-plating',
+          to: 'player',
+          lands: { 'maneuvers.dashContactDamage': 'damage' },
           payload: { damage: 20 },
         },
       ],
@@ -51,6 +53,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-ram-plating',
+          to: 'player',
+          lands: { 'maneuvers.dashContactDamage': 'damage' },
           payload: { damage: 35 },
         },
       ],
@@ -61,6 +65,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-ram-plating',
+          to: 'player',
+          lands: { 'maneuvers.dashContactDamage': 'damage' },
           payload: { damage: 50 },
         },
       ],

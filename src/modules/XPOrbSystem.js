@@ -13,6 +13,7 @@ import { OrbFusion } from './xp/OrbFusion.js';
 import { OrbSpacing } from './xp/OrbSpacing.js';
 import { OrbMagnet } from './xp/OrbMagnet.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
+import { routeCardEffects } from './cardEffectRoutes.js';
 
 const SERVICE_CACHE_MAP = Object.freeze({
   cachedPlayer: 'player',
@@ -279,10 +280,18 @@ class XPOrbSystem extends BaseSystem {
       this.towPulse = null;
     });
 
-    // A new rank keeps the time already counted toward the next haul.
-    this.registerEventListener('upgrade-tow-pulse', ({ interval }) => {
-      this.towPulse = { interval, timer: this.towPulse?.timer ?? 0 };
-    });
+    // The card effects routed to the orbs (src/modules/cardEffectRoutes.js).
+    routeCardEffects(
+      this,
+      'xp-orbs',
+      (event, fn) => this.registerEventListener(event, fn),
+      {
+        // A new rank keeps the time already counted toward the next haul.
+        'upgrade-tow-pulse': ({ interval }) => {
+          this.towPulse = { interval, timer: this.towPulse?.timer ?? 0 };
+        },
+      }
+    );
 
     this.registerEventListener('player-reset', () => {
       super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });

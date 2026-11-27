@@ -32,11 +32,13 @@ export default {
         {
           type: 'event',
           event: 'upgrade-damage-boost',
+          to: 'player',
           payload: { multiplier: 1.6 },
         },
         {
           type: 'event',
           event: 'upgrade-health-boost',
+          to: 'player',
           payload: { multiplier: 0.7 },
         },
       ],

@@ -55,7 +55,9 @@ export default {
   levels: [
     {
       rank: 1,
-      effects: [{ type: 'event', event: 'upgrade-modern-flight', payload: {} }],
+      effects: [
+        { type: 'event', event: 'upgrade-modern-flight', to: [], payload: {} },
+      ],
     },
   ],
 };

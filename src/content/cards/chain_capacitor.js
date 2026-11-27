@@ -88,6 +88,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-chain-capacitor',
+          to: 'combat',
+          lands: 'cards.cardEffects.chainCapacitor',
           payload: { extraJumps: 1, doubleHitChance: 0.1 },
         },
       ],

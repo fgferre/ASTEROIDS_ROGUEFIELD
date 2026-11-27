@@ -50,6 +50,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { cooldownMultiplier: 0.9 },
         },
       ],
@@ -60,6 +61,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { cooldownMultiplier: 0.9 },
         },
       ],
@@ -70,6 +72,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { cooldownMultiplier: 0.9 },
         },
       ],

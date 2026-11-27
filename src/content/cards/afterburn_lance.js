@@ -87,11 +87,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { targetingRangeMultiplier: 1.15 },
         },
         {
           type: 'event',
           event: 'upgrade-long-burn',
+          to: 'combat',
+          lands: 'cards.cardEffects.longBurn',
           payload: { bonusPer100px: 0.1, maxDistance: MAX_DISTANCE }, // proposta 20/10
         },
       ],
@@ -102,11 +105,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { targetingRangeMultiplier: 1.15 },
         },
         {
           type: 'event',
           event: 'upgrade-long-burn',
+          to: 'combat',
+          lands: 'cards.cardEffects.longBurn',
           payload: { bonusPer100px: 0.15, maxDistance: MAX_DISTANCE }, // proposta 20/10
         },
       ],
@@ -117,11 +123,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { targetingRangeMultiplier: 1.15 },
         },
         {
           type: 'event',
           event: 'upgrade-long-burn',
+          to: 'combat',
+          lands: 'cards.cardEffects.longBurn',
           payload: { bonusPer100px: 0.2, maxDistance: MAX_DISTANCE }, // proposta 20/10
         },
       ],
