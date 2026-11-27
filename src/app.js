@@ -617,6 +617,12 @@ document.addEventListener('DOMContentLoaded', () => {
       getServices: () => gameSystemServices,
     });
 
+    // ?final=1 (dev): the last sector started at its boss, one hit from down.
+    if (IS_DEV && new URLSearchParams(window.location.search).has('final')) {
+      const { openFinalDoor } = await import('./bootstrap/finalDoor.js');
+      void openFinalDoor({ getServices: () => gameSystemServices });
+    }
+
     // ?replay=<url>: the recording's seed must be known before init().
     const replayUrl = getReplayUrl();
     let recording = null;

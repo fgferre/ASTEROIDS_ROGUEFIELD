@@ -676,8 +676,11 @@ class UISystem extends BaseSystem {
       this.runWon = true;
       this.chestCeremony.clear();
       this.lastTransmission = null;
-      // The ending's act 1 says Sovereign's last words itself.
+      // The ending's act 1 says Sovereign's last words itself. Its scenes play
+      // over a field still in flight, the instruments away: no flying tip on
+      // them (this run is over; the next one teaches what is left).
       if (this.runEndScreens.opensChoice(sector)) {
+        this.onboarding.stop();
         this.cinematics.startRevelation();
         return;
       }
