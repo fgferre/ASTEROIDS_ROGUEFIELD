@@ -48,6 +48,7 @@ export const NEXT = {
     "Launching from the map a sector that begins with a head start (every sector after the first), the scenes before the run (the story, the journey, the descent) no longer sit under a gold tint: the head start's level-up flash stayed lit over them until the run began.", // not confirmed
     "A flying tip (the dash, the shield, the first moves) still on screen when Sovereign falls no longer stays over the ending's scenes or dim behind its choice: it leaves at the last blow, and since it was not used the next run teaches it again.", // not confirmed
     'A flying tip still on screen when a sector is won or the ship is lost no longer shows faintly through the victory or game-over screen, across its title; it is back with the ship on a Retry.', // not confirmed
+    "On a pad, changing the spread or the aim in the first seconds after Sovereign falls no longer writes its notice over the ending's first scene; the change itself still happens.", // not confirmed
     'Settings opened over the flight briefing, the end credits or the Codex no longer lets a key act on the screen underneath: Enter closed the briefing or the credits, and the arrows changed the Codex tab, without you seeing it.', // not confirmed
   ],
   unseen: [
