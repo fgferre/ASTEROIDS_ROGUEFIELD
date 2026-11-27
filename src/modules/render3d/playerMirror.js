@@ -82,6 +82,9 @@ const TILT_PITCH = (8 * Math.PI) / 180;
 const TILT_FLANK = 0.8;
 const TILT_OMEGA = 11; // rad/s
 const TILT_DAMPING = 0.72;
+// The ship's hull panels cast; its turret, nozzles and canopy (radius under
+// this, world units) only receive.
+export const SHIP_MIN_CASTER = 5;
 
 export class PlayerMirror {
   constructor(THREE, scene, seeded) {
