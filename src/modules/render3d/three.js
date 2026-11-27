@@ -18,40 +18,20 @@ import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 // converted from sRGB (r152 turned that conversion on). Before any Color.
 core.ColorManagement.enabled = false;
 
-// Lights in r128's units, which r155 made optional and r165 removed:
-// directional, point, ambient and hemisphere light count π times stronger,
-// and a point light fades linearly to nothing at its distance rather than
-// with the square of it. Done in the shader, so the light uniforms keep
-// r128's values (rimLight.js reads the key light's colour directly).
-function legacyLights(chunk) {
-  const edits = [
-    [
-      /float getDistanceAttenuation\([\s\S]*?\n}\n/,
-      `float getDistanceAttenuation( const in float lightDistance, const in float cutoffDistance, const in float decayExponent ) {
-	if ( cutoffDistance > 0.0 && decayExponent > 0.0 ) {
-		return pow( saturate( - lightDistance / cutoffDistance + 1.0 ), decayExponent );
-	}
-	return 1.0;
+// Lights in three's units (r155 made r128's optional, r165 removed them):
+// each light's r128 strength is set × Math.PI where the game sets it. A
+// point light also fades otherwise: r128 linearly to nothing at its distance
+// (pow(1 − d / distance, decay)), three with the inverse power of the
+// distance, windowed to nothing at it. pointStrength() is the three
+// intensity of `light` (at its distance and decay, set first) that lights
+// as r128's `strength` did at half that distance.
+export function pointStrength(light, strength) {
+  const { distance, decay } = light;
+  return (
+    (strength * Math.PI * 0.5 ** decay) /
+    ((distance / 2) ** -decay * (1 - 0.5 ** 4) ** 2)
+  );
 }
-`,
-    ],
-    ['vec3 irradiance = ambientLightColor;', '$& irradiance *= PI;'],
-    [
-      'vec3 irradiance = mix( hemiLight.groundColor, hemiLight.skyColor, hemiDiffuseWeight );',
-      '$& irradiance *= PI;',
-    ],
-    ['light.color = directionalLight.color;', '$& light.color *= PI;'],
-    ['light.color = pointLight.color;', '$& light.color *= PI;'],
-  ];
-  return edits.reduce((text, [find, put]) => {
-    const next = text.replace(find, put);
-    if (next === text) throw new Error(`three.js: light chunk lost ${find}`);
-    return next;
-  }, chunk);
-}
-core.ShaderChunk.lights_pars_begin = legacyLights(
-  core.ShaderChunk.lights_pars_begin
-);
 
 // Since r163 a material's envMapIntensity scales only its own envMap, and
 // the scene's sky (Scene.environment) takes Scene.environmentIntensity. The

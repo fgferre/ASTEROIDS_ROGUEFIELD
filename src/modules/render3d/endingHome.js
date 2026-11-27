@@ -12,6 +12,7 @@
 
 import { HOME_SHOTS, easeInOut } from '../../core/cinematics.js';
 import { LAUNCH, STORY_FAR, STORY_SHOTS } from './storyScene.js';
+import { pointStrength } from './three.js';
 import { setWakeLight } from './travel/wake.js';
 
 const BEATS = new Set(['home', 'steady', 'return', 'depart', 'watch']);
@@ -157,7 +158,7 @@ export class EndingHome {
     for (let i = 0; i < engines.length; i += 1) {
       setWakeLight(engines[i], state.engines);
     }
-    story.bay.intensity = state.bay;
+    story.bay.intensity = pointStrength(story.bay, state.bay);
     this.placeWake(beat === 'depart' ? u : 0);
   }
 

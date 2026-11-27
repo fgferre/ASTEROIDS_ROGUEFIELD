@@ -12,7 +12,7 @@ describe('FlashLights', () => {
     flashes.hit(100, 50, [0.5, 0, 1], 25);
     const lit = flashes.lights.filter((l) => l.intensity > 0);
     expect(lit).toHaveLength(2);
-    const hit = lit.find((l) => l.intensity < 3);
+    const hit = lit.find((l) => l !== flashes.lights[0]);
     expect(hit.color.b).toBe(1);
     expect(hit.distance).toBeLessThan(flashes.lights[0].distance);
     flashes.hit(200, 50, [1, 1, 1], 25);

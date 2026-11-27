@@ -28,7 +28,7 @@ export function lightWake(THREE, wake, side = -1) {
   const lamp = ({ color, intensity, from }) => {
     const light = new THREE.DirectionalLight(
       new THREE.Color(color).convertSRGBToLinear(),
-      intensity
+      intensity * Math.PI
     );
     // Authoring units: far enough to stand outside the hull.
     light.position

@@ -129,18 +129,24 @@ export function createOpeningScene(menu, random, shotName = null) {
 
   // The game's lights (sceneSetup.js): warm key from the upper left, cool
   // fill, a hemisphere so the dark sides never go void.
-  const key = new THREE.DirectionalLight(colorOf(THREE, '#fff1e2'), 1.6);
+  const key = new THREE.DirectionalLight(
+    colorOf(THREE, '#fff1e2'),
+    1.6 * Math.PI
+  );
   const keyDir = new THREE.Vector3(
     KEY_LIGHT_DIR.x * Math.cos(KEY_ELEVATION),
     Math.sin(KEY_ELEVATION),
     KEY_LIGHT_DIR.y * Math.cos(KEY_ELEVATION)
   );
-  const fill = new THREE.DirectionalLight(colorOf(THREE, '#64748b'), 0.35);
+  const fill = new THREE.DirectionalLight(
+    colorOf(THREE, '#64748b'),
+    0.35 * Math.PI
+  );
   fill.position.set(0.7, 0.3, 0.65);
   const hemi = new THREE.HemisphereLight(
     colorOf(THREE, '#2a3346'),
     colorOf(THREE, '#050608'),
-    0.3
+    0.3 * Math.PI
   );
   world.add(key, key.target, fill, hemi);
 

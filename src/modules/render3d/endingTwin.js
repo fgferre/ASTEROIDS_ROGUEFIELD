@@ -152,7 +152,7 @@ export class LastImage {
     const { key } = t;
     this.savedKey.color.copy(key.color);
     this.savedKey.position.copy(key.position);
-    key.intensity = level;
+    key.intensity = level * Math.PI;
     key.color.copy(this.keyColor);
     this.from
       .set(...light.from)

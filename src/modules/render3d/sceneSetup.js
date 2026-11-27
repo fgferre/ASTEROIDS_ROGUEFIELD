@@ -221,7 +221,10 @@ export function setupThree(seeded) {
   // on high/ultra it casts shadows between the 3D objects (applyShadows),
   // its target following the camera (updateCamera). The fill and the
   // environment keep the unlit sides readable.
-  const key = new THREE.DirectionalLight(colorOf(THREE, '#fff1e2'), 1.6);
+  const key = new THREE.DirectionalLight(
+    colorOf(THREE, '#fff1e2'),
+    1.6 * Math.PI
+  );
   const keyDir = new THREE.Vector3(
     KEY_LIGHT_DIR.x * Math.cos(KEY_ELEVATION),
     Math.sin(KEY_ELEVATION),
@@ -236,13 +239,13 @@ export function setupThree(seeded) {
   // Fill: cool, from below-right; hemisphere keeps shadows from going void.
   const fill = new THREE.DirectionalLight(
     colorOf(THREE, PALETTE.neutral),
-    0.35
+    0.35 * Math.PI
   );
   fill.position.set(0.7, 0.3, 0.65);
   const hemi = new THREE.HemisphereLight(
     colorOf(THREE, '#2a3346'),
     colorOf(THREE, '#050608'),
-    0.3
+    0.3 * Math.PI
   );
   const wardenLight = new THREE.PointLight(
     colorOf(THREE, PALETTE.boss),

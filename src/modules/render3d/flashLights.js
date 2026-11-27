@@ -4,6 +4,7 @@
 // fast; the oldest is reused when the pool is full.
 
 import { HALF_H, HALF_W } from './batches.js';
+import { pointStrength } from './three.js';
 
 // proposta 17/10: pool size, height over the plane, reach and decay.
 const POOL_SIZE = 6;
@@ -60,21 +61,26 @@ export class FlashLights {
     light.color.setRGB(r, g, b);
     light.position.set(x - HALF_W, LIGHT_HEIGHT, y - HALF_H);
     light.distance = LIGHT_DISTANCE;
-    light.intensity = intensity;
+    light.intensity = pointStrength(light, intensity);
   }
 
   /** A shot of `rgb` and `damage` hit something at (x, y) logical. */
   hit(x, y, rgb, damage) {
     if (!this.hitReady) return;
     this.hitReady = false;
+    // the dimmest by its r128 strength (the pool's lights reach differently)
+    const strength = (one) => one.intensity / pointStrength(one, 1);
     let light = this.lights[0];
     for (const other of this.lights) {
-      if (other.intensity < light.intensity) light = other;
+      if (strength(other) < strength(light)) light = other;
     }
     light.color.setRGB(rgb[0], rgb[1], rgb[2]);
     light.position.set(x - HALF_W, HIT_HEIGHT, y - HALF_H);
     light.distance = HIT_REACH;
-    light.intensity = HIT_PEAK * Math.min(2, (damage || 0) / HIT_DAMAGE);
+    light.intensity = pointStrength(
+      light,
+      HIT_PEAK * Math.min(2, (damage || 0) / HIT_DAMAGE)
+    );
   }
 
   update(dt) {
@@ -82,7 +88,8 @@ export class FlashLights {
     const k = Math.exp(-dt / DECAY_TIME);
     for (let i = 0; i < this.lights.length; i += 1) {
       const light = this.lights[i];
-      light.intensity = light.intensity > 0.02 ? light.intensity * k : 0;
+      const out = light.intensity <= pointStrength(light, 0.02);
+      light.intensity = out ? 0 : light.intensity * k;
     }
   }
 }
@@ -140,7 +147,7 @@ export class VeinLights {
       light.color.copy(view.rock.vein);
       light.position.set(position.x, view.radius * VEIN_RISE, position.z);
       light.distance = view.radius * VEIN_REACH;
-      light.intensity = VEIN_PEAK * view.rock.glow[0];
+      light.intensity = pointStrength(light, VEIN_PEAK * view.rock.glow[0]);
     });
   }
 }

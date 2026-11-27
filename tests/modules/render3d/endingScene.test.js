@@ -107,7 +107,7 @@ function kit() {
     space: {},
     key,
     debris: { meshes: [], plates: [] },
-    wardenLight: new THREE.PointLight(),
+    wardenLight: new THREE.PointLight(0xffffff, 0, 420, 2),
     player,
   };
   player.lightEngines = vi.fn();
@@ -125,7 +125,7 @@ function kit() {
     hangar: new THREE.Vector3(-260, -90, 0),
     sky: { place: vi.fn() },
     signal: { visible: true },
-    bay: { intensity: 0 },
+    bay: new THREE.PointLight(0xbfd8ff, 0, 900, 2),
     wake: {
       group: new THREE.Group(),
       lights: { engines: [engine(), engine(), engine()] },

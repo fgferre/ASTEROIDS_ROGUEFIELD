@@ -14,6 +14,7 @@ import { STORY_MS, STORY_SHOT_MS, easeInOut } from '../../core/cinematics.js';
 import { STORY_SKY, buildStorySky } from './story/storySky.js';
 import { buildWake, setWakeLight } from './travel/wake.js';
 import { buildFieldRocks } from './story/storyRocks.js';
+import { pointStrength } from './three.js';
 import { lightWake } from './travel/wakeRig.js';
 
 // proposta 18/11: the shots, in order: `ms` long, the camera from `from` to
@@ -172,7 +173,7 @@ export class StoryScene {
     this.rig = lightWake(THREE, this.wake, -1);
     Object.entries(RIG).forEach(([name, [color, intensity]]) => {
       this.rig[name].color.set(color).convertSRGBToLinear();
-      this.rig[name].intensity = intensity;
+      this.rig[name].intensity = intensity * Math.PI;
     });
     this.rig.rim.position
       .set(...STORY_SKY.sun)
@@ -347,7 +348,8 @@ export class StoryScene {
     const pulse = 0.5 + 0.5 * Math.cos((time * 2 * Math.PI) / SIGNAL.period);
     this.signal.scale.setScalar(SIGNAL.size * (0.6 + 0.6 * pulse));
     this.signal.material.opacity = 0.35 + 0.65 * pulse;
-    this.bay.intensity = shot.id === 'hangar' ? 1.4 : 0;
+    this.bay.intensity =
+      shot.id === 'hangar' ? pointStrength(this.bay, 1.4) : 0;
     // The reactors falter from the second shot on: the port engine dies.
     const failing = shot.id !== 'wake';
     const flicker = 0.55 + 0.45 * Math.sin(time * 23) * Math.sin(time * 7.3);
