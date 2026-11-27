@@ -13,6 +13,7 @@ import {
 } from '../../core/serviceUtils.js';
 import { debugLog } from '../../core/debugLogging.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
+import RandomService from '../../core/RandomService.js';
 import { clamp } from '../../utils/mathHelpers.js';
 import HealthHeart from './HealthHeart.js';
 
@@ -128,24 +129,32 @@ export class HealthHeartSystem {
     }
   }
 
-  // The hearts on the field as plain data: the death snapshot
-  // (session/deathSnapshot.js) puts them back on a retry.
+  // The hearts on the field as plain data, each one's stream by where it
+  // stands: the death snapshot (session/deathSnapshot.js) puts them back on a
+  // retry.
   getSnapshotState() {
-    return this.hearts.map(({ x, y, pulsePhase, collected, lifetime }) => ({
-      x,
-      y,
-      pulsePhase,
-      collected,
-      lifetime,
-    }));
+    return this.hearts.map(
+      ({ x, y, pulsePhase, collected, lifetime, random }) => ({
+        x,
+        y,
+        pulsePhase,
+        collected,
+        lifetime,
+        random: random?.serialize(),
+      })
+    );
   }
 
   restoreSnapshotState(snapshot) {
-    this.hearts = snapshot.map(({ x, y, pulsePhase, collected, lifetime }) =>
-      Object.assign(new HealthHeart(x, y, { pulsePhase }), {
-        collected,
-        lifetime,
-      })
+    this.hearts = snapshot.map(
+      ({ x, y, pulsePhase, collected, lifetime, random: stream }) => {
+        const random = stream && new RandomService(stream.seed);
+        random?.restore(stream);
+        return Object.assign(new HealthHeart(x, y, { random, pulsePhase }), {
+          collected,
+          lifetime,
+        });
+      }
     );
     return true;
   }
