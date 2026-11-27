@@ -171,6 +171,45 @@ describe('Onboarding', () => {
     expect(after.current).toBeNull();
   });
 
+  it('leaves the screen at the win that opens the ending, uncounted, and is taught again next run', () => {
+    localStorage.setItem(
+      ONBOARDING_STORAGE_KEY,
+      JSON.stringify({ done: ['move'] })
+    );
+    const view = fakeView();
+    const onboarding = new Onboarding(view);
+    onboarding.start();
+    onboarding.update(STEP);
+    expect(view.showing).toBe('dash');
+    const handlers = new Map();
+    UISystem.prototype.setupEventListeners.call(
+      Object.setPrototypeOf(
+        {
+          onboarding,
+          chestCeremony: { clear() {} },
+          runEndScreens: { opensChoice: () => true },
+          cinematics: { startRevelation() {} },
+          registerEventListener: (name, fn) => handlers.set(name, fn),
+        },
+        UISystem.prototype
+      )
+    );
+
+    handlers.get('run-won')({ wave: 20, sector: 'the-crucible' });
+    expect(view.showing).toBeNull();
+    // the ending's scenes and its choice go by: no tip's time runs under them
+    run(onboarding, DASH_TIP_SECONDS + ONBOARDING_GAP_SECONDS + 1, {
+      shieldReady: true,
+    });
+    expect(view.showing).toBeNull();
+
+    const next = new Onboarding(view);
+    next.start();
+    next.update(STEP);
+    expect(view.showing).toBe('dash');
+    expect(next.expired.dash).toBeUndefined();
+  });
+
   it('counts the shield raised while its tip is up', () => {
     localStorage.setItem(
       ONBOARDING_STORAGE_KEY,

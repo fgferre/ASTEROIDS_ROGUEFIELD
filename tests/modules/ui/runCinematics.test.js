@@ -426,12 +426,15 @@ describe('RunCinematics', () => {
       RunEndScreens.prototype
     );
     const queueTransmission = vi.fn();
+    // the tutorial: act 1 plays over a field still in flight, no tip on it
+    const onboarding = { stop: vi.fn() };
     UISystem.prototype.setupEventListeners.call(
       Object.setPrototypeOf(
         {
           cinematics,
           runEndScreens,
           queueTransmission,
+          onboarding,
           chestCeremony: { clear: () => {} },
           registerEventListener: (name, fn) => handlers.set(name, fn),
         },
@@ -444,6 +447,7 @@ describe('RunCinematics', () => {
     expect(cinematics.startRevelation).toHaveBeenCalledTimes(1);
     expect(cinematics.startEpilogue).not.toHaveBeenCalled();
     expect(queueTransmission).not.toHaveBeenCalled();
+    expect(onboarding.stop).toHaveBeenCalledTimes(1);
 
     won({ wave: 18, sector: 'wardens-reach' });
     expect(cinematics.startEpilogue).toHaveBeenCalledTimes(1);
@@ -456,6 +460,8 @@ describe('RunCinematics', () => {
     expect(queueTransmission.mock.lastCall[0].key).toBe(
       'boss:sovereign:defeated'
     );
+    // the wins with an epilogue leave the tutorial as it was
+    expect(onboarding.stop).toHaveBeenCalledTimes(1);
   });
 
   it('letterboxes a Warden entrance without holding the run, lifting it when the Warden closes up', () => {
