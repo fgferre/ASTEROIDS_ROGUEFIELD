@@ -227,6 +227,8 @@ export class Projectiles {
     bullet.enemyId = data.enemyId ?? data.source?.id ?? data.enemy?.id ?? null;
     bullet.enemyType =
       data.enemyType ?? data.source?.type ?? data.enemy?.type ?? null;
+    // Its kind of shot ('herald-shard'...): a Herald finds its shards by it.
+    bullet.pattern = projectile.pattern ?? null;
     bullet.source = data.source
       ? { ...data.source }
       : bullet.enemyId || bullet.enemyType
@@ -592,6 +594,21 @@ export class Projectiles {
   freezeEnemyBullets(duration) {
     for (const bullet of this.enemyBullets) {
       if (bullet && !bullet.isBossProjectile) bullet.stasisTimer = duration;
+    }
+  }
+
+  /** The enemy shots in flight, copied at the death for a Retry. */
+  getSnapshotState() {
+    return this.enemyBullets.map((bullet) => structuredClone(bullet));
+  }
+
+  /** The enemy shots in flight back as they were at the death. */
+  restoreSnapshotState(bullets) {
+    this.clearEnemyBullets();
+    for (const saved of bullets) {
+      const bullet = GamePools.bullets.acquire();
+      Object.assign(bullet, structuredClone(saved));
+      this.enemyBullets.push(bullet);
     }
   }
 

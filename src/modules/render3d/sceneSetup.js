@@ -331,7 +331,7 @@ export function setupThree(seeded) {
   // softboxes vivid blue, 22/11)
   const hullMaterials = [...player.hullMaterials, player.canopyMaterial];
   useHullEnvironment(hullMaterials, skies.hull);
-  watchContextRestore(THREE, renderer, scene, space, hullMaterials);
+  watchContextRestore(THREE, renderer, scene, space, hullMaterials, seeded);
   const pickups = new PickupMirror(THREE, scene);
   const chests = new ChestMirror(THREE, scene);
   const decals = new ScorchDecals(THREE, scene, camera);
@@ -454,22 +454,26 @@ export function setupThree(seeded) {
 
 // After a lost graphics context comes back, what was generated on the GPU is
 // empty: the reflection maps (the scene's, the player hull's on its
-// `hullMaterials`) are built again, the nebula's maps bake again.
+// `hullMaterials`) are built again, the nebula's maps bake again. Seeded, as
+// every build: three names what it makes with Math.random.
 export function watchContextRestore(
   THREE,
   renderer,
   scene,
   space,
-  hullMaterials
+  hullMaterials,
+  seeded
 ) {
-  renderer.domElement.addEventListener('webglcontextrestored', () => {
-    scene.environment?.dispose();
-    hullMaterials[0].envMap?.dispose();
-    const skies = buildSkies(THREE, renderer);
-    scene.environment = skies.scene;
-    useHullEnvironment(hullMaterials, skies.hull);
-    space.invalidateBakes();
-  });
+  renderer.domElement.addEventListener('webglcontextrestored', () =>
+    seeded(() => {
+      scene.environment?.dispose();
+      hullMaterials[0].envMap?.dispose();
+      const skies = buildSkies(THREE, renderer);
+      scene.environment = skies.scene;
+      useHullEnvironment(hullMaterials, skies.hull);
+      space.invalidateBakes();
+    })
+  );
 }
 
 // The scene's and the player hull's reflection skies from one PMREMGenerator,

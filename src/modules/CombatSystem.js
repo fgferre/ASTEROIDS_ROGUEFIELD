@@ -391,6 +391,15 @@ class CombatSystem extends BaseSystem {
     return this.projectiles.enemyBullets;
   }
 
+  // What a Retry brings back of the combat: the enemy shots in flight.
+  getSnapshotState() {
+    return { enemyBullets: this.projectiles.getSnapshotState() };
+  }
+
+  restoreSnapshotState(snapshot) {
+    this.projectiles.restoreSnapshotState(snapshot.enemyBullets);
+  }
+
   // Called on the combat object: EnemySystem forwards enemy shots, app.js
   // reads the perf, the weapons and upgrade suites fire and tick bullets.
   handleEnemyProjectile(data = {}) {

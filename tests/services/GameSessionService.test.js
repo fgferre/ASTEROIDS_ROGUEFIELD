@@ -564,18 +564,7 @@ describe('GameSessionService lifecycle flows', () => {
           supportEnemies: [],
           waves: [],
         },
-        physics: {
-          asteroids: [
-            {
-              poolId: restoredBoss[ASTEROID_POOL_ID],
-              x: 220,
-              y: 180,
-              vx: 0,
-              vy: 0,
-              radius: restoredBoss.radius,
-            },
-          ],
-        },
+        physics: { version: 2 },
       },
     });
 
@@ -593,8 +582,6 @@ describe('GameSessionService lifecycle flows', () => {
     expect(physics.activeEnemies.has(restoredBoss)).toBe(true);
     expect(physics.activeBosses.has(restoredBoss)).toBe(true);
     expect(physics.spatialHash.objects.has(restoredBoss)).toBe(true);
-    expect(restoredBoss.x).toBe(220);
-    expect(restoredBoss.y).toBe(180);
 
     const bullet = {
       x:

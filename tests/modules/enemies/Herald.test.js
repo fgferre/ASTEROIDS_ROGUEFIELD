@@ -172,6 +172,7 @@ describe('Herald', () => {
       if (event !== 'enemy-fired') return;
       bullets.push({
         enemyId: payload.enemyId,
+        pattern: payload.projectile.pattern,
         active: true,
         x: payload.position.x,
         y: payload.position.y,
@@ -217,7 +218,7 @@ describe('Herald', () => {
     herald.steerShards(player.position, STEP);
 
     expect(second).toBe(first);
-    expect(herald.shards).toEqual([second]);
+    expect(projectiles.enemyBullets).toEqual([second]);
     expect(Math.abs(Math.atan2(second.vy, second.vx) - before)).toBeCloseTo(
       HERALD_KINDS.silence.shardTurnRate * STEP,
       9
