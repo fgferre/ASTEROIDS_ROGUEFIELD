@@ -50,6 +50,7 @@ export const NEXT = {
     'A flying tip still on screen when a sector is won or the ship is lost no longer shows faintly through the victory or game-over screen, across its title; it is back with the ship on a Retry.', // not confirmed
     "On a pad, changing the spread or the aim in the first seconds after Sovereign falls no longer writes its notice over the ending's first scene; the change itself still happens.", // not confirmed
     'Settings opened over the flight briefing, the end credits or the Codex no longer lets a key act on the screen underneath: Enter closed the briefing or the credits, and the arrows changed the Codex tab, without you seeing it.', // not confirmed
+    "In a narrow window with a pad, the strip of pad buttons on Mission Control no longer covers the Hangar, Codex and Settings buttons, and in the Hangar a hull's line that does not fit (the Bastion's, the Solar Slicer's) breaks between its parts instead of leaving a lone number on the second line.", // not confirmed
   ],
   unseen: [
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",

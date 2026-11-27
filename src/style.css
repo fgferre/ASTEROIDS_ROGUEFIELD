@@ -4073,6 +4073,12 @@ body.touch-play .menu-version {
   font-size: var(--text-sm);
   line-height: 1.4;
   text-align: center;
+  text-wrap: balance;
+}
+
+/* Too long for one line, it breaks between the parts, never inside one. */
+.hangar-hull-info > span {
+  white-space: nowrap;
 }
 
 /* The menu's 3D hull, copied in from the menu canvas (MenuBackgroundSystem) */
