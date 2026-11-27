@@ -157,7 +157,9 @@ export function onboardingPrompts(
   };
   const touch = device === 'touch';
   // The strafe as the controls legend names it: LB + the stick on a pad
-  // (classic: the stick alone), Z and C or the hold + A and D on the keys.
+  // (classic: the stick alone), Z and C or the hold + A and D on the keys
+  // (Settings' "Spacebar" is the legend's "Space").
+  const hold = keys.strafeHold === 'Spacebar' ? 'Space' : keys.strafeHold;
   const strafe = touch
     ? {
         keys: ['STRAFE'],
@@ -172,7 +174,7 @@ export function onboardingPrompts(
           }
       : {
           keys: [keys.strafeLeft, keys.strafeRight],
-          text: `Slide sideways with ${keys.strafeLeft} and ${keys.strafeRight}, or hold ${keys.strafeHold} with ${keys.moveLeft} and ${keys.moveRight}.`,
+          text: `Slide sideways with ${keys.strafeLeft} and ${keys.strafeRight}, or hold ${hold} with ${keys.moveLeft} and ${keys.moveRight}.`,
         };
   return {
     move: touch ? touchMove : device === 'gamepad' ? padMove : keyboardMove,

@@ -522,7 +522,7 @@ describe('Onboarding', () => {
       ...keys,
       strafeLeft: 'Z',
       strafeRight: 'C',
-      strafeHold: 'Space',
+      strafeHold: 'Spacebar',
     }).strafe;
     expect(strafe.keys).toEqual(['Z', 'C']);
     expect(strafe.text).toBe(
