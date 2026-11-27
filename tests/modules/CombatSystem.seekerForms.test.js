@@ -57,7 +57,8 @@ function seeker(list) {
 // A salvo's first missile, put on `enemy`'s rim flying along +x.
 function missileOn(combat, enemy) {
   combat.handleShooting(1, STATS);
-  const missile = combat.bullets[combat.bullets.length - 2];
+  const missile =
+    combat.projectiles.bullets[combat.projectiles.bullets.length - 2];
   missile.x = enemy.x - enemy.radius;
   missile.y = enemy.y;
   missile.vx = 275;
@@ -89,28 +90,28 @@ describe('Seeker Swarm family forms', () => {
     const shrapnel = missile.shrapnel * FORMS.thermal.burstDamage;
 
     combat.processBulletHit(missile, target, combat.cachedEnemies);
-    expect(combat.flakBursts).toHaveLength(0);
-    expect(combat.lodged).toHaveLength(1);
+    expect(combat.weapons.flakBursts).toHaveLength(0);
+    expect(combat.weapons.lodged).toHaveLength(1);
     // no Incendiary Lance: the hit itself sets nothing burning
-    expect(combat.burns.has(target)).toBe(false);
+    expect(combat.cards.burns.has(target)).toBe(false);
     step(combat, 0.3);
-    expect(combat.burns.has(target)).toBe(true);
+    expect(combat.cards.burns.has(target)).toBe(true);
     expect(near.health).toBe(1000);
     step(combat, 0.75);
-    expect(combat.lodged).toHaveLength(0);
-    expect(combat.flakBursts).toHaveLength(1);
-    expect(combat.flakBursts[0].maxRadius).toBeCloseTo(
+    expect(combat.weapons.lodged).toHaveLength(0);
+    expect(combat.weapons.flakBursts).toHaveLength(1);
+    expect(combat.weapons.flakBursts[0].maxRadius).toBeCloseTo(
       BURST.radius * FORMS.thermal.burstScale,
       6
     );
     expect(near.health).toBeCloseTo(1000 - shrapnel, 6);
 
     const weak = makeEnemy('weak', 200, 400, { health: 1 });
-    combat.flakBursts.length = 0;
+    combat.weapons.flakBursts.length = 0;
     const killer = missileOn(combat, weak);
     combat.processBulletHit(killer, weak, combat.cachedEnemies);
-    expect(combat.lodged).toHaveLength(0);
-    expect(combat.flakBursts).toHaveLength(1);
+    expect(combat.weapons.lodged).toHaveLength(0);
+    expect(combat.weapons.flakBursts).toHaveLength(1);
   });
 
   it('Thermite at 5: the burst throws thermite at the nearest neighbours; it flies there, sticks and burns', () => {
@@ -124,11 +125,11 @@ describe('Seeker Swarm family forms', () => {
 
     combat.processBulletHit(missile, target, combat.cachedEnemies);
     step(combat, 1.05);
-    expect(combat.thermite.map((p) => p.enemy)).toEqual([near]);
+    expect(combat.weapons.thermite.map((p) => p.enemy)).toEqual([near]);
     expect(near.health).toBe(1000);
     step(combat, 0.8);
-    expect(combat.thermite.every((p) => !p.flying)).toBe(true);
-    expect(combat.burns.has(near)).toBe(true);
+    expect(combat.weapons.thermite.every((p) => !p.flying)).toBe(true);
+    expect(combat.cards.burns.has(near)).toBe(true);
     expect(near.health).toBeLessThan(1000);
     expect(far.health).toBe(1000);
   });
@@ -149,10 +150,10 @@ describe('Seeker Swarm family forms', () => {
 
     combat.processBulletHit(missile, target, combat.cachedEnemies);
     // no Chain Lance off the hit
-    expect(combat.arcs).toHaveLength(0);
+    expect(combat.cards.arcs).toHaveLength(0);
     combat.updateWeaponEffects(0.01);
-    expect(combat.arcs).toHaveLength(1);
-    expect(combat.arcs[0]).toMatchObject({ heavy: true, bolt: false });
+    expect(combat.cards.arcs).toHaveLength(1);
+    expect(combat.cards.arcs[0]).toMatchObject({ heavy: true, bolt: false });
     step(combat, 0.5);
     hops.slice(0, 3).forEach((e) => {
       expect(e.health).toBeCloseTo(1000 - each, 6);
@@ -180,21 +181,22 @@ describe('Seeker Swarm family forms', () => {
     const missile = missileOn(combat, target);
 
     combat.processBulletHit(missile, target, combat.cachedEnemies);
-    expect(combat.flakBursts).toHaveLength(1);
-    expect(combat.gravityWells).toHaveLength(1);
-    expect(combat.slows.size).toBe(0); // no Gravitic Lance
+    expect(combat.weapons.flakBursts).toHaveLength(1);
+    expect(combat.weapons.gravityWells).toHaveLength(1);
+    expect(combat.cards.slows.size).toBe(0); // no Gravitic Lance
     step(combat, 0.3);
     expect(side.y).toBeLessThan(330);
     expect(outside.y).toBe(395);
     step(combat, 0.35);
-    expect(combat.gravityWells).toHaveLength(0);
+    expect(combat.weapons.gravityWells).toHaveLength(0);
     const held = side.y;
     step(combat, 0.2);
     expect(side.y).toBe(held);
 
     eventBus.emit('apex-unlocked', { family: 'field' });
     const first = missileOn(combat, target);
-    const other = combat.bullets[combat.bullets.length - 1];
+    const other =
+      combat.projectiles.bullets[combat.projectiles.bullets.length - 1];
     other.x = 150;
     other.y = 350;
     other.vx = 275;

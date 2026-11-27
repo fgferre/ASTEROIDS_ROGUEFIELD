@@ -51,7 +51,7 @@ function readBuild({ player, combat, 'xp-orbs': xpOrbs }) {
   return {
     maxHealth: player.maxHealth,
     damage: player.damage,
-    maxSpeed: player.maxSpeed,
+    maxSpeed: player.flight.maxSpeed,
     magnetismRadius: player.magnetismRadius,
     orbPull: xpOrbs.getMagnetismForce(),
     orbReach: xpOrbs.getMagnetismRadius(),

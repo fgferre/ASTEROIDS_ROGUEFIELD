@@ -21,7 +21,7 @@ describe('BurnMarks', () => {
     };
     const entry = { ticksLeft: 3 };
     const combat = {
-      burns: new Map([[enemy, entry]]),
+      cards: { burns: new Map([[enemy, entry]]) },
       weapons: { hasApex: () => false },
     };
     const player = { position: { x: 100, y: 300 } };

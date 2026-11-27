@@ -215,11 +215,13 @@ const makeServices = () => ({
     position: { x: 500, y: 100 },
     velocity: { vx: 30, vy: -20 },
     angle: 2,
-    cachedMovementInput: {
-      up: false,
-      down: false,
-      left: false,
-      right: false,
+    movementInput: {
+      cachedMovementInput: {
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+      },
     },
     setInvulnerableTimer: vi.fn(),
   },
@@ -305,10 +307,10 @@ describe('composeContentScene', () => {
     expect(player.velocity.vx).toBe(0);
 
     // Steered: the pilot's from then on, even after the key is released.
-    player.cachedMovementInput.right = true;
+    player.movementInput.cachedMovementInput.right = true;
     player.position.x = 400;
     vi.advanceTimersByTime(50);
-    player.cachedMovementInput.right = false;
+    player.movementInput.cachedMovementInput.right = false;
     vi.advanceTimersByTime(50);
     expect(player.position.x).toBe(400);
   });
@@ -320,7 +322,7 @@ describe('composeContentScene', () => {
         scene: enemyScene(),
         services: { player, ...rest },
       });
-      Object.assign(player.cachedMovementInput, flown);
+      Object.assign(player.movementInput.cachedMovementInput, flown);
       player.position.x = 400;
       vi.advanceTimersByTime(50);
       expect(player.position.x).toBe(400);

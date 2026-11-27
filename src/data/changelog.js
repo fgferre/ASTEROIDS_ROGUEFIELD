@@ -93,6 +93,7 @@ export const NEXT = {
     'Each card now says itself which part of the game its effect goes to, and one place delivers it, instead of a line written for every card in the ship and weapon code; every card does exactly what it did, so nobody notices.', // not confirmed
     "The 3D renderer's loading-screen warm-up moves to a file of its own, so the renderer can be changed again without passing its line limit; it prepares the same things in the same order at the same moment, so nobody notices.", // not confirmed
     "The recorded matches are now also checked against a recording made on GitHub's own machines, an empty error handler fails the code check, three unused developer scripts are gone, and a test address holding a card that is spent when picked (Hull Patch, Salvage Cache) no longer hangs the page.", // not confirmed
+    "The ship and the combat code no longer keep copies of their parts' fields (about seventy names): the 3D picture, the HUD, the bot, the Heralds and the tests read each field from the part that owns it, and a test keeps the copies from coming back; the seven weapons with every evolution, the card effects that showed on screen, the aim marks and the enemy shots were compared frame by frame with the way before, and the recorded runs play the same, so nobody notices (on the test server the Furnace Corona's heat ring round the ship, lost when the first unread copies went, is drawn again).", // not confirmed
   ],
 };
 

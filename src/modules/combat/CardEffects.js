@@ -387,7 +387,7 @@ export class CardEffects {
     if (
       player.isDead ||
       player._quitExplosionHidden ||
-      !(player.dashTimer > 0)
+      !(player.maneuvers.dashTimer > 0)
     ) {
       this.afterburnDashing = false;
       return;

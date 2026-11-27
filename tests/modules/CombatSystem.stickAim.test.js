@@ -30,7 +30,9 @@ describe('right-stick manual aim', () => {
 
   // The bullet fired last has the most life left.
   const newestBulletAngle = (combat) => {
-    const bullet = combat.bullets.reduce((a, b) => (b.life > a.life ? b : a));
+    const bullet = combat.projectiles.bullets.reduce((a, b) =>
+      b.life > a.life ? b : a
+    );
     return Math.atan2(bullet.vy, bullet.vx);
   };
 
@@ -42,18 +44,18 @@ describe('right-stick manual aim', () => {
     game.eventBus.emit('modern-flight-engaged');
     const { combat, player } = game.services;
     steps(game, 150);
-    expect(combat.currentTarget).not.toBeNull();
+    expect(combat.targeting.currentTarget).not.toBeNull();
 
     // A light push (inside the engage) leaves auto-aim alone.
     fake.set({ axes: [0, 0, -0.2, 0.2] });
     steps(game, 5);
     expect(player.getAimStick()).toBeNull();
-    expect(combat.currentTarget).not.toBeNull();
+    expect(combat.targeting.currentTarget).not.toBeNull();
 
     fake.set({ axes: [0, 0, -0.7, 0.7] });
     let locked = 0;
     steps(game, 60, () => {
-      if (combat.currentTarget) locked += 1;
+      if (combat.targeting.currentTarget) locked += 1;
     });
     expect(locked).toBe(0);
     expect(player.turretAngle).toBeCloseTo(AIM, 2);
@@ -62,7 +64,7 @@ describe('right-stick manual aim', () => {
     fake.set();
     steps(game, 30);
     expect(player.getAimStick()).toBeNull();
-    expect(combat.currentTarget).not.toBeNull();
+    expect(combat.targeting.currentTarget).not.toBeNull();
     expect(player.aimPoint).toEqual(combat.getPrimaryAimPoint());
   });
 });

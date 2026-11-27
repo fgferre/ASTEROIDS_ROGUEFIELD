@@ -99,7 +99,7 @@ describe('Warden entrance', () => {
       expect(boss.x).toBeGreaterThanOrEqual(to.x);
       expect(boss.y).toBeCloseTo(to.y, 6);
       expect(boss.spreadTimer).toBe(spreadTimer);
-      expect(combat.enemyBullets).toHaveLength(0);
+      expect(combat.projectiles.enemyBullets).toHaveLength(0);
       expect(boss.health).toBe(health);
       expect(player.health).toBe(shipHealth);
       game.step();

@@ -39,14 +39,14 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
     it('setAimMode("manual") clears currentTarget + locks + predictedAimPoints', () => {
       const { combat } = setupCombatHarness({ multishot: 2 });
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      expect(combat.currentTarget).not.toBeNull();
+      expect(combat.targeting.currentTarget).not.toBeNull();
 
       combat.setAimMode('manual');
-      expect(combat.currentTarget).toBeNull();
-      expect(combat.currentTargetLocks).toEqual([]);
-      expect(combat.currentLockAssignments).toEqual([]);
+      expect(combat.targeting.currentTarget).toBeNull();
+      expect(combat.targeting.currentTargetLocks).toEqual([]);
+      expect(combat.targeting.currentLockAssignments).toEqual([]);
     });
 
     it('manual mode: fireForward path used (no target lock); bullets fly in ship rotation direction', () => {
@@ -55,10 +55,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.setAimMode('manual');
       combat.setSpreadMode('concentrated');
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-      const fired = combat.bullets.slice(before);
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBe(3);
       // Fix-pass (F6): manual + concentrated now keeps every origin at the
@@ -79,24 +82,24 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // re-populate currentTarget/currentTargetLocks while still in manual
       // mode. Plan must_have: "no target lock / no multi-lock while manual."
       const { combat } = setupCombatHarness({ multishot: 2 });
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      expect(combat.currentTarget).not.toBeNull();
+      expect(combat.targeting.currentTarget).not.toBeNull();
 
       combat.setAimMode('manual');
       // After entering manual mode the locks are cleared.
-      expect(combat.currentTarget).toBeNull();
-      expect(combat.currentTargetLocks).toEqual([]);
+      expect(combat.targeting.currentTarget).toBeNull();
+      expect(combat.targeting.currentTargetLocks).toEqual([]);
 
       // Advance several update ticks. Without the F7 gate, updateTargeting
       // re-runs findBestTarget every tick and repopulates currentTarget.
       for (let i = 0; i < 5; i += 1) {
-        combat.targetUpdateTimer = 0;
-        combat.updateTargeting(combat.targetUpdateInterval + 0.01);
+        combat.targeting.targetUpdateTimer = 0;
+        combat.updateTargeting(combat.targeting.targetUpdateInterval + 0.01);
       }
-      expect(combat.currentTarget).toBeNull();
-      expect(combat.currentTargetLocks).toEqual([]);
-      expect(combat.currentLockAssignments).toEqual([]);
+      expect(combat.targeting.currentTarget).toBeNull();
+      expect(combat.targeting.currentTargetLocks).toEqual([]);
+      expect(combat.targeting.currentLockAssignments).toEqual([]);
     });
 
     it('F8: switching from manual back to auto forces fresh acquisition on the next tick (needsRetarget consumed)', () => {
@@ -105,22 +108,22 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // and delayed acquisition by one full interval. Fix: when needsRetarget
       // is set, the next update forces findBestTarget immediately.
       const { combat } = setupCombatHarness({ multishot: 2 });
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      const originalTarget = combat.currentTarget;
+      const originalTarget = combat.targeting.currentTarget;
       expect(originalTarget).not.toBeNull();
 
       combat.setAimMode('manual');
-      expect(combat.currentTarget).toBeNull();
+      expect(combat.targeting.currentTarget).toBeNull();
 
       combat.setAimMode('auto');
-      expect(combat.needsRetarget).toBe(true);
+      expect(combat.targeting.needsRetarget).toBe(true);
 
       // Advance ONE update tick. needsRetarget must force findBestTarget
       // immediately, regardless of targetUpdateTimer remaining.
       combat.updateTargeting(0.001);
-      expect(combat.currentTarget).not.toBeNull();
-      expect(combat.needsRetarget).toBe(false);
+      expect(combat.targeting.currentTarget).not.toBeNull();
+      expect(combat.targeting.needsRetarget).toBe(false);
     });
 
     // Fix-pass-2 (C3): the _aimModeFlagSnapshot was captured on manual-on
@@ -134,48 +137,48 @@ describe('FIX-05 centerline invariant + toggles', () => {
     // during manual MUST survive switchback.
     it('C3: upgrade acquired during manual survives auto switchback (dangerScore + dynamicPrediction)', () => {
       const { combat, eventBus } = setupCombatHarness({ multishot: 2 });
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
       // Start at rank 1: dangerScoreEnabled becomes true, dynamicPrediction false.
       eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
-      expect(combat.targetingUpgradeLevel).toBe(1);
-      expect(combat.dangerScoreEnabled).toBe(true);
-      expect(combat.dynamicPredictionEnabled).toBe(false);
+      expect(combat.targeting.targetingUpgradeLevel).toBe(1);
+      expect(combat.targeting.dangerScoreEnabled).toBe(true);
+      expect(combat.targeting.dynamicPredictionEnabled).toBe(false);
 
       // Toggle to manual. Snapshot captured here:
       //   {dangerScoreEnabled: true, dynamicPredictionEnabled: false}.
       combat.setAimMode('manual');
-      expect(combat.aimMode).toBe('manual');
+      expect(combat.targeting.aimMode).toBe('manual');
       // Behavioral flags paused while manual.
-      expect(combat.dangerScoreEnabled).toBe(false);
-      expect(combat.dynamicPredictionEnabled).toBe(false);
+      expect(combat.targeting.dangerScoreEnabled).toBe(false);
+      expect(combat.targeting.dynamicPredictionEnabled).toBe(false);
 
       // Apply rank-2 upgrade WHILE in manual. dynamicPrediction should
       // be tracked so the restore on switchback re-enables it.
       eventBus.emit('upgrade-aiming-suite', { level: 2 });
-      expect(combat.targetingUpgradeLevel).toBe(2);
+      expect(combat.targeting.targetingUpgradeLevel).toBe(2);
 
       // Toggle back to auto. The restore MUST reflect rank 2's flags
       // (both true), not the pre-upgrade rank-1 snapshot.
       combat.setAimMode('auto');
-      expect(combat.aimMode).toBe('auto');
-      expect(combat.dangerScoreEnabled).toBe(true);
+      expect(combat.targeting.aimMode).toBe('auto');
+      expect(combat.targeting.dangerScoreEnabled).toBe(true);
       // The C3 regression check — currently FAILS pre-fix because the
       // stale rank-1 snapshot restore overrides the rank-2 upgrade.
-      expect(combat.dynamicPredictionEnabled).toBe(true);
+      expect(combat.targeting.dynamicPredictionEnabled).toBe(true);
     });
 
     it('C3: upgrade from rank 0 → rank 3 acquired during manual survives auto switchback', () => {
       // Stronger variant: bigger jump. rank-0 → manual → rank-3.
       const { combat, eventBus } = setupCombatHarness({ multishot: 4 });
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
       // Start at rank 0: both flags false (default).
-      expect(combat.targetingUpgradeLevel).toBe(0);
-      expect(combat.dangerScoreEnabled).toBe(false);
-      expect(combat.dynamicPredictionEnabled).toBe(false);
+      expect(combat.targeting.targetingUpgradeLevel).toBe(0);
+      expect(combat.targeting.dangerScoreEnabled).toBe(false);
+      expect(combat.targeting.dynamicPredictionEnabled).toBe(false);
 
       // Toggle to manual. Snapshot = {false, false}.
       combat.setAimMode('manual');
@@ -191,8 +194,8 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       // Toggle back to auto. Both flags must reflect rank-3 capabilities.
       combat.setAimMode('auto');
-      expect(combat.dangerScoreEnabled).toBe(true);
-      expect(combat.dynamicPredictionEnabled).toBe(true);
+      expect(combat.targeting.dangerScoreEnabled).toBe(true);
+      expect(combat.targeting.dynamicPredictionEnabled).toBe(true);
     });
 
     // Fix-pass-2 (C5): mode state must reset on run end. The first fix-pass
@@ -205,10 +208,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // Dirty all four bits of mode state.
       combat.setSpreadMode('fan');
       combat.setAimMode('manual');
-      combat.needsRetarget = true;
+      combat.targeting.needsRetarget = true;
       // The setAimMode('manual') already populates _aimModeFlagSnapshot,
       // so dirty it further to make sure reset clears (not just overwrites).
-      combat._aimModeFlagSnapshot = {
+      combat.targeting._aimModeFlagSnapshot = {
         dangerScoreEnabled: true,
         dynamicPredictionEnabled: true,
       };
@@ -216,24 +219,24 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // Pre-condition: dirty state confirmed.
       expect(combat.getSpreadMode()).toBe('fan');
       expect(combat.getAimMode()).toBe('manual');
-      expect(combat._aimModeFlagSnapshot).not.toBeNull();
-      expect(combat.needsRetarget).toBe(true);
+      expect(combat.targeting._aimModeFlagSnapshot).not.toBeNull();
+      expect(combat.targeting.needsRetarget).toBe(true);
 
       combat.reset();
 
       // Post-condition: all four restored to defaults.
       expect(combat.getSpreadMode()).toBe('concentrated');
       expect(combat.getAimMode()).toBe('auto');
-      expect(combat._aimModeFlagSnapshot).toBeNull();
-      expect(combat.needsRetarget).toBe(false);
+      expect(combat.targeting._aimModeFlagSnapshot).toBeNull();
+      expect(combat.targeting.needsRetarget).toBe(false);
     });
 
     it('C5: player-reset event also restores spreadMode / aimMode / snapshot / needsRetarget', () => {
       const { combat, eventBus } = setupCombatHarness({ multishot: 2 });
       combat.setSpreadMode('fan');
       combat.setAimMode('manual');
-      combat.needsRetarget = true;
-      combat._aimModeFlagSnapshot = {
+      combat.targeting.needsRetarget = true;
+      combat.targeting._aimModeFlagSnapshot = {
         dangerScoreEnabled: true,
         dynamicPredictionEnabled: true,
       };
@@ -244,8 +247,8 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       expect(combat.getSpreadMode()).toBe('concentrated');
       expect(combat.getAimMode()).toBe('auto');
-      expect(combat._aimModeFlagSnapshot).toBeNull();
-      expect(combat.needsRetarget).toBe(false);
+      expect(combat.targeting._aimModeFlagSnapshot).toBeNull();
+      expect(combat.targeting.needsRetarget).toBe(false);
     });
 
     it('F6: manual + concentrated + N>1 → ALL shots leave from the same ship-nose origin (not nose ± perpendicular offset)', () => {
@@ -306,9 +309,12 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.setSpreadMode('concentrated');
       combat.setAimMode('manual');
 
-      const before = combat.bullets.length;
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-      const fired = combat.bullets.slice(before);
+      const before = combat.projectiles.bullets.length;
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBe(3);
       const noseExpected = { x: 416, y: 300 };
@@ -367,9 +373,12 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
       combat.setAimMode('manual');
 
-      const before = combat.bullets.length;
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-      const fired = combat.bullets.slice(before);
+      const before = combat.projectiles.bullets.length;
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBe(1);
       // Bullet should spawn at (416, 300) — the muzzle, not the ship center (400, 300).
@@ -388,16 +397,16 @@ describe('FIX-05 centerline invariant + toggles', () => {
         cooldownMultiplier: 0.92,
       });
 
-      const cooldownBefore = combat.shootCooldown;
-      const expectedReduction = combat.baseShootCooldown * 0.92;
+      const cooldownBefore = combat.weapons.shootCooldown;
+      const expectedReduction = combat.weapons.baseShootCooldown * 0.92;
       expect(cooldownBefore).toBeCloseTo(expectedReduction, 5);
 
       combat.setAimMode('manual');
       // Cooldown stat preserved — it's a weapon stat, not an aim behavior.
-      expect(combat.shootCooldown).toBeCloseTo(cooldownBefore, 5);
+      expect(combat.weapons.shootCooldown).toBeCloseTo(cooldownBefore, 5);
 
       combat.setAimMode('auto');
-      expect(combat.shootCooldown).toBeCloseTo(cooldownBefore, 5);
+      expect(combat.weapons.shootCooldown).toBeCloseTo(cooldownBefore, 5);
     });
 
     it('manual mode: behavioral flags paused; restored on switchback to auto', () => {
@@ -411,24 +420,24 @@ describe('FIX-05 centerline invariant + toggles', () => {
           fallbackLeadTime: 0.32,
         },
       });
-      expect(combat.dangerScoreEnabled).toBe(true);
-      expect(combat.dynamicPredictionEnabled).toBe(true);
+      expect(combat.targeting.dangerScoreEnabled).toBe(true);
+      expect(combat.targeting.dynamicPredictionEnabled).toBe(true);
 
       combat.setAimMode('manual');
-      expect(combat.dangerScoreEnabled).toBe(false);
-      expect(combat.dynamicPredictionEnabled).toBe(false);
+      expect(combat.targeting.dangerScoreEnabled).toBe(false);
+      expect(combat.targeting.dynamicPredictionEnabled).toBe(false);
 
       combat.setAimMode('auto');
-      expect(combat.dangerScoreEnabled).toBe(true);
-      expect(combat.dynamicPredictionEnabled).toBe(true);
+      expect(combat.targeting.dangerScoreEnabled).toBe(true);
+      expect(combat.targeting.dynamicPredictionEnabled).toBe(true);
     });
 
     it('switching auto → manual → auto sets needsRetarget flag', () => {
       const { combat } = setupCombatHarness();
       combat.setAimMode('manual');
-      expect(combat.needsRetarget).toBeFalsy();
+      expect(combat.targeting.needsRetarget).toBeFalsy();
       combat.setAimMode('auto');
-      expect(combat.needsRetarget).toBe(true);
+      expect(combat.targeting.needsRetarget).toBe(true);
     });
 
     it('toggle-aim-mode event with screen=playing flips aimMode', () => {
@@ -476,15 +485,15 @@ describe('FIX-05 centerline invariant + toggles', () => {
         multiLockTargets: 4,
         cooldownMultiplier: 0.92,
       });
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      expect(combat.currentTarget).not.toBeNull();
+      expect(combat.targeting.currentTarget).not.toBeNull();
 
       combat.setAimMode('manual');
       // The lock feedback reads these: manual mode must leave none behind.
-      expect(combat.currentTarget).toBeNull();
-      expect(combat.currentLockAssignments).toEqual([]);
-      expect(combat.predictedAimPoints).toEqual([]);
+      expect(combat.targeting.currentTarget).toBeNull();
+      expect(combat.targeting.currentLockAssignments).toEqual([]);
+      expect(combat.targeting.predictedAimPoints).toEqual([]);
     });
 
     // Fix-pass (F11): Codex review noted rank-2 predicted-marker and rank-3
@@ -506,16 +515,16 @@ describe('FIX-05 centerline invariant + toggles', () => {
           fallbackLeadTime: 0.32,
         },
       });
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(2);
+      expect(combat.targeting.targetingUpgradeLevel).toBeGreaterThanOrEqual(2);
       expect(combat.usingDynamicPrediction()).toBe(true);
-      expect(combat.predictedAimPoints.length).toBeGreaterThan(0);
-      const predicted = combat.predictedAimPoints[0].position;
+      expect(combat.targeting.predictedAimPoints.length).toBeGreaterThan(0);
+      const predicted = combat.targeting.predictedAimPoints[0].position;
       expect(predicted).toBeDefined();
 
       // The marker sits ahead of the target along its velocity, not on it.
-      const target = combat.currentTarget;
+      const target = combat.targeting.currentTarget;
       const lead =
         (predicted.x - target.x) * target.vx +
         (predicted.y - target.y) * target.vy;
@@ -544,11 +553,11 @@ describe('FIX-05 centerline invariant + toggles', () => {
         multiLockTargets: 4,
         cooldownMultiplier: 0.92,
       });
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+      expect(combat.targeting.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
 
-      const assignments = combat.currentLockAssignments;
+      const assignments = combat.targeting.currentLockAssignments;
       expect(assignments.length).toBeGreaterThanOrEqual(2);
 
       // At least 2 DISTINCT locked enemies (the rank-3 indicators mark every
@@ -581,14 +590,17 @@ describe('FIX-05 centerline invariant + toggles', () => {
         combat.setAimMode(aim);
 
         if (aim === 'auto') {
-          combat.targetUpdateTimer = 0;
+          combat.targeting.targetUpdateTimer = 0;
           combat.updateTargeting(0);
         }
 
-        const before = combat.bullets.length;
+        const before = combat.projectiles.bullets.length;
         const player = combat.getCachedPlayer();
-        combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-        const fired = combat.bullets.slice(before);
+        combat.handleShooting(
+          combat.weapons.shootCooldown + 0.001,
+          player.getStats()
+        );
+        const fired = combat.projectiles.bullets.slice(before);
 
         expect(fired.length).toBe(2);
       });
@@ -619,16 +631,19 @@ describe('FIX-05 centerline invariant + toggles', () => {
         const { combat, playerState } = setupCombatHarness({ multishot: n });
         playerState.multishot = n;
         combat.setSpreadMode('concentrated');
-        combat.targetUpdateTimer = 0;
+        combat.targeting.targetUpdateTimer = 0;
         combat.updateTargeting(0);
 
-        const before = combat.bullets.length;
+        const before = combat.projectiles.bullets.length;
         const player = combat.getCachedPlayer();
-        combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-        const fired = combat.bullets.slice(before);
+        combat.handleShooting(
+          combat.weapons.shootCooldown + 0.001,
+          player.getStats()
+        );
+        const fired = combat.projectiles.bullets.slice(before);
         expect(fired.length).toBeGreaterThanOrEqual(n);
 
-        const enemy = combat.currentTarget;
+        const enemy = combat.targeting.currentTarget;
         const limit = (enemy.radius || 16) + BULLET_SIZE;
         fired.forEach((b) => {
           // In concentrated mode, lanes are parallel-translated by ≤ limit.

@@ -160,7 +160,7 @@ describe('Tactical HUD', () => {
         }),
         progression: () => null,
         combat: () => ({
-          enemyBullets: [shot],
+          projectiles: { enemyBullets: [shot] },
           getWeaponState: () => null,
           getSpreadMode: () => null,
           getAimMode: () => null,

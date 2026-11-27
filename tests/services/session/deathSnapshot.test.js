@@ -27,7 +27,7 @@ function readRewards({ combat, healthHearts, pickups, 'xp-orbs': xpOrbs }) {
 // An elite rock of 1 HP just ahead of each shot in flight: the shots kill
 // them after the death.
 function plantInShotPaths({ combat, enemies }) {
-  combat.bullets.slice(0, 4).forEach((bullet) => {
+  combat.projectiles.bullets.slice(0, 4).forEach((bullet) => {
     const rock = enemies.acquireAsteroid({
       size: 'small',
       wave: 1,
@@ -68,7 +68,8 @@ describe('death snapshot of the field rewards', () => {
     );
     pickups.rockDropChance = 1;
     for (let i = 0; i < 10 * 60; i += 1) game.step();
-    for (let i = 0; i < 120 && combat.bullets.length < 3; i += 1) game.step();
+    for (let i = 0; i < 120 && combat.projectiles.bullets.length < 3; i += 1)
+      game.step();
     pickups.collect({ kind: 'overcharge', x: 0, y: 0 });
 
     plantInShotPaths(game.services);

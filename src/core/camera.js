@@ -104,7 +104,7 @@ const EMPTY_LIST = Object.freeze([]);
 
 /**
  * Fills `scene` for the director: the ship, its aim, the live enemies, the
- * hostile shots (combat.enemyBullets) and the XP orbs, read in place.
+ * hostile shots (combat.projectiles.enemyBullets) and the XP orbs, read in place.
  */
 export function readCameraScene(scene, player, combat, enemies, xpOrbs) {
   const position = player?.position;
@@ -119,7 +119,7 @@ export function readCameraScene(scene, player, combat, enemies, xpOrbs) {
   scene.vy = player?.velocity?.vy || 0;
   scene.heading = player?.angle || 0;
   scene.enemies = enemies || EMPTY_LIST;
-  scene.shots = combat?.enemyBullets || EMPTY_LIST;
+  scene.shots = combat?.projectiles.enemyBullets || EMPTY_LIST;
   scene.orbs = xpOrbs?.xpOrbs || EMPTY_LIST;
   return scene;
 }

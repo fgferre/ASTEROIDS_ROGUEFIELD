@@ -94,10 +94,10 @@ function seenRate(shape, value, time, memory, turn = false) {
 // The turret's reach with the weapon it carries (px): what its shots or
 // strikes get to, never past the turret's own targeting range.
 export function weaponReach(combat) {
-  const form = combat.weaponForm;
+  const form = combat.weapons.weapon;
   const shot =
     form?.projectile?.range ??
-    combat.bulletSpeed * (combat.weapons?.bulletLifetime || 0);
+    combat.weapons.bulletSpeed * (combat.weapons?.bulletLifetime || 0);
   const reaches = (form?.fire || []).map(
     (p) =>
       p.range ?? p.length ?? p.acquire ?? p.sweep?.reach ?? p.radius ?? shot
@@ -132,7 +132,7 @@ function glideOf(player, combat) {
     // No drag: the shared loot terms' terminal speed (push ÷ drag) is the
     // top speed.
     damping: accel / maxSpeed,
-    bulletSpeed: combat.bulletSpeed,
+    bulletSpeed: combat.weapons.bulletSpeed,
   };
 }
 
@@ -154,7 +154,7 @@ export function readWorld(services, time, memory = new WeakMap()) {
     acceleration: player.flight.acceleration,
     damping: player.flight.baseLinearDamping,
     braking: player.flight.brakingDamping,
-    dashReady: player.maneuvers.canDash() && !(player.dashTimer > 0),
+    dashReady: player.maneuvers.canDash() && !(player.maneuvers.dashTimer > 0),
     dashImpulse: DASH_IMPULSE * player.maneuvers.dashDistanceMultiplier,
     shieldReady:
       shield.shieldUpgradeLevel > 0 &&
@@ -229,7 +229,7 @@ export function readWorld(services, time, memory = new WeakMap()) {
       };
     }
   });
-  for (const b of combat.enemyBullets || []) {
+  for (const b of combat.projectiles.enemyBullets || []) {
     movers.push({
       x: b.x,
       y: b.y,

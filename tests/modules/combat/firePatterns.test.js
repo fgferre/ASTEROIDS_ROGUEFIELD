@@ -75,7 +75,7 @@ function makeRun(list = []) {
 function armed(weaponId, list) {
   const run = makeRun(list);
   run.eventBus.emit('upgrade-weapon', { weaponId });
-  expect(run.combat.weaponId).toBe(weaponId);
+  expect(run.combat.weapons.weaponId).toBe(weaponId);
   return run;
 }
 
@@ -95,7 +95,7 @@ describe('fire patterns', () => {
     const { combat } = armed('arc-caster', [...line, aside]);
 
     // On the cooldown exactly: the clock carries nothing past it.
-    combat.lastShotTime = combat.shootCooldown;
+    combat.weapons.lastShotTime = combat.weapons.shootCooldown;
     combat.handleShooting(0, STATS);
 
     const damage = (hop) => DAMAGE * cast.falloff ** hop;
@@ -106,9 +106,9 @@ describe('fire patterns', () => {
       );
     expect(line[cast.jumps + 1].health).toBe(100);
     expect(aside.health).toBe(100);
-    expect(combat.arcs).toHaveLength(cast.jumps + 1);
-    expect(combat.lastShotTime).toBeCloseTo(
-      -combat.shootCooldown * (cast.cooldownMultiplier - 1),
+    expect(combat.cards.arcs).toHaveLength(cast.jumps + 1);
+    expect(combat.weapons.lastShotTime).toBeCloseTo(
+      -combat.weapons.shootCooldown * (cast.cooldownMultiplier - 1),
       9
     );
 
@@ -146,7 +146,7 @@ describe('fire patterns', () => {
     const empty = armed('arc-caster', [out]).combat;
     empty.handleShooting(1, STATS);
     expect(out.health).toBe(100);
-    expect(empty.arcs).toHaveLength(1);
+    expect(empty.cards.arcs).toHaveLength(1);
   });
 
   describe('chain: the families and the six cards', () => {
@@ -255,10 +255,11 @@ describe('fire patterns', () => {
         bulletSpeedMultiplier: 1.15,
       });
       // On the cooldown exactly: the clock carries nothing past it.
-      combat.lastShotTime = combat.shootCooldown;
+      combat.weapons.lastShotTime = combat.weapons.shootCooldown;
       combat.handleShooting(0, STATS);
-      expect(combat.lastShotTime).toBeCloseTo(
-        -combat.shootCooldown * (cast.cooldownMultiplier / Math.cbrt(1.15) - 1),
+      expect(combat.weapons.lastShotTime).toBeCloseTo(
+        -combat.weapons.shootCooldown *
+          (cast.cooldownMultiplier / Math.cbrt(1.15) - 1),
         9
       );
     });
@@ -326,8 +327,8 @@ describe('fire patterns', () => {
     const cut = DAMAGE * halo.damageMultiplier;
 
     tickWeaponField(combat.weapons, 0.01, STATS);
-    expect(combat.blades).toHaveLength(halo.blades);
-    combat.blades.forEach((blade) =>
+    expect(combat.weapons.blades).toHaveLength(halo.blades);
+    combat.weapons.blades.forEach((blade) =>
       expect(Math.hypot(blade.x - SHIP.x, blade.y - SHIP.y)).toBeCloseTo(
         halo.radius,
         6
@@ -344,7 +345,7 @@ describe('fire patterns', () => {
 
     // Multishot adds blades.
     tickWeaponField(combat.weapons, 0.01, { multishot: 3, damage: DAMAGE });
-    expect(combat.blades).toHaveLength(halo.blades + 2);
+    expect(combat.weapons.blades).toHaveLength(halo.blades + 2);
   });
 
   describe('orbit: the families and the six cards', () => {
@@ -382,13 +383,13 @@ describe('fire patterns', () => {
 
     it('arc: a cycle cutting five enemies starts one chain; Storm forks it', () => {
       const combat = cut(crowd(), (c) => c.weapons.evolveWeapon('arc'));
-      expect(combat.arcs).toHaveLength(forms.perShot.chains);
+      expect(combat.cards.arcs).toHaveLength(forms.perShot.chains);
       const storm = cut(crowd(), (c) => c.weapons.apexWeapon('arc'));
-      expect(storm.arcs.length).toBeGreaterThan(1);
+      expect(storm.cards.arcs.length).toBeGreaterThan(1);
       // The next cycle gets a new budget.
       combat.handleShooting(1, STATS);
       tickWeaponField(combat.weapons, 0.01, STATS);
-      expect(combat.arcs).toHaveLength(2 * forms.perShot.chains);
+      expect(combat.cards.arcs).toHaveLength(2 * forms.perShot.chains);
     });
 
     it('kinetic: Railshot and Coilgun cut harder and shove further', () => {
@@ -454,7 +455,7 @@ describe('fire patterns', () => {
           });
         }
         tickWeaponField(combat.weapons, 0.1, STATS);
-        return combat.blades[0].around;
+        return combat.weapons.blades[0].around;
       };
       expect(turn(1.15)).toBeCloseTo(turn(0) * Math.cbrt(1.15), 6);
     });
@@ -528,14 +529,14 @@ describe('fire patterns', () => {
     const pulse = DAMAGE * corona.damageMultiplier;
 
     // On the cooldown exactly: the clock carries nothing past it.
-    combat.lastShotTime = combat.shootCooldown;
+    combat.weapons.lastShotTime = combat.weapons.shootCooldown;
     combat.handleShooting(0, STATS);
     expect(inside.health).toBeCloseTo(100 - pulse, 6);
     expect(inside.vx).toBeGreaterThan(0);
     expect(outside.health).toBe(100);
-    expect(combat.pulses).toHaveLength(1);
+    expect(combat.weapons.pulses).toHaveLength(1);
 
-    const wait = combat.shootCooldown * corona.cooldownMultiplier;
+    const wait = combat.weapons.shootCooldown * corona.cooldownMultiplier;
     combat.handleShooting(wait * 0.9, STATS);
     expect(inside.health).toBeCloseTo(100 - pulse, 6);
     combat.handleShooting(wait * 0.1 + 1e-6, STATS);
@@ -583,13 +584,13 @@ describe('fire patterns', () => {
     const { combat } = armed('furnace-corona', crowd());
     combat.weapons.evolveWeapon('arc');
     combat.handleShooting(1, STATS);
-    expect(combat.arcs).toHaveLength(
+    expect(combat.cards.arcs).toHaveLength(
       WEAPON_FORMS['furnace-corona'].base.familyForms.perShot.chains
     );
     const storm = armed('furnace-corona', crowd());
     storm.combat.weapons.apexWeapon('arc');
     storm.combat.handleShooting(1, STATS);
-    expect(storm.combat.arcs.length).toBeGreaterThan(2);
+    expect(storm.combat.cards.arcs.length).toBeGreaterThan(2);
   });
 
   it('aura: a lance hit with no shot budget starts a chain every time', () => {
@@ -688,7 +689,8 @@ describe('fire patterns', () => {
       combat.handleShooting(1, STATS);
       const once = dealt(who);
       const wait =
-        (combat.shootCooldown * firstOf('furnace-corona').cooldownMultiplier) /
+        (combat.weapons.shootCooldown *
+          firstOf('furnace-corona').cooldownMultiplier) /
         Math.cbrt(1.15);
       combat.handleShooting(wait + 1e-6, STATS);
       expect(dealt(who)).toBeCloseTo(2 * once, 6);
@@ -753,9 +755,9 @@ describe('fire patterns', () => {
     const inside = enemy('inside', SHIP.x + 40, SHIP.y);
     const { combat } = armed('furnace-corona', [inside]);
     combat.weapons.apexWeapon('thermal');
-    expect(combat.weaponForm.form.id).toBe('sunheart');
+    expect(combat.weapons.weapon.form.id).toBe('sunheart');
     combat.handleShooting(1, STATS);
-    expect(combat.burns.has(inside)).toBe(true);
+    expect(combat.cards.burns.has(inside)).toBe(true);
   });
 
   it('seeker: a salvo gives each missile a target and turns it at most `turn` rad/s, at its speed', () => {
@@ -765,14 +767,20 @@ describe('fire patterns', () => {
     const { combat } = armed('seeker-swarm', [below]);
 
     combat.handleShooting(1, STATS);
-    expect(combat.bullets).toHaveLength(salvo.missiles);
-    const headings = combat.bullets.map((m) => Math.atan2(m.vy, m.vx));
-    const speeds = combat.bullets.map((m) => Math.hypot(m.vx, m.vy));
-    combat.bullets.forEach((m) => expect(m.seeker.target).toBe(below));
+    expect(combat.projectiles.bullets).toHaveLength(salvo.missiles);
+    const headings = combat.projectiles.bullets.map((m) =>
+      Math.atan2(m.vy, m.vx)
+    );
+    const speeds = combat.projectiles.bullets.map((m) =>
+      Math.hypot(m.vx, m.vy)
+    );
+    combat.projectiles.bullets.forEach((m) =>
+      expect(m.seeker.target).toBe(below)
+    );
 
     const dt = 0.1;
     combat.updateBullets(dt);
-    combat.bullets.forEach((missile, i) => {
+    combat.projectiles.bullets.forEach((missile, i) => {
       const turned = Math.atan2(missile.vy, missile.vx) - headings[i];
       expect(turned).toBeCloseTo(salvo.turn * dt, 6); // both turn toward +y
       expect(Math.hypot(missile.vx, missile.vy)).toBeCloseTo(speeds[i], 6);
@@ -784,7 +792,9 @@ describe('fire patterns', () => {
     combat.weapons.enemies().forEachActiveEnemy = (callback) =>
       [below, next].forEach(callback);
     combat.updateBullets(dt);
-    combat.bullets.forEach((m) => expect(m.seeker.target).toBe(next));
+    combat.projectiles.bullets.forEach((m) =>
+      expect(m.seeker.target).toBe(next)
+    );
   });
 
   it('seeker: with the Overcharge Coil at rank 3 missiles fly 30% faster and turn 60% tighter', () => {
@@ -799,8 +809,8 @@ describe('fire patterns', () => {
       })
     );
     combat.handleShooting(1, STATS);
-    const [missile] = combat.bullets;
-    const base = combat.bulletSpeed / 1.15 ** 3;
+    const [missile] = combat.projectiles.bullets;
+    const base = combat.weapons.bulletSpeed / 1.15 ** 3;
     expect(Math.hypot(missile.vx, missile.vy)).toBeCloseTo(
       base * 1.3 * WEAPON_FORMS['seeker-swarm'].base.projectile.speedMultiplier,
       6
@@ -818,7 +828,7 @@ describe('fire patterns', () => {
       lanceDamageMultiplier: 1.15,
     });
     combat.handleShooting(1, STATS);
-    const [missile] = combat.bullets;
+    const [missile] = combat.projectiles.bullets;
     expect(missile.seeker.target).toBe(far);
     const shot = DAMAGE * salvo.damageMultiplier;
     expect(missile.damage).toBeCloseTo(
@@ -841,14 +851,14 @@ describe('fire patterns', () => {
     };
     combat.cards.rollCardChance = vi.fn(() => true);
     combat.handleShooting(1, { multishot: 0, damage: DAMAGE });
-    const salvo = combat.bullets.length;
+    const salvo = combat.projectiles.bullets.length;
     // Each missile locks on within a few frames: one roll each, a twin each.
     for (let frame = 0; frame < 30; frame += 1) {
       combat.updateBullets(1 / 60);
       tickWeaponField(combat.weapons, 1 / 60, STATS);
     }
     expect(combat.cards.rollCardChance).toHaveBeenCalledTimes(salvo);
-    const twins = combat.bullets.slice(salvo);
+    const twins = combat.projectiles.bullets.slice(salvo);
     expect(twins).toHaveLength(salvo);
     twins.forEach((twin) => expect(twin.seeker.splits).toBe(false));
     // The two missiles chase one enemy each, so each twin takes the other.
@@ -863,14 +873,14 @@ describe('fire patterns', () => {
     const { combat, enemies } = armed('seeker-swarm', [weak, other]);
     combat.weapons.apexWeapon('salvage');
     combat.handleShooting(1, STATS);
-    const [missile] = combat.bullets;
+    const [missile] = combat.projectiles.bullets;
     expect(missile.seeker.breed).toBe(2);
 
     combat.processBulletHit(missile, weak, enemies);
     expect(weak.destroyed).toBe(true);
-    const before = combat.bullets.length;
+    const before = combat.projectiles.bullets.length;
     tickWeaponField(combat.weapons, 0.01, STATS);
-    const brood = combat.bullets.slice(before);
+    const brood = combat.projectiles.bullets.slice(before);
     expect(brood).toHaveLength(2);
     brood.forEach((m) => expect(m.seeker.breed).toBe(0));
   });
@@ -883,8 +893,8 @@ describe('fire patterns', () => {
     combat.handleShooting(1, STATS);
     combat.handleShooting(1, STATS);
 
-    expect(combat.bullets.slice(-6)).toHaveLength(6);
-    combat.bullets.slice(-6).forEach((missile) => {
+    expect(combat.projectiles.bullets.slice(-6)).toHaveLength(6);
+    combat.projectiles.bullets.slice(-6).forEach((missile) => {
       expect(missile.seeker.breed).toBe(2);
     });
   });
@@ -896,8 +906,8 @@ describe('fire patterns', () => {
     progression.applyUpgrade('thermal_lens');
     progression.applyUpgrade('afterburn_lance');
 
-    expect(combat.weaponId).toBe('furnace-corona');
-    expect(combat.weaponForm.form.id).toBe('nova-corona');
+    expect(combat.weapons.weaponId).toBe('furnace-corona');
+    expect(combat.weapons.weapon.form.id).toBe('nova-corona');
   });
 });
 
@@ -935,7 +945,7 @@ describe("a weapon's own evolution and Apex", () => {
     expect(evolved).toHaveBeenCalledWith(
       expect.objectContaining({ family: 'arc', name: 'Forked Arc' })
     );
-    expect(combat.weaponForm.fire[0].fork).toBe(2);
+    expect(combat.weapons.weapon.fire[0].fork).toBe(2);
     // The Chain Lance stays off: the Arc Caster brings its own.
     expect(combat.weapons.hasEvolution('arc')).toBe(false);
 
@@ -944,7 +954,7 @@ describe("a weapon's own evolution and Apex", () => {
       name: 'Storm Crown',
       evolutions: [{ family: 'arc', id: 'storm-crown', apex: true }],
     });
-    expect(combat.weaponForm.fire.map((entry) => entry.every)).toEqual([
+    expect(combat.weapons.weapon.fire.map((entry) => entry.every)).toEqual([
       3,
       undefined,
     ]);
@@ -974,7 +984,7 @@ describe("a weapon's own evolution and Apex", () => {
         volley: { struck: [], bursts: 0 },
         projectile: WEAPON_FORMS[weaponId].base.projectile,
       });
-      return combat.flakBursts[0].maxRadius;
+      return combat.weapons.flakBursts[0].maxRadius;
     };
     const dampers = (combat, bus) =>
       bus.emit('upgrade-weapon-tuning', {

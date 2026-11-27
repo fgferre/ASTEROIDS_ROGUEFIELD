@@ -279,7 +279,8 @@ export class Herald extends BaseEnemy {
   // kind, so the shards a Retry puts back are under its hand again.
   steerShards(target, deltaTime) {
     if (!target) return;
-    const bullets = this.system?.getCachedCombat?.()?.enemyBullets ?? [];
+    const bullets =
+      this.system?.getCachedCombat?.()?.projectiles.enemyBullets ?? [];
     const maxTurn = this.data.shardTurnRate * deltaTime;
     for (const bullet of bullets) {
       if (

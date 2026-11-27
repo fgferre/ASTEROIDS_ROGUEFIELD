@@ -28,7 +28,7 @@ function makeCombat(list = []) {
   const eventBus = createEventBusMock();
   const player = {
     isDead: false,
-    dashTimer: 0,
+    maneuvers: { dashTimer: 0 },
     position: { x: 100, y: 300 },
     getPosition() {
       return { ...this.position };
@@ -55,11 +55,11 @@ function makeCombat(list = []) {
 
 // A dash from x = 100 to x = 132 along y = 300, in two frames.
 function dash(combat, player) {
-  player.dashTimer = 0.1;
+  player.maneuvers.dashTimer = 0.1;
   combat.updateWeaponEffects(FRAME);
   player.position.x = 132;
   combat.updateWeaponEffects(FRAME);
-  player.dashTimer = 0;
+  player.maneuvers.dashTimer = 0;
 }
 
 describe('Afterburn (Maneuver synergy)', () => {
@@ -75,10 +75,10 @@ describe('Afterburn (Maneuver synergy)', () => {
   it('drops a point every 8 px of dash travel, and none once the dash ends', () => {
     const { combat, player } = makeCombat();
     dash(combat, player);
-    expect(combat.afterburnTrail.map((p) => p.x)).toEqual([
+    expect(combat.cards.afterburnTrail.map((p) => p.x)).toEqual([
       100, 108, 116, 124, 132,
     ]);
-    expect(combat.afterburnTrail.map((p) => p.joined)).toEqual([
+    expect(combat.cards.afterburnTrail.map((p) => p.joined)).toEqual([
       false,
       true,
       true,
@@ -88,12 +88,12 @@ describe('Afterburn (Maneuver synergy)', () => {
 
     player.position.x = 170;
     combat.updateWeaponEffects(FRAME);
-    expect(combat.afterburnTrail).toHaveLength(5);
+    expect(combat.cards.afterburnTrail).toHaveLength(5);
   });
 
   it('leaves no fire where a Blink hides the ship', () => {
     const { combat, player } = makeCombat();
-    player.dashTimer = 0.1;
+    player.maneuvers.dashTimer = 0.1;
     player._quitExplosionHidden = true;
     combat.updateWeaponEffects(FRAME);
     player.position.x = 132;
@@ -101,7 +101,7 @@ describe('Afterburn (Maneuver synergy)', () => {
     combat.updateWeaponEffects(FRAME);
     player.position.x = 140;
     combat.updateWeaponEffects(FRAME);
-    expect(combat.afterburnTrail.map((p) => [p.x, p.joined])).toEqual([
+    expect(combat.cards.afterburnTrail.map((p) => [p.x, p.joined])).toEqual([
       [132, false],
       [140, true],
     ]);
@@ -128,7 +128,7 @@ describe('Afterburn (Maneuver synergy)', () => {
     dash(combat, player);
     combat.updateWeaponEffects(AFTERBURN.tickInterval);
     combat.updateWeaponEffects(AFTERBURN.life);
-    expect(combat.afterburnTrail).toHaveLength(0);
+    expect(combat.cards.afterburnTrail).toHaveLength(0);
     combat.updateWeaponEffects(AFTERBURN.tickInterval);
     expect(drone.health).toBe(100 - AFTERBURN.damage);
   });

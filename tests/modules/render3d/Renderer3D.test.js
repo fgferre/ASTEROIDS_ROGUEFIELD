@@ -276,12 +276,14 @@ describe('Renderer3D lock line', () => {
       player: { lockLineOrigin: () => ({ x: -278, y: 12, z: -202 }) },
     };
     renderer.cachedCombat = {
-      aimMode: 'auto',
-      targetingUpgradeLevel: 1,
-      currentLockAssignments: [],
-      currentTarget: { x: 300, y: 100, radius: 16 },
-      targetIndicatorPulse: 0,
-      targetPulseDuration: 1,
+      targeting: {
+        aimMode: 'auto',
+        targetingUpgradeLevel: 1,
+        currentLockAssignments: [],
+        currentTarget: { x: 300, y: 100, radius: 16 },
+        targetIndicatorPulse: 0,
+        targetPulseDuration: 1,
+      },
       usingDynamicPrediction: () => false,
     };
     renderer.mirrorLocks();

@@ -151,7 +151,7 @@ export function setupCombatHarness({
 
   // Force initial cache + targeting refresh so `currentTarget` is populated
   // before the first `handleShooting` call.
-  combat.targetUpdateTimer = 0;
+  combat.targeting.targetUpdateTimer = 0;
   combat.updateTargeting(0);
 
   return { combat, eventBus, random, player, playerState, enemyList };
@@ -159,12 +159,12 @@ export function setupCombatHarness({
 
 /**
  * Capture the projectile vector set produced by `fireCount` sequential fires.
- * Each fire is preceded by a delta-time of `combat.shootCooldown + 0.001` so
+ * Each fire is preceded by a delta-time of `combat.weapons.shootCooldown + 0.001` so
  * the cooldown gate at `canShoot()` clears.
  */
 export function captureVectorSet(combat, fireCount = 8) {
-  const before = combat.bullets.length;
-  const dt = combat.shootCooldown + 0.001;
+  const before = combat.projectiles.bullets.length;
+  const dt = combat.weapons.shootCooldown + 0.001;
   for (let i = 0; i < fireCount; i++) {
     // Re-establish target acquisition each tick (no-op if already locked).
     combat.updateTargeting(dt);
@@ -172,7 +172,7 @@ export function captureVectorSet(combat, fireCount = 8) {
     const stats = player.getStats();
     combat.handleShooting(dt, stats);
   }
-  const fired = combat.bullets.slice(before);
+  const fired = combat.projectiles.bullets.slice(before);
   const angles = fired.map((b) => Math.atan2(b.vy, b.vx)).sort((a, b) => a - b);
   return {
     count: fired.length,
@@ -180,8 +180,8 @@ export function captureVectorSet(combat, fireCount = 8) {
     firstAngle: fired.length > 0 ? Math.atan2(fired[0].vy, fired[0].vx) : null,
     firstDamage: fired.length > 0 ? fired[0].damage : null,
     dynamicPrediction: combat.usingDynamicPrediction?.() ?? null,
-    multiLockTargets: combat.multiLockTargets ?? null,
-    targetingUpgradeLevel: combat.targetingUpgradeLevel ?? null,
-    dangerScoreEnabled: combat.dangerScoreEnabled ?? null,
+    multiLockTargets: combat.targeting.multiLockTargets ?? null,
+    targetingUpgradeLevel: combat.targeting.targetingUpgradeLevel ?? null,
+    dangerScoreEnabled: combat.targeting.dangerScoreEnabled ?? null,
   };
 }
