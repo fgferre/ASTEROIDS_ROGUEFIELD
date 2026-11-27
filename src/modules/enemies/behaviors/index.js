@@ -19,8 +19,7 @@
 //   base death (its event, Volatile, Splitter).
 // `getters` are read on the enemy by name (the views read them); `methods`
 // are called on it by name (the engine calls them), with (enemy, params,
-// ...args). `kept` names the state a Retry brings back (EnemySnapshots):
-// copied at the death, set again once the enemy is rebuilt.
+// ...args).
 // Its state lives on the enemy, under the names the views and tests read.
 import aimLine from './aimLine.js';
 import charge from './charge.js';

@@ -394,6 +394,12 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   certo? fizemso algo assim? depois dos consertos grandes que fizemos nessas rodadas algo pode ter parado de funionar?"_;
   e _"vamos resolver tudo antes de publicar,,,"_. Em curso no ramo `cartas/consertos-e-matriz`: os consertos e um teste
   que falha quando alguém cria uma carta defeituosa. Fecha quando ele aprovar jogando.
+- **(64)** O Retry no meio da luta com um chefe continua a luta de onde parou (26/11): à pergunta "As duas reformas
+  grandes ficam para depois de publicar?", _"Não, antes"_; com _"vamos resolver tudo antes de publicar,,,"_ (25/11).
+  Recusado por ele, não se constrói: o Retry refeito como recomeço da fase (_"nao vamos fazer isso."_). Em curso no ramo
+  `reformas/retry-chefes`: o chefe e cada inimigo voltam como estavam na morte, o ataque em curso incluído, e um teste
+  falha se um chefe ou inimigo novo voltar diferente. Fica mais duro que no jogo publicado. Fecha quando ele aprovar
+  jogando.
 - **(65)** As cartas falam com o jogo por um caminho só (26/11, ponto B6 da auditoria de fora 8). À pergunta se as duas
   reformas grandes ficavam para depois de publicar: _"Não, antes"_; com o que ele já tinha dito em 25/11: _"vamos
   resolver tudo antes de publicar,,,"_. Em curso no ramo `cartas/ligacao-unica`: cada carta diz a que parte do jogo o

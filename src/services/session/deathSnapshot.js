@@ -155,11 +155,18 @@ export class DeathSnapshot {
         ? physics.getSnapshotState()
         : null;
 
+    // The enemy shots in flight at the death (the world kept them before the
+    // combat system cleared them), put back at the end of the Retry
+    // (retryCountdown.js), after the resets that clear them.
+    const combatSnapshot =
+      resolveService('world', this.services)?.shotsAtDeath ?? null;
+
     const snapshot = {
       player: playerSnapshot,
       progression: progressionSnapshot,
       enemies: enemySnapshot,
       physics: physicsSnapshot,
+      combat: combatSnapshot,
       timestamp: Date.now(),
       randomSeed: this.gameState?.randomSeed ?? this.seedInfo.seed,
       random: randomSnapshot,
