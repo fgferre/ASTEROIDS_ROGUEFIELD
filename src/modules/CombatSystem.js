@@ -249,7 +249,7 @@ class CombatSystem extends BaseSystem {
       if (this.cachedPlayer.noseAim) {
         return;
       }
-      const next = this.aimMode === 'auto' ? 'manual' : 'auto';
+      const next = this.targeting.aimMode === 'auto' ? 'manual' : 'auto';
       this.targeting.setAimMode(next);
       this.eventBus?.emit?.('combat-mode-toggled', { kind: 'aim', mode: next });
     });
@@ -266,96 +266,7 @@ class CombatSystem extends BaseSystem {
   }
 
   // === TARGETING (combat/Targeting.js) ===
-  // Targeting owns this state. The 3D renderer, the fire paths and the aim
-  // regression suite read it on the combat object; the setters
-  // exist because that suite writes these fields.
-  get currentTarget() {
-    return this.targeting.currentTarget;
-  }
-
-  set currentTarget(value) {
-    this.targeting.currentTarget = value;
-  }
-
-  get currentTargetLocks() {
-    return this.targeting.currentTargetLocks;
-  }
-
-  set currentTargetLocks(value) {
-    this.targeting.currentTargetLocks = value;
-  }
-
-  get currentLockAssignments() {
-    return this.targeting.currentLockAssignments;
-  }
-
-  set currentLockAssignments(value) {
-    this.targeting.currentLockAssignments = value;
-  }
-
-  get predictedAimPoints() {
-    return this.targeting.predictedAimPoints;
-  }
-
-  get predictedAimPointsMap() {
-    return this.targeting.predictedAimPointsMap;
-  }
-
-  get targetIndicatorPulse() {
-    return this.targeting.targetIndicatorPulse;
-  }
-
-  get targetPulseDuration() {
-    return this.targeting.targetPulseDuration;
-  }
-
-  get targetingUpgradeLevel() {
-    return this.targeting.targetingUpgradeLevel;
-  }
-
-  get dangerScoreEnabled() {
-    return this.targeting.dangerScoreEnabled;
-  }
-
-  get dynamicPredictionEnabled() {
-    return this.targeting.dynamicPredictionEnabled;
-  }
-
-  get multiLockTargets() {
-    return this.targeting.multiLockTargets;
-  }
-
-  get aimMode() {
-    return this.targeting.aimMode;
-  }
-
-  get _aimModeFlagSnapshot() {
-    return this.targeting._aimModeFlagSnapshot;
-  }
-
-  set _aimModeFlagSnapshot(value) {
-    this.targeting._aimModeFlagSnapshot = value;
-  }
-
-  get needsRetarget() {
-    return this.targeting.needsRetarget;
-  }
-
-  set needsRetarget(value) {
-    this.targeting.needsRetarget = value;
-  }
-
-  get targetUpdateTimer() {
-    return this.targeting.targetUpdateTimer;
-  }
-
-  set targetUpdateTimer(value) {
-    this.targeting.targetUpdateTimer = value;
-  }
-
-  get targetUpdateInterval() {
-    return this.targeting.targetUpdateInterval;
-  }
+  // Targeting owns the aim state; readers ask it (combat.targeting.aimMode).
 
   // Called on the combat object by the aim regression suite, the shooting
   // paths and (usingDynamicPrediction) the 3D renderer.

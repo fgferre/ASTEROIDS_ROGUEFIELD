@@ -151,7 +151,7 @@ export function setupCombatHarness({
 
   // Force initial cache + targeting refresh so `currentTarget` is populated
   // before the first `handleShooting` call.
-  combat.targetUpdateTimer = 0;
+  combat.targeting.targetUpdateTimer = 0;
   combat.updateTargeting(0);
 
   return { combat, eventBus, random, player, playerState, enemyList };
@@ -180,8 +180,8 @@ export function captureVectorSet(combat, fireCount = 8) {
     firstAngle: fired.length > 0 ? Math.atan2(fired[0].vy, fired[0].vx) : null,
     firstDamage: fired.length > 0 ? fired[0].damage : null,
     dynamicPrediction: combat.usingDynamicPrediction?.() ?? null,
-    multiLockTargets: combat.multiLockTargets ?? null,
-    targetingUpgradeLevel: combat.targetingUpgradeLevel ?? null,
-    dangerScoreEnabled: combat.dangerScoreEnabled ?? null,
+    multiLockTargets: combat.targeting.multiLockTargets ?? null,
+    targetingUpgradeLevel: combat.targeting.targetingUpgradeLevel ?? null,
+    dangerScoreEnabled: combat.targeting.dangerScoreEnabled ?? null,
   };
 }

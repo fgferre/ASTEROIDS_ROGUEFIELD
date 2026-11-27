@@ -107,14 +107,14 @@ describe('Aim regression suite (FIX-01)', () => {
   describe('vector-affecting / targeting_suite', () => {
     it('rank 1 enables danger-score targeting (resetWeights + state flag)', () => {
       const { combat, eventBus } = setupCombatHarness();
-      expect(combat.dangerScoreEnabled).toBe(false);
-      expect(combat.targetingUpgradeLevel).toBe(0);
+      expect(combat.targeting.dangerScoreEnabled).toBe(false);
+      expect(combat.targeting.targetingUpgradeLevel).toBe(0);
 
       // Production payload — UpgradeSystem injects `level: 1`.
       eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
 
-      expect(combat.dangerScoreEnabled).toBe(true);
-      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(1);
+      expect(combat.targeting.dangerScoreEnabled).toBe(true);
+      expect(combat.targeting.targetingUpgradeLevel).toBeGreaterThanOrEqual(1);
     });
 
     it('rank 2 fires a DIFFERENT vector against a MOVING target (Concern 4)', () => {
@@ -131,7 +131,7 @@ describe('Aim regression suite (FIX-01)', () => {
         });
         eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
         // Re-acquire target with new weights before firing.
-        combat.targetUpdateTimer = 0;
+        combat.targeting.targetUpdateTimer = 0;
         combat.updateTargeting(0);
         return captureVectorSet(combat, 1);
       })();
@@ -155,7 +155,7 @@ describe('Aim regression suite (FIX-01)', () => {
             fallbackLeadTime: 0.32,
           },
         });
-        combat.targetUpdateTimer = 0;
+        combat.targeting.targetUpdateTimer = 0;
         combat.updateTargeting(0);
         return captureVectorSet(combat, 1);
       })();
@@ -200,7 +200,7 @@ describe('Aim regression suite (FIX-01)', () => {
             fallbackLeadTime: 0.32,
           },
         });
-        combat.targetUpdateTimer = 0;
+        combat.targeting.targetUpdateTimer = 0;
         combat.updateTargeting(0);
         return captureVectorSet(combat, 2);
       })();
@@ -225,7 +225,7 @@ describe('Aim regression suite (FIX-01)', () => {
           multiLockTargets: 4,
           cooldownMultiplier: 0.92,
         });
-        combat.targetUpdateTimer = 0;
+        combat.targeting.targetUpdateTimer = 0;
         combat.updateTargeting(0);
         return captureVectorSet(combat, 2);
       })();

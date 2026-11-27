@@ -91,9 +91,9 @@ function lockOnMany(combat, eventBus, multishot) {
   eventBus.emit('upgrade-aiming-suite', { level: 2 });
   eventBus.emit('upgrade-aiming-suite', { level: 3, multiLockTargets: 4 });
   combat.lastKnownPlayerStats = { multishot, damage: DAMAGE };
-  combat.targetUpdateTimer = 0;
+  combat.targeting.targetUpdateTimer = 0;
   combat.updateTargeting(0);
-  expect(combat.currentTargetLocks).toHaveLength(multishot);
+  expect(combat.targeting.currentTargetLocks).toHaveLength(multishot);
 }
 
 // The Overcharge Coil at all three ranks (+52% lance speed).
@@ -249,10 +249,12 @@ describe('Harmonic Plasma Lance', () => {
         pattern: 'beam',
         targeting: expect.objectContaining({
           multiLockActive: true,
-          predictedPoints: combat.currentLockAssignments.map((lock) => ({
-            enemyId: lock.enemy.id,
-            position: lock.predictedAim,
-          })),
+          predictedPoints: combat.targeting.currentLockAssignments.map(
+            (lock) => ({
+              enemyId: lock.enemy.id,
+              position: lock.predictedAim,
+            })
+          ),
         }),
       })
     );
@@ -714,7 +716,7 @@ describe('Scatter Coil', () => {
     const step = (FAN.fan * Math.PI) / 180 / (FAN.bolts - 1);
     const groups = [angles.slice(0, 3), angles.slice(3, 5), angles.slice(5)];
     groups.forEach((group, index) => {
-      const { predictedAim } = combat.currentLockAssignments[index];
+      const { predictedAim } = combat.targeting.currentLockAssignments[index];
       const toLock = Math.atan2(
         predictedAim.y - PIVOT.y,
         predictedAim.x - PIVOT.x
@@ -733,7 +735,7 @@ describe('Scatter Coil', () => {
     );
     expect(
       fired.mock.lastCall[0].targeting.predictedPoints.map((p) => p.enemyId)
-    ).toEqual(combat.currentTargetLocks.map((enemy) => enemy.id));
+    ).toEqual(combat.targeting.currentTargetLocks.map((enemy) => enemy.id));
 
     // Fewer bolts than locks: one bolt each for the first locks.
     combat.bullets = [];
@@ -745,7 +747,7 @@ describe('Scatter Coil', () => {
     );
     expect(combat.bullets).toHaveLength(2);
     [0, 1].forEach((index) => {
-      const { predictedAim } = combat.currentLockAssignments[index];
+      const { predictedAim } = combat.targeting.currentLockAssignments[index];
       const bolt = combat.bullets[index];
       expect(Math.atan2(bolt.vy, bolt.vx)).toBeCloseTo(
         Math.atan2(predictedAim.y - PIVOT.y, predictedAim.x - PIVOT.x),
@@ -853,8 +855,8 @@ describe('multi-lock turret layers', () => {
     ]);
     if (weaponId) made.eventBus.emit('upgrade-weapon', { weaponId });
     lockOnMany(made.combat, made.eventBus, 3);
-    const tips = made.combat.currentLockAssignments.map(({ predictedAim }) =>
-      muzzleToward(predictedAim)
+    const tips = made.combat.targeting.currentLockAssignments.map(
+      ({ predictedAim }) => muzzleToward(predictedAim)
     );
     return { ...made, tips };
   };

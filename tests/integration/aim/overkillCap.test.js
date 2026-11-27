@@ -56,7 +56,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
       baseEnemy.radius = 8;
       baseEnemy.health = 50;
       baseEnemy.maxHealth = 50;
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
       playerState.multishot = 4;
       playerState.damage = 100;
@@ -88,7 +88,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
       baseEnemy.radius = 18;
       baseEnemy.health = 500;
       baseEnemy.maxHealth = 500;
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
       playerState.multishot = 4;
       playerState.damage = 100;
@@ -116,7 +116,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
       baseEnemy.radius = 64;
       baseEnemy.health = 1500;
       baseEnemy.maxHealth = 1500;
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
       playerState.multishot = 4;
       playerState.damage = 10;
@@ -234,12 +234,14 @@ describe('FIX-05 centerline invariant + toggles', () => {
       baseEnemy.radius = 8;
       baseEnemy.health = 50;
       baseEnemy.maxHealth = 50;
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
       // Sanity: rank-3 active, 4 multishot, ≥1 lock.
-      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+      expect(combat.targeting.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
       expect(playerState.multishot).toBe(4);
-      expect(combat.currentTargetLocks.length).toBeGreaterThanOrEqual(1);
+      expect(combat.targeting.currentTargetLocks.length).toBeGreaterThanOrEqual(
+        1
+      );
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
@@ -274,10 +276,12 @@ describe('FIX-05 centerline invariant + toggles', () => {
         e.health = 50;
         e.maxHealth = 50;
       });
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
-      expect(combat.currentTargetLocks.length).toBeGreaterThanOrEqual(2);
+      expect(combat.targeting.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+      expect(combat.targeting.currentTargetLocks.length).toBeGreaterThanOrEqual(
+        2
+      );
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
@@ -319,9 +323,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
       tinyEnemy.radius = 8;
       tinyEnemy.health = 50;
       tinyEnemy.maxHealth = 50;
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+      expect(combat.targeting.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
 
       // Subscribe to bullet-created BEFORE handleShooting. The event payload
       // is the real observable surface — read CombatSystem.js:2392-2396 to
@@ -423,9 +427,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
       tinyEnemy.radius = 8;
       tinyEnemy.health = 50;
       tinyEnemy.maxHealth = 50;
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+      expect(combat.targeting.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
 
       // PRE-FIX: currentLockAssignments.length is 4 (un-capped). Render,
       // multi-lock indicators, and weapon-fired all see 4 locks. But only 1
@@ -438,7 +442,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
       off?.();
 
-      const assignmentCount = combat.currentLockAssignments.length;
+      const assignmentCount = combat.targeting.currentLockAssignments.length;
       const firedCount = created.length;
 
       // The invariant: the lock state the rest of the engine reads MUST
@@ -461,7 +465,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
         e.health = 50;
         e.maxHealth = 50;
       });
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
       const created = [];
@@ -471,7 +475,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
       off?.();
 
       // The 4 enemies each absorb 1 bullet. Assignment count matches.
-      expect(combat.currentLockAssignments.length).toBe(created.length);
+      expect(combat.targeting.currentLockAssignments.length).toBe(
+        created.length
+      );
       expect(created.length).toBe(4);
     });
   });
@@ -528,7 +534,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
       enemy.radius = 12;
       enemy.health = 150;
       enemy.maxHealth = 150;
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
       const created = [];
@@ -631,9 +637,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
       tiny.radius = 8;
       tiny.health = 50;
       tiny.maxHealth = 50;
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
-      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+      expect(combat.targeting.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
 
       const created = [];
       const off = eventBus.on('bullet-created', (p) => created.push(p));
@@ -658,12 +664,12 @@ describe('FIX-05 centerline invariant + toggles', () => {
       console.log(`[SMOKE] OBSERVED bullet count: ${created.length}`);
       // eslint-disable-next-line no-console
       console.log(
-        `[SMOKE] OBSERVED currentLockAssignments.length: ${combat.currentLockAssignments.length}`
+        `[SMOKE] OBSERVED currentLockAssignments.length: ${combat.targeting.currentLockAssignments.length}`
       );
       // eslint-disable-next-line no-console
       console.log(
         '[SMOKE] OBSERVED currentLockAssignments enemies:',
-        combat.currentLockAssignments.map((a) => a.enemy?.id)
+        combat.targeting.currentLockAssignments.map((a) => a.enemy?.id)
       );
       // eslint-disable-next-line no-console
       console.log('[SMOKE] OBSERVED per-bullet `to` positions:');
@@ -690,7 +696,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       // === Headline assertions ===
       // 1. Lock count matches fired count (Finding 1 invariant).
-      expect(combat.currentLockAssignments.length).toBe(created.length);
+      expect(combat.targeting.currentLockAssignments.length).toBe(
+        created.length
+      );
       // 2. Total ≤ multishot.
       expect(created.length).toBeLessThanOrEqual(4);
       // 3. Tiny absorbs ≤ 1 bullet (per-enemy cap, Finding 3 contract).
