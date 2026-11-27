@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeEvent } from '../../../__helpers__/domEvents.js';
 import { mountScreens } from '../../../__helpers__/screenRig.js';
-import { listenForHold } from '../../../../src/modules/ui/skipHold.js';
+import { HOLD_MS, listenForHold } from '../../../../src/modules/ui/skipHold.js';
 import { TouchControls } from '../../../../src/modules/input/touchControls.js';
 
 // The stick library reads the window on import; the buttons need none of it.
@@ -52,27 +52,33 @@ describe('the SKIP button with Settings over the scene, today', () => {
     rig.destroy();
   });
 
-  it('LEAK today: Settings opened by the pad over a scene leaves SKIP over it (z-index 9500); a tap on it goes to the next line under Settings', () => {
+  it('Settings opened by the pad over a scene: SKIP, shown (z-index 9500), takes no tap or hold under it', () => {
     const answers = startCinematic(rig);
-    rig.send('pad:VIEW'); // opens Settings, and shows the hint
+    rig.tap('KeyW'); // shows the hint
+    rig.send('pad:VIEW'); // opens Settings
     expect(rig.ui.settingsPanel.settingsState.isOpen).toBe(true);
     const skip = rig.dom.document.querySelector('.skip-hold__button');
     expect(skip.closest('.skip-hold').classList.contains('is-showing')).toBe(
       true
     );
     tap(skip);
-    expect(answers).toEqual({ skip: 0, next: 1 });
+    const init = { bubbles: true, pointerId: 1, isTrusted: true };
+    skip.dispatchEvent(new FakeEvent('pointerdown', init));
+    rig.wait(HOLD_MS + 100);
+    rig.dom.frame();
+    skip.dispatchEvent(new FakeEvent('pointerup', init));
+    expect(answers).toEqual({ skip: 0, next: 0 });
     expect(rig.ui.settingsPanel.settingsState.isOpen).toBe(true);
   });
 
-  it('a tap anywhere else on Settings is swallowed on its way down (pointerdown, window capture): it only shows the hint', () => {
+  it('a tap on Settings over a scene reaches Settings (before the stack the hold swallowed it on its way down)', () => {
     startCinematic(rig);
     rig.send('pad:VIEW');
     const heard = vi.fn();
     const tab = rig.dom.document.querySelector('#settings-tabs button');
     tab.addEventListener('pointerdown', heard);
     tap(tab);
-    expect(heard).not.toHaveBeenCalled();
+    expect(heard).toHaveBeenCalledTimes(1);
   });
 });
 

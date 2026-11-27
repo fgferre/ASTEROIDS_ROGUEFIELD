@@ -271,13 +271,19 @@ class InputSystem {
     if (key) this.keys[key] = true;
     if (code) this.codes[code] = true;
     this.setActiveDevice('keyboard');
+    // A key a screen took (input/inputLayers.js) is its alone: no action
+    // here, and no default held back (the HUD editor's text fields type it).
+    const taken = inputLayers.took(event);
 
-    if (isMovementBinding(this, key) || isMovementBinding(this, code)) {
+    if (
+      !taken &&
+      (isMovementBinding(this, key) || isMovementBinding(this, code))
+    ) {
       event.preventDefault();
     }
     // A Space's repeats arm no button, nor does the release of one begun in
     // flight (the strafe) on a screen opened under it: pressed again, it does.
-    if (code === 'space') {
+    if (code === 'space' && !taken) {
       if (!event.repeat) this.spaceFromFlight = this.isGameRunning();
       if (this.spaceFromFlight || event.repeat) event.preventDefault();
     }
@@ -287,7 +293,7 @@ class InputSystem {
 
     const actions = collectKeyboardActions(this, normalizedKey, normalizedCode);
 
-    if (!wasPressed) {
+    if (!wasPressed && !taken) {
       actions.forEach((action) => {
         // A repeat (the keys dropped on a focus loss) never confirms.
         if (event.repeat && action === 'confirm') return;
@@ -478,8 +484,8 @@ class InputSystem {
 
     const stepField = STEP_PRESS_FIELDS[action];
     if (stepField) {
-      // A press made on the pause screen must not fire on resume, nor one a
-      // screen took (a card picked by its key resumes the run under it).
+      // A press made on the pause screen must not fire on resume, nor one
+      // made under a screen (a card picked by its key resumes the run).
       if (this.isGameRunning() && inputLayers.passes(action, context.event)) {
         this.pendingStepPresses.add(stepField);
       }

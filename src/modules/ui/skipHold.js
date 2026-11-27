@@ -15,6 +15,7 @@
 // key's repeat.
 
 import { PAD_BUTTON } from '../../data/constants/gamepad.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 export const HOLD_MS = 1500; // Felipe, 23/11
 // Pressed and let go within this: a tap.
@@ -141,12 +142,13 @@ function settle() {
 
 /**
  * Listens while a cinematic plays: `onSkip()` when the hold fills, `onNext()`
- * on a tap. Swallows every key, click and touch meanwhile (capture on window:
- * before any other handler); a key still held after the unbind stays
- * swallowed until it is released. Returns the unbind.
+ * on a tap. On the input layer stack meanwhile: it takes every key (no
+ * screen under it and none of the game's actions hear one), and swallows
+ * every click and touch (capture on window: before any other handler); with
+ * a screen over it (Settings opened by the pad) it hears nothing, SKIP and
+ * the pad's Start included. Returns the unbind.
  */
 export function listenForHold(onSkip, onNext) {
-  const keys = new Set();
   let live = true;
   let frame = 0;
   let last = performance.now();
@@ -167,28 +169,21 @@ export function listenForHold(onSkip, onNext) {
     if (held !== null && held < TAP_MS) onNext();
     if (held >= HOLD_MS) onSkip();
   };
-  const onKeyDown = (event) => {
-    if (!live && !(event.repeat && keys.has(event.code))) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (!live) return;
-    keys.add(event.code);
-    reveal();
-    if (event.code === SKIP_CODE && !event.repeat && !hold.key) press('key');
-  };
-  const detachKeys = () => {
-    window.removeEventListener('keydown', onKeyDown, true);
-    window.removeEventListener('keyup', onKeyUp, true);
-  };
-  const onKeyUp = (event) => {
-    keys.delete(event.code);
-    if (!live) {
-      if (keys.size === 0) detachKeys();
-      return;
-    }
-    if (event.code === SKIP_CODE && hold.key) release('key');
+  const layer = {
+    name: 'skip-hold',
+    passes: ['pause'],
+    onKey: (event) => {
+      event.preventDefault();
+      reveal();
+      if (event.code === SKIP_CODE && !event.repeat && !hold.key) press('key');
+      return true;
+    },
+    onKeyUp: (event) => {
+      if (event.code === SKIP_CODE && hold.key) release('key');
+    },
   };
   const onPointerDown = (event) => {
+    if (inputLayers.covered(layer)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     reveal();
@@ -197,12 +192,16 @@ export function listenForHold(onSkip, onNext) {
   const onPointerUp = () => {
     if (hold.pointer) release('pointer');
   };
-  let padHeld = padSource()?.buttons.map((b) => b.pressed) ?? [];
+  const padButtons = () =>
+    inputLayers.covered(layer)
+      ? []
+      : padSource()?.buttons.map((b) => b.pressed) ?? [];
+  let padHeld = padButtons();
   const tick = () => {
     const now = performance.now();
     const dt = now - last;
     last = now;
-    const pressed = padSource()?.buttons.map((b) => b.pressed) ?? [];
+    const pressed = padButtons();
     if (pressed.some((on, i) => on && !padHeld[i])) reveal();
     padHeld = pressed;
     const start = Boolean(pressed[PAD_BUTTON.START]);
@@ -227,8 +226,7 @@ export function listenForHold(onSkip, onNext) {
     if (live) frame = window.requestAnimationFrame(tick);
   };
 
-  window.addEventListener('keydown', onKeyDown, true);
-  window.addEventListener('keyup', onKeyUp, true);
+  inputLayers.push(layer);
   window.addEventListener('pointerdown', onPointerDown, true);
   window.addEventListener('pointerup', onPointerUp, true);
   window.addEventListener('pointercancel', onPointerUp, true);
@@ -238,7 +236,7 @@ export function listenForHold(onSkip, onNext) {
     live = false;
     listening -= 1;
     window.cancelAnimationFrame(frame);
-    if (keys.size === 0) detachKeys();
+    inputLayers.remove(layer);
     window.removeEventListener('pointerdown', onPointerDown, true);
     window.removeEventListener('pointerup', onPointerUp, true);
     window.removeEventListener('pointercancel', onPointerUp, true);

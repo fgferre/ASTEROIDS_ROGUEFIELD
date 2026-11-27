@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountScreens, pinTable } from '../../../__helpers__/screenRig.js';
 import { listenForHold } from '../../../../src/modules/ui/skipHold.js';
 import { inputLayers } from '../../../../src/modules/input/inputLayers.js';
+import { RunCinematics } from '../../../../src/modules/ui/runCinematics.js';
 
 // What the keyboard, the pad and a confirm on the bus do TODAY on the run's
 // other screens (pause, Settings over the run, end credits, HUD editor, a
@@ -204,7 +205,7 @@ pinTable('end credits', (rig) => rig.open.endCredits(), [
   ['bus:confirm', { sent: { 'input-confirmed': 1 } }],
 ]);
 
-// The credits' own is-settings-open check (lot 2) holds Enter and Escape.
+// Settings, on top of the stack, keeps the credits' Enter and Escape.
 pinTable(
   'Settings over the end credits',
   (rig) => {
@@ -253,6 +254,8 @@ pinTable(
     ['Enter', { sent: {}, prevented: false }],
     ['KeyP', { sent: {}, prevented: false }],
     ['F10', { sent: {}, prevented: false }],
+    // A letter goes on as typed (its text fields): nothing holds it back.
+    ['KeyW', { sent: {}, prevented: false }],
     [
       'pad:START',
       { top: 'pause', focus: 'pause-resume-btn', sent: { 'toggle-pause': 2 } },
@@ -334,17 +337,23 @@ describe("the run's screens, hidden rules today", () => {
     expect(rig.ui.pauseScreen.currentPauseState).toBe(false);
   });
 
-  // Before the stack, the pause screen's own Escape check heard it there
-  // (bound before the hold): with nothing armed it did nothing, as now.
-  it('the skip hold swallows keys only after the window listeners bound before it: the layer stack hands each to the screen on top', () => {
+  // Before the stack the hold stopped every key at the window (only the
+  // listeners bound before it heard one); it is a layer now: the screen
+  // under it hears nothing, the global listeners still do.
+  it('the skip hold takes every key: no screen under it hears one, a global listener still does', () => {
+    const under = vi.fn(() => false);
+    inputLayers.push({
+      name: 'probe',
+      element: null,
+      passes: [],
+      onKey: under,
+    });
     startCinematic(rig);
-    const onKey = vi.fn(() => false);
-    inputLayers.push({ name: 'probe', element: null, passes: [], onKey });
     const after = vi.fn();
     rig.dom.window.addEventListener('keydown', after, true);
     rig.tap('Escape');
-    expect(onKey).toHaveBeenCalledTimes(1);
-    expect(after).not.toHaveBeenCalled();
+    expect(under).not.toHaveBeenCalled();
+    expect(after).toHaveBeenCalledTimes(1);
   });
 
   it("the game's own actions follow the cinematic: no Settings over the ending's acts, the pause only in the epilogue and a Warden's arrival", () => {
@@ -371,11 +380,33 @@ describe("the run's screens, hidden rules today", () => {
     expect(rig.snapshot().focus).toBe('ending:severance');
   });
 
-  it('the skip hold lets key releases through to the game', () => {
+  it('a scene that ends under Settings (opened by the pad) leaves the run paused under it; closing Settings resumes it', () => {
+    rig.fly();
+    const cinematics = new RunCinematics({
+      eventBus: rig.bus,
+      renderer: () => ({ playIntro: () => true, endCinematic: () => {} }),
+      hud: () => ({ cancelBanner() {}, showLetterbox() {} }),
+      holdSim: (held) => rig.ui.holdSim(held),
+      onIntroEnd: () => {},
+    });
+    rig.cleanups.push(() => cinematics.stop());
+    cinematics.playIntro();
+    rig.send('pad:VIEW');
+    cinematics.skip();
+    expect(cinematics.kind).toBe(null);
+    expect(rig.state.paused).toBe(true);
+    expect(rig.snapshot()).toMatchObject({ top: 'settings', pause: true });
+    rig.tap('Escape');
+    expect(rig.state.paused).toBe(false);
+    expect(rig.snapshot()).toMatchObject({ settings: false, pause: false });
+  });
+
+  it('the skip hold lets key releases through to the game; the press is heard and moves nothing', () => {
     startCinematic(rig);
-    const released = rig.record();
+    const heard = rig.record();
     rig.tap('KeyW');
-    expect(released('key-pressed')).toBe(1); // the release only
+    expect(heard('key-pressed')).toBe(2);
+    expect(heard('input-action')).toBe(1); // the release only
     expect(rig.sent.at(-1).payload.type).toBe('up');
   });
 });

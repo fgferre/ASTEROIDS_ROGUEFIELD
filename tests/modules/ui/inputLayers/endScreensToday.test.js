@@ -1,6 +1,4 @@
-import { describe, expect, it } from 'vitest';
 import { layOut, pinTable } from '../../../__helpers__/screenRig.js';
-import { GAMEPAD_NAV_SCREENS } from '../../../../src/modules/ui/gamepadNav.js';
 import { RunCinematics } from '../../../../src/modules/ui/runCinematics.js';
 
 // What the keyboard, the pad and a confirm on the bus do TODAY on the run's
@@ -276,26 +274,7 @@ pinTable('the intro, a real cinematic', intro, [
   ],
 ]);
 
-describe("the pad's screen list", () => {
-  it('is the twelve screens pinned below, topmost first', () => {
-    expect(GAMEPAD_NAV_SCREENS).toEqual([
-      'settings',
-      'end-credits',
-      'codex',
-      'hangar',
-      'credits',
-      'changelog',
-      'gameover',
-      'levelup',
-      'pause',
-      'ending',
-      'victory',
-      'menu',
-    ]);
-  });
-});
-
-// The pad's A and d-pad on each screen of the list (the changelog, game
+// The pad's A and d-pad on each screen it navigates (the changelog, game
 // over and victory have theirs in the tables above), laid out as a column
 // or a row so a move has somewhere to go; Enter with the browser's default
 // beside A.
@@ -440,11 +419,9 @@ pinTable(
 );
 
 // Enter's default click lands on the focused card after the pick has reset
-// the cards (Reduce Motion: no exit animation keeps them locked), so the
-// card is taken twice here, in the imitator only. Checked in headless
-// Chromium (27/11): the pick disables the cards first, the focused one loses
-// the focus, and Enter's default then presses nothing (one pick; without the
-// disable, two). The imitator does not blur a disabled button.
+// the cards (Reduce Motion: no exit animation keeps them locked). Chromium
+// blurs the disabled card first (checked 27/11), Safari unchecked: the
+// cards screen takes one pick per offer, whatever presses it.
 pinTable(
   'pad on the level-up alone',
   (rig) => {
@@ -472,10 +449,11 @@ pinTable(
         screen: 'playing',
         levelUp: false,
         card: -1,
-        picked: 'a,a',
+        picked: 'a',
         sent: { 'input-confirmed': 1 },
         prevented: false,
       },
+      'one pick: the click after the confirm takes nothing',
     ],
   ]
 );

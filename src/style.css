@@ -387,9 +387,9 @@ select {
 }
 
 /* Settings opens over any other overlay (the input layer stack keeps it on
-   top), so it is drawn over them too. */
+   top), so it is drawn over them too, the pilots (140) included. */
 #settings-screen {
-  z-index: 131;
+  z-index: 141;
 }
 
 /* Shared panel surface: pause, settings, credits */

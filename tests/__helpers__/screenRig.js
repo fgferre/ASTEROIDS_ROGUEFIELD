@@ -366,6 +366,7 @@ export function mountScreens() {
     refresh: () => {},
     wardenLive: () => false,
     device: () => input.getActiveDevice(),
+    padPress: (root, action) => ui.padNav.press(root, action),
   });
   const send = (name, payload) => bus.emit(name, payload);
   ui.settingsPanel = new SettingsPanel({

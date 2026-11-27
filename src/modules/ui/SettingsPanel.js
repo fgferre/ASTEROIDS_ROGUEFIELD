@@ -629,7 +629,6 @@ export class SettingsPanel {
 
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden', 'false');
-    document.body?.classList.add('is-settings-open');
     this.announceVisibility(true, { source });
 
     const activeTab = overlay.querySelector(
@@ -653,6 +652,14 @@ export class SettingsPanel {
     event.preventDefault();
     this.closeSettingsPanel();
     return true;
+  }
+
+  /** The run goes back to play under it (the cards closed, a scene over):
+   * it waits paused, as when Settings opens in flight; closing resumes it. */
+  holdRun() {
+    if (!this.settingsState.isOpen) return;
+    this.settingsState.source = 'playing';
+    this.emit('toggle-pause');
   }
 
   closeSettingsPanel({ resumeRun = true } = {}) {
@@ -686,7 +693,6 @@ export class SettingsPanel {
       overlay.setAttribute('aria-hidden', 'true');
     }
 
-    document.body?.classList.remove('is-settings-open');
     this.cancelBindingCapture();
     this.settingsState.isOpen = false;
     inputLayers.remove(this.inputLayer);

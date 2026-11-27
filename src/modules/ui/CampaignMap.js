@@ -22,6 +22,7 @@ import {
   travelTransmissions,
   wardenTransmission,
 } from './transmissions.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 /** Chapters along the arc: the real ones, then chapters with no signal yet. */
 export const CAMPAIGN_NODE_COUNT = 6;
@@ -309,33 +310,28 @@ export class CampaignMap {
         node?.classList.contains('is-locked');
       if (!padPassing) this.selectFrom(event.target);
     });
-    // Heard on the way down (capture): InputSystem stops ArrowDown at the
-    // document before a bubbling listener would hear it.
-    document.addEventListener(
-      'keydown',
-      (event) => {
-        // Only on the Campaign tab, with the menu in view (not over a run
-        // or an overlay).
-        if (!this.visible()) return;
-        const onChapter = document.activeElement?.closest?.(
-          '[data-campaign-chapter]'
-        );
-        const onRow = document.activeElement?.closest?.('[data-campaign-row]');
-        const move = {
-          ArrowLeft: onChapter && (() => this.stepChapter(-1)),
-          ArrowRight: onChapter && (() => this.stepChapter(1)),
-          ArrowDown: onChapter
-            ? () => this.focusRow(this.selectedId)
-            : onRow && (() => this.stepRow(1)),
-          ArrowUp: onRow && (() => this.stepRow(-1)),
-        }[event.key];
-        if (move) {
-          event.preventDefault();
-          move();
-        }
-      },
-      true
-    );
+    // A menu key (input/inputLayers.js): heard with no screen over the menu,
+    // before InputSystem stops ArrowDown at the document.
+    inputLayers.addBase((event) => {
+      // Only on the Campaign tab, with the menu in view (not over a run).
+      if (!this.visible()) return;
+      const onChapter = document.activeElement?.closest?.(
+        '[data-campaign-chapter]'
+      );
+      const onRow = document.activeElement?.closest?.('[data-campaign-row]');
+      const move = {
+        ArrowLeft: onChapter && (() => this.stepChapter(-1)),
+        ArrowRight: onChapter && (() => this.stepChapter(1)),
+        ArrowDown: onChapter
+          ? () => this.focusRow(this.selectedId)
+          : onRow && (() => this.stepRow(1)),
+        ArrowUp: onRow && (() => this.stepRow(-1)),
+      }[event.key];
+      if (move) {
+        event.preventDefault();
+        move();
+      }
+    });
   }
 
   /** The panel is in view: the menu is shown, on the Campaign tab. */

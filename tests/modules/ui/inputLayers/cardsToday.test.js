@@ -358,8 +358,8 @@ pinTable(
   ]
 );
 
-// No refusal here: the briefing's own is-settings-open check holds the
-// confirm (lot 2), so nothing reaches it.
+// Settings, on top of the stack, keeps the confirm: nothing reaches the
+// briefing.
 pinTable(
   'Settings over the flight briefing',
   (rig) => {
@@ -649,6 +649,32 @@ describe('the cards take their own keys', () => {
   afterEach(() => {
     expect(rig.errors()).toEqual([]);
     rig.destroy();
+  });
+
+  it('one pick per offer: the confirm, a click on a card and its key back to back take one card', () => {
+    rig.open.levelUp();
+    const [, cardB] = rig.ui.levelUpScreen.levelUpState.buttons;
+    rig.send('bus:confirm');
+    cardB.click();
+    rig.tap('Digit2');
+    rig.send('Enter+click');
+    expect(rig.snapshot().picked).toBe('a');
+  });
+
+  it("one pick per offer, also when the next offer opens at once: a press on the first offer's card takes nothing from it", () => {
+    rig.open.levelUp();
+    const [cardA] = rig.ui.levelUpScreen.levelUpState.buttons;
+    rig.progression.openNextLevelUpOffer = () => {
+      rig.bus.emit('upgrade-options-ready', {
+        level: 4,
+        options: CARDS.map((id) => ({ id })),
+      });
+      return true;
+    };
+    rig.send('bus:confirm');
+    cardA.click();
+    rig.tap('Digit2');
+    expect(rig.snapshot()).toMatchObject({ picked: 'a', levelUp: true });
   });
 
   it('a card picked by its key fires no flight press bound to that key in the run it resumes', () => {

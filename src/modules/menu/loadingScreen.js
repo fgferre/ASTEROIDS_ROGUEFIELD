@@ -65,6 +65,12 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     return;
   }
 
+  // On the input layer stack from now until the menu shows: each step
+  // (loading, the opening, the morph, the gate) hands over to the next with
+  // no gap, so Settings never opens unseen under it.
+  const loading = loadingLayer('loading', () => false);
+  inputLayers.push(loading);
+
   // The loading line: what is loading now, a joke between (loadingLines.js).
   const line = loadingScreen.querySelector('.opening__line');
   let step = loadingStep(0);
@@ -97,6 +103,7 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
       clearInterval(lineTimer);
       if (failed()) return;
       if (!shouldShowGate()) {
+        inputLayers.remove(loading);
         onLeave?.();
         finish();
         return;
@@ -122,9 +129,9 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
   }
 
   // Escape with nothing open, the game's name or the idle time takes the menu
-  // back to the gate. Capture phase: a panel's own Escape closes it first,
-  // and only that. Not while the remote link covers the menu (inert): the
-  // run is starting.
+  // back to the gate. A menu key (input/inputLayers.js): with a screen open
+  // its Escape closes that screen, and only that. Not while the remote link
+  // covers the menu (inert): the run is starting.
   let watching = false;
   let lastInput = 0;
   const input = () => (lastInput = performance.now());
@@ -136,21 +143,12 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     if (watching) return;
     watching = true;
     input();
-    window.addEventListener(
-      'keydown',
-      (event) => {
-        input();
-        // A held Escape's repeats: its first press closed a panel, only that.
-        if (
-          event.key === 'Escape' &&
-          !event.repeat &&
-          onMenu() &&
-          !panelOpen(event)
-        )
-          backToGate();
-      },
-      true
-    );
+    inputLayers.addBase((event) => {
+      input();
+      // A held Escape's repeats: its first press closed a panel, only that.
+      if (event.key === 'Escape' && !event.repeat && onMenu() && !panelOpen())
+        backToGate();
+    });
     for (const type of ['pointerdown', 'pointermove', 'wheel']) {
       window.addEventListener(type, input, true);
     }
@@ -177,9 +175,10 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     menuScreen?.classList.add('menu-screen--gated');
     loadingScreen.style.setProperty('--load', '1');
     loadingScreen.classList.add('loading-screen--ready');
+    inputLayers.remove(loading);
 
     function goOn(gesture) {
-      document.removeEventListener('keydown', onKey);
+      inputLayers.remove(opening);
       loadingScreen.removeEventListener('click', onClick);
       cancelAnimationFrame(rafId);
       onLeave?.();
@@ -188,7 +187,7 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
       let timer = 0;
       function toGate() {
         clearTimeout(timer);
-        document.removeEventListener('keydown', toGate);
+        inputLayers.remove(morphing);
         loadingScreen.removeEventListener('click', toGate);
         loadingScreen.classList.remove(
           'loading-screen--ready',
@@ -201,26 +200,29 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
           setTimeout(() => morph.remove(), LEAVE_MS);
         }
       }
-      timer = setTimeout(toGate, morph ? MORPH_MS : LEAVE_MS);
       // A press during the morph skips to the gate; it does not start.
-      if (morph) {
-        document.addEventListener('keydown', toGate);
-        loadingScreen.addEventListener('click', toGate);
-      }
+      const morphing = loadingLayer('morph', () => {
+        if (morph) toGate();
+        return false;
+      });
+      inputLayers.push(morphing);
+      timer = setTimeout(toGate, morph ? MORPH_MS : LEAVE_MS);
+      if (morph) loadingScreen.addEventListener('click', toGate);
     }
 
     const onClick = () => goOn(true);
 
-    function onKey(event) {
+    const opening = loadingLayer('opening', (event) => {
       if (
         event.repeat ||
         ['Control', 'Meta', 'Alt', 'Shift'].includes(event.key)
       ) {
-        return;
+        return false;
       }
       event.preventDefault();
       goOn(true);
-    }
+      return false;
+    });
 
     function pollPad() {
       const pressed = padPressed();
@@ -232,7 +234,7 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
       rafId = requestAnimationFrame(pollPad);
     }
 
-    document.addEventListener('keydown', onKey);
+    inputLayers.push(opening);
     loadingScreen.addEventListener('click', onClick);
     rafId = requestAnimationFrame(pollPad);
   }
@@ -270,9 +272,7 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
         return;
       }
       started = true;
-      document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('pointerdown', wake, true);
-      document.removeEventListener('keydown', wake, true);
       loadingScreen.removeEventListener('click', onClick);
       cancelAnimationFrame(rafId);
       onStart?.();
@@ -294,20 +294,27 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
             )
           )?.focus();
         }, backToGate);
+        // The gate held the keys through its start; the pilots (or the menu,
+        // or the gate again) have them now.
+        inputLayers.remove(gate);
       }, START_EFFECT_MS);
     }
 
     const onClick = () => start();
 
-    function onKeyDown(event) {
+    // Any key wakes it, the same press that wakes the music (AudioSystem's
+    // unlock hears every key); Enter or Space then starts.
+    const gate = loadingLayer('gate', (event) => {
+      wake();
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) {
-        return;
+        return false;
       }
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         start();
       }
-    }
+      return false;
+    });
 
     function pollPad() {
       const pressed = padPressed();
@@ -323,11 +330,10 @@ export function setupLoadingScreen(setLoadingCallbacks, onStart, onLeave) {
     if (awakeAt === null) {
       loadingScreen.classList.add('loading-screen--asleep');
       if (hint) hint.textContent = touch ? TOUCH_WAKE_HINT : WAKE_HINT;
-      // Capture phase, beside AudioSystem's: the same gesture wakes both.
+      // Capture phase, beside AudioSystem's: the same touch wakes both.
       document.addEventListener('pointerdown', wake, true);
-      document.addEventListener('keydown', wake, true);
     }
-    document.addEventListener('keydown', onKeyDown);
+    inputLayers.push(gate);
     loadingScreen.addEventListener('click', onClick);
     rafId = requestAnimationFrame(pollPad);
     button?.focus();
@@ -377,13 +383,21 @@ function padActive() {
   );
 }
 
+// The loading screen in one of its steps (the opening, the morph, the gate)
+// on the input layer stack: `onKey(event)` hears the keys. It reads the pad
+// itself and the pad's pointer works over it; the pause key goes to the
+// game, which ignores it there. Settings does not open over it: the game is
+// not ready yet, and the gate's key wake needs every key.
+function loadingLayer(name, onKey) {
+  return { name, passes: ['pause'], pointer: true, noSettings: true, onKey };
+}
+
 // Something over the menu that Escape closes first: a screen on the input
-// layer stack (Settings, Credits, Codex, Hangar; for a key, the one on top
-// when it came, which its Escape may have closed already), a dialog, the
-// pilots or the phone's Wake log.
-function panelOpen(event) {
-  if (inputLayers.layerFor(event)) return true;
-  if (document.querySelector('.pilot-screen, .is-log-open')) return true;
+// layer stack (Settings, Credits, Codex, Hangar, the pilots), a dialog or
+// the phone's Wake log.
+function panelOpen() {
+  if (inputLayers.top()) return true;
+  if (document.querySelector('.is-log-open')) return true;
   return Array.from(
     document.querySelectorAll('.screen--overlay, [aria-modal="true"]')
   ).some((el) => !el.closest('.hidden'));

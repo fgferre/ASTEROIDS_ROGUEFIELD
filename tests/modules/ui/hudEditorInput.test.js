@@ -20,16 +20,10 @@ describe('HUD editor close input', () => {
       chrome: { contains: () => false },
       requestClose,
     };
-    const event = {
-      key: 'Escape',
-      target: null,
-      preventDefault: vi.fn(),
-      stopImmediatePropagation: vi.fn(),
-    };
+    const event = { key: 'Escape', target: null, preventDefault: vi.fn() };
 
     editorKey(editor, event);
 
-    expect(event.stopImmediatePropagation).toHaveBeenCalled();
     expect(event.preventDefault).toHaveBeenCalled();
     expect(requestClose).toHaveBeenCalledOnce();
   });

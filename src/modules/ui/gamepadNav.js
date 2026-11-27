@@ -5,27 +5,10 @@
 // the focus to the nearest control in that direction, A presses it, B goes
 // back, LB/RB switch tabs, the right stick scrolls, and a strip of hints names
 // the buttons that work on the screen. Driven by UISystem's 'gamepad-ui-nav'
-// and 'gamepad-ui-scroll' (InputSystem).
+// and 'gamepad-ui-scroll' (InputSystem). The screen is the top layer of the
+// input layer stack (input/inputLayers.js), or the menu under none.
 
 import { inputLayers } from '../input/inputLayers.js';
-
-/** Screens a pad can navigate, topmost first (`#<id>-screen`), under the
- * top layer of the input layer stack: the screens not on it yet go by this
- * list. */
-export const GAMEPAD_NAV_SCREENS = Object.freeze([
-  'settings',
-  'end-credits',
-  'codex',
-  'hangar',
-  'credits',
-  'changelog',
-  'gameover',
-  'levelup',
-  'pause',
-  'ending',
-  'victory',
-  'menu',
-]);
 
 export const GAMEPAD_FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
@@ -195,7 +178,7 @@ const hintMarkup = ([glyphs, label]) =>
 /**
  * The pad's side of every menu and overlay. `ui` is the UISystem: its
  * screens (settingsPanel, codexScreen, hangarScreen, creditsOverlay,
- * mainMenu, runEndScreens, hudEditor) and its eventBus.
+ * mainMenu, runEndScreens) and its eventBus.
  */
 export class GamepadMenuNav {
   constructor(ui) {
@@ -205,11 +188,10 @@ export class GamepadMenuNav {
     this.hints = null;
   }
 
-  /** The screen a pad navigates: the input layer stack's top
-   * (input/inputLayers.js) when it is shown, with its `layer`; with none on
-   * the stack, the first of the list shown; or null (also while the PRESS
-   * START gate or the pilots cover the menu: they read the pad; and while
-   * the remote link covers it, inert: the run is starting). */
+  /** The screen a pad navigates: the input layer stack's top when it is
+   * shown, else the menu when it is (not in flight, not while the PRESS
+   * START gate still keeps it gated, not while the remote link covers it,
+   * inert: the run is starting); or null. */
   screen() {
     const shown = (element) =>
       element &&
@@ -219,31 +201,23 @@ export class GamepadMenuNav {
     const layer = inputLayers.top();
     if (layer) {
       return shown(layer.element)
-        ? { id: layer.name, element: layer.element, layer }
+        ? { id: layer.name, element: layer.element }
         : null;
     }
-    for (const id of GAMEPAD_NAV_SCREENS) {
-      const element = document.getElementById(`${id}-screen`);
-      if (shown(element)) return { id, element };
-    }
-    return null;
+    const menu = document.getElementById('menu-screen');
+    return shown(menu) ? { id: 'menu', element: menu } : null;
   }
 
   /** One pad press (InputSystem 'gamepad-ui-nav'): d-pad/stick move the
-   * focus, A presses, B goes back, LB/RB switch tabs; a layer with its own
-   * pad map takes the press instead (the level-up's X/Y reroll and banish,
-   * its cards following the move and confirm bindings). */
+   * focus, A presses, B goes back, LB/RB switch tabs; a top layer with its
+   * own pad map takes the press instead (the level-up's X/Y reroll and
+   * banish, its cards following the move and confirm bindings; the HUD
+   * editor's instruments). */
   handle(action) {
     const { ui } = this;
-    // The HUD editor drives its instruments; its dialogs and panels move
-    // the focus like any screen.
-    if (ui.hudEditor.isOpen) {
-      const root = ui.hudEditor.navRoot;
-      if (root && (STEP_ACTIONS.has(action) || action === 'confirm')) {
-        this.press(root, action);
-      } else {
-        ui.hudEditor.handlePadNav(action);
-      }
+    const top = inputLayers.top();
+    if (top?.onPad) {
+      top.onPad(action);
       return;
     }
     const screen = this.screen();
@@ -256,11 +230,7 @@ export class GamepadMenuNav {
       }
       return;
     }
-    const { id, element, layer } = screen;
-    if (layer?.onPad) {
-      layer.onPad(action);
-      return;
-    }
+    const { id, element } = screen;
     if (this.editing && !this.editing.isConnected) this.editing = null;
     if (this.editing) {
       this.edit(action);
@@ -442,8 +412,7 @@ export class GamepadMenuNav {
     const shown =
       document.body.dataset.inputDevice === 'gamepad' &&
       Boolean(screen) &&
-      screen.id !== 'levelup' &&
-      !this.ui.hudEditor.isOpen;
+      screen.id !== 'levelup';
     this.hints.hidden = !shown;
     if (!shown) return;
     const { settingsPanel } = this.ui;
@@ -485,15 +454,12 @@ export class GamepadMenuNav {
   watchScreens() {
     if (typeof MutationObserver === 'undefined') return;
     const observer = new MutationObserver(() => this.refreshHints());
-    for (const id of GAMEPAD_NAV_SCREENS) {
-      const element = document.getElementById(`${id}-screen`);
-      if (element) {
-        observer.observe(element, {
-          attributes: true,
-          attributeFilter: ['class'],
-        });
-      }
-    }
+    document.querySelectorAll('.screen').forEach((element) =>
+      observer.observe(element, {
+        attributes: true,
+        attributeFilter: ['class'],
+      })
+    );
     document.addEventListener('focusin', () => {
       if (this.editing && document.activeElement !== this.editing) {
         this.editing.classList.remove('is-pad-editing');

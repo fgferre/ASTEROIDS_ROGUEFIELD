@@ -1,42 +1,47 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { FlightBriefing } from '../../../src/modules/ui/FlightBriefing.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 
 // Settings opened over another screen let a key act on the screen underneath:
 // Enter closed the briefing or the credits, an arrow changed the Codex tab,
-// all unseen. The credits and the Codex are on the input layer stack now,
-// under Settings (tests/modules/ui/inputLayers/); the briefing still checks
-// for itself: Settings is open when the body carries 'is-settings-open'.
+// all unseen. Every screen is on the input layer stack now, under Settings
+// (tests/modules/ui/inputLayers/); the briefing takes the confirm only on
+// top of it.
 describe('Settings over another screen', () => {
   let restoreDom;
-  let settingsOpen;
   beforeEach(() => {
     restoreDom = installDomStubs();
-    settingsOpen = true;
-    document.body = { classList: { contains: () => settingsOpen } };
+    inputLayers.install(null);
   });
   afterEach(() => restoreDom());
 
   it('does not let a confirm reach the flight briefing', () => {
-    const handlers = new Map();
     const ui = {
-      registerEventListener: (name, handler) => handlers.set(name, handler),
+      registerEventListener: () => {},
       showScreen: vi.fn(),
       showGameUI: vi.fn(),
       eventBus: { emit: vi.fn() },
     };
     const briefing = new FlightBriefing(
-      { screen: { focus: vi.fn() }, continueBtn: null },
+      {
+        screen: { focus: vi.fn(), style: { setProperty() {} } },
+        continueBtn: null,
+      },
       ui
     );
-    briefing.lockedUntil = 0; // up, past its lockout
+    briefing.pending = true;
+    briefing.openNext();
+    briefing.lockedUntil = 0; // past its lockout
+    const settings = { name: 'settings', passes: [], staysOnTop: true };
+    inputLayers.push(settings);
 
-    handlers.get('input-confirmed')();
+    inputLayers.confirm();
     expect(ui.showGameUI).not.toHaveBeenCalled();
     expect(briefing.isVisible).toBe(true);
 
-    settingsOpen = false;
-    handlers.get('input-confirmed')();
+    inputLayers.remove(settings);
+    inputLayers.confirm();
     expect(ui.showGameUI).toHaveBeenCalledTimes(1);
   });
 });

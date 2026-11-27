@@ -8,6 +8,7 @@ import {
 import { morphIntoTitle } from '../../../src/modules/menu/openingMorph.js';
 import { openPilotSelect } from '../../../src/modules/menu/pilotSelect.js';
 import { isPilotStale } from '../../../src/core/storage.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 
 // The morph draws on a real page; here it either declines (null) or hands
 // back a stand-in overlay.
@@ -75,6 +76,7 @@ function boot(
   vi.stubGlobal('window', {
     location: { search },
     addEventListener: (type, fn) => (winListeners[type] = fn),
+    removeEventListener: () => {},
   });
   vi.stubGlobal('navigator', {
     getGamepads: () => pad.pads,
@@ -94,6 +96,10 @@ function boot(
     querySelector: () => null,
     querySelectorAll: () => page.overlays,
   });
+  // A key, as the page hands it over: to the input layer stack, which gives
+  // it to the step of the loading screen on top, or to the menu's keys.
+  inputLayers.install(null);
+  const press = (event) => inputLayers.onKeyDown(event);
   let complete;
   let progress;
   const gate = setupLoadingScreen(
@@ -105,7 +111,7 @@ function boot(
     onLeave
   );
   if (via === 'loading')
-    return { screen, line, menu, docListeners, progress, complete };
+    return { screen, line, menu, press, progress, complete };
   complete();
   // The opening: a click (a gesture) or a pad press goes on to the gate.
   if (via === 'click') screen.listeners.click();
@@ -124,6 +130,7 @@ function boot(
     button,
     docListeners,
     winListeners,
+    press,
     page,
     hint,
     pad,
@@ -166,10 +173,10 @@ describe('loading screen opening', () => {
   });
 
   it('any key goes on, a lone modifier does not', () => {
-    const { screen, docListeners } = boot('', undefined, { via: 'none' });
-    docListeners.keydown({ key: 'Shift', preventDefault: vi.fn() });
+    const { screen, press } = boot('', undefined, { via: 'none' });
+    press({ key: 'Shift', preventDefault: vi.fn() });
     expect(screen.classes.has('loading-screen--leaving')).toBe(false);
-    docListeners.keydown({ key: 'x', preventDefault: vi.fn() });
+    press({ key: 'x', preventDefault: vi.fn() });
     vi.advanceTimersByTime(600);
     expect(screen.classes.has('loading-screen--gate')).toBe(true);
   });
@@ -201,11 +208,9 @@ describe('loading screen opening', () => {
   });
 
   it('a start-up failure stays on its line and never opens the menu', () => {
-    const { screen, line, menu, docListeners, progress, complete } = boot(
-      '',
-      undefined,
-      { via: 'loading' }
-    );
+    const { screen, line, menu, progress, complete } = boot('', undefined, {
+      via: 'loading',
+    });
     showStartFailure();
     progress(0.5);
     vi.advanceTimersByTime(5000);
@@ -215,7 +220,8 @@ describe('loading screen opening', () => {
     expect(screen.classes.has('loading-screen--ready')).toBe(false);
     expect(screen.classes.has('hidden')).toBe(false);
     expect(menu.classes.has('hidden')).toBe(true);
-    expect(docListeners.keydown).toBeUndefined();
+    // The screen keeps the keys, and none goes on.
+    expect(inputLayers.top().name).toBe('loading');
   });
 });
 
@@ -268,9 +274,9 @@ describe('loading screen PRESS START gate', () => {
   });
 
   it('opens the menu once on Enter, without leaking the key', () => {
-    const { screen, menu, menuButton, docListeners } = boot('');
+    const { screen, menu, menuButton, press } = boot('');
     const event = enter();
-    docListeners.keydown(event);
+    press(event);
     expect(event.preventDefault).toHaveBeenCalled();
     expect(screen.classes.has('loading-screen--starting')).toBe(true);
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
@@ -279,14 +285,14 @@ describe('loading screen PRESS START gate', () => {
     expect(menu.classes.has('hidden')).toBe(false);
     expect(screen.classes.has('hidden')).toBe(true);
     expect(menuButton.focus).toHaveBeenCalledTimes(1);
-    expect(docListeners.keydown).toBeUndefined();
+    expect(inputLayers.top()).toBe(null);
   });
 
   it('asks for the pilot before the menu opens', () => {
     let goOn = null;
     openPilotSelect.mockImplementationOnce((onContinue) => (goOn = onContinue));
-    const { screen, menu, menuButton, docListeners } = boot('');
-    docListeners.keydown(enter());
+    const { screen, menu, menuButton, press } = boot('');
+    press(enter());
     vi.advanceTimersByTime(1000);
     expect(screen.classes.has('hidden')).toBe(true);
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
@@ -299,15 +305,15 @@ describe('loading screen PRESS START gate', () => {
   it('back from the pilots shows the gate again, whose press reopens them', () => {
     let goBack = null;
     openPilotSelect.mockImplementationOnce((_, onBack) => (goBack = onBack));
-    const { screen, menu, docListeners } = boot('');
-    docListeners.keydown(enter());
+    const { screen, menu, press } = boot('');
+    press(enter());
     vi.advanceTimersByTime(1000);
     goBack();
     expect(screen.classes.has('hidden')).toBe(false);
     expect(screen.classes.has('loading-screen--starting')).toBe(false);
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
     openPilotSelect.mockClear();
-    docListeners.keydown(enter());
+    press(enter());
     vi.advanceTimersByTime(1000);
     expect(openPilotSelect).toHaveBeenCalledTimes(1);
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
@@ -349,22 +355,20 @@ describe('loading screen PRESS START gate', () => {
 
   it('asleep before any gesture: the first key wakes it, a later one starts', () => {
     const onStart = vi.fn();
-    const { screen, docListeners } = boot('', undefined, {
+    const { screen, press } = boot('', undefined, {
       awake: false,
       onStart,
       via: 'pad',
     });
     expect(screen.classes.has('loading-screen--asleep')).toBe(true);
-    // The capture listener (the wake) and the key listener hear the same key.
-    const wake = docListeners.pointerdown;
-    wake();
-    docListeners.keydown(enter());
+    // The gate's own key wakes it (as the audio unlock hears it).
+    press(enter());
     expect(screen.classes.has('loading-screen--asleep')).toBe(false);
     clock.now = 300;
-    docListeners.keydown(enter());
+    press(enter());
     expect(onStart).not.toHaveBeenCalled();
     clock.now = 600;
-    docListeners.keydown(enter());
+    press(enter());
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(screen.classes.has('loading-screen--starting')).toBe(true);
   });
@@ -396,49 +400,49 @@ describe('loading screen PRESS START gate', () => {
   // Into the menu through the gate and the pilots.
   function inMenu() {
     const game = boot('');
-    game.docListeners.keydown(enter());
+    game.press(enter());
     vi.advanceTimersByTime(1000);
     return game;
   }
   const escape = () => ({ key: 'Escape' });
 
   it('Escape on the menu brings the gate back, and its press goes through the pilots again', () => {
-    const { screen, menu, button, docListeners, winListeners } = inMenu();
+    const { screen, menu, button, press } = inMenu();
     openPilotSelect.mockClear();
-    winListeners.keydown(escape());
+    press(escape());
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
     expect(screen.classes.has('hidden')).toBe(false);
     expect(screen.classes.has('loading-screen--starting')).toBe(false);
     expect(button.focus).toHaveBeenCalledTimes(2);
-    docListeners.keydown(enter());
+    press(enter());
     vi.advanceTimersByTime(1000);
     expect(openPilotSelect).toHaveBeenCalledTimes(1);
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
   });
 
   it('Escape and pad B leave the menu alone while the remote link covers it', () => {
-    const { gate, menu, winListeners } = inMenu();
+    const { gate, menu, press } = inMenu();
     menu.inert = true; // remoteLink.js, until the run starts
-    winListeners.keydown(escape());
+    press(escape());
     gate.leaveMenu();
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
   });
 
   it('Escape with a panel open leaves the menu to the panel', () => {
-    const { menu, winListeners, page } = inMenu();
+    const { menu, page, press } = inMenu();
     page.overlays = [{ closest: () => null }];
-    winListeners.keydown(escape());
+    press(escape());
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
   });
 
   it('Escape held to close a panel does not go on to the gate (key repeat)', () => {
-    const { menu, winListeners, page } = inMenu();
+    const { menu, page, press } = inMenu();
     page.overlays = [{ closest: () => null }];
-    winListeners.keydown({ key: 'Escape', repeat: false });
+    press({ key: 'Escape', repeat: false });
     page.overlays = []; // the panel's own Escape closed it
-    winListeners.keydown({ key: 'Escape', repeat: true });
+    press({ key: 'Escape', repeat: true });
     expect(menu.classes.has('menu-screen--gated')).toBe(false);
-    winListeners.keydown({ key: 'Escape', repeat: false });
+    press({ key: 'Escape', repeat: false });
     expect(menu.classes.has('menu-screen--gated')).toBe(true);
   });
 
@@ -487,14 +491,14 @@ describe('loading screen PRESS START gate', () => {
     'shows the menu directly with %s',
     (search) => {
       const onLeave = vi.fn();
-      const { screen, menu, docListeners } = boot(search, undefined, {
+      const { screen, menu } = boot(search, undefined, {
         onLeave,
         via: 'none',
       });
       expect(onLeave).toHaveBeenCalledTimes(1);
       expect(menu.classes.has('hidden')).toBe(false);
       expect(screen.classes.has('hidden')).toBe(true);
-      expect(docListeners.keydown).toBeUndefined();
+      expect(inputLayers.top()).toBe(null);
     }
   );
 });

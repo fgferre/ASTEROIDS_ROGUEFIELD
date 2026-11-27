@@ -91,9 +91,7 @@ class UISystem extends BaseSystem {
       eventBus: this.eventBus,
       renderer: () => resolveService('renderer', this.dependencies),
       hud: () => this.tacticalHud.layout,
-      // The session's pause flag alone: no pause screen, no fixed steps.
-      holdSim: (held) =>
-        resolveService('game-state', this.dependencies)?.setPaused(held),
+      holdSim: (held) => this.holdSim(held),
       // A head start holds the first layer: its title card waits for it.
       onIntroEnd: () =>
         resolveService('enemies', this.dependencies)?.waveManager
@@ -160,6 +158,7 @@ class UISystem extends BaseSystem {
         Boolean(this.tacticalHud.layout?.slotState('warden')?.active),
       device: () =>
         resolveService('input', this.dependencies).getActiveDevice(),
+      padPress: (root, action) => this.padNav.press(root, action),
     });
     this.settingsPanel = new SettingsPanel({
       refs: this.domRefs.settings,
@@ -358,13 +357,8 @@ class UISystem extends BaseSystem {
       menu.classList.add('hidden');
       gameUI.classList.remove('hidden');
     }
-    // On top of the input layer stack while open (its own listener takes
-    // its keys): no screen under it hears one; the pad's Start still passes.
-    const editorLayer = { name: 'hud-editor', passes: ['pause'] };
-    inputLayers.push(editorLayer);
     this.hudEditor.open({
       onClose: () => {
-        inputLayers.remove(editorLayer);
         if (inRun) {
           pause.classList.toggle('hidden', !this.pauseScreen.currentPauseState);
         } else {
@@ -828,8 +822,7 @@ class UISystem extends BaseSystem {
       this.levelUpScreen.handleLevelUpInputAction(payload);
     });
 
-    // The screen on top of the input layer stack takes the confirm (the
-    // flight briefing, not on it yet, hears it itself, first).
+    // The screen on top of the input layer stack takes the confirm.
     this.registerEventListener('input-confirmed', () => inputLayers.confirm());
 
     this.registerEventListener('gamepad-ui-nav', (payload = {}) => {
@@ -1074,12 +1067,15 @@ class UISystem extends BaseSystem {
     }
     this.showScreen('playing', options);
     this.tacticalHud.refreshHudFromServices(true);
-    // Settings opened over the cards outlives them: the run waits under it,
-    // as when it opens in flight.
-    if (this.settingsPanel.settingsState.isOpen) {
-      this.settingsPanel.settingsState.source = 'playing';
-      this.eventBus?.emit?.('toggle-pause');
-    }
+    this.settingsPanel.holdRun();
+  }
+
+  /** A cinematic holds the run or lets it go: the session's pause flag alone
+   * (no pause screen, no fixed steps); let go under Settings, the run waits
+   * paused for it. */
+  holdSim(held) {
+    resolveService('game-state', this.dependencies)?.setPaused(held);
+    if (!held) this.settingsPanel.holdRun();
   }
 
   /** GameSessionService clears the cards when a run starts or ends. */

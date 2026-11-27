@@ -13,13 +13,14 @@ import { showReplayNotice } from '../../../../src/bootstrap/replaySession.js';
 // stopPropagation still lets the later listeners run, stopImmediatePropagation
 // does not). Each listener is bound here after the consumer opened; where
 // boot binds it earlier on the same node and phase, the answer is the same.
-// Settings and the pause screen take their keys through the layer stack,
-// which stops none: every listener hears them since.
+// Every screen takes its keys through the layer stack now, which stops
+// none: every listener hears them since (InputSystem hears and acts on none
+// a screen took).
 const NOW = 'true, since the layer stack (it stops no key)';
 
 // The screens that consume a key today, and that key.
 const CONSUMERS = {
-  // window capture, every key, stopImmediatePropagation
+  // the layer stack (window capture), every key, taken but not stopped
   'skip hold': [
     'Enter',
     (rig) => {
@@ -33,7 +34,7 @@ const CONSUMERS = {
       );
     },
   ],
-  // window capture, every key, stopImmediatePropagation
+  // the layer stack (window capture), every key, taken but not stopped
   'HUD editor': [
     'Enter',
     (rig) => {
@@ -41,7 +42,7 @@ const CONSUMERS = {
       rig.ui.domRefs.pause.editHudBtn.click();
     },
   ],
-  // document capture, its keys, stopPropagation
+  // the layer stack (window capture), its keys, taken but not stopped
   pilots: ['Enter', (rig) => rig.open.gate({ pilots: true })],
   // the layer stack (window capture), Escape, taken but not stopped
   Settings: ['Escape', (rig) => rig.open.settings()],
@@ -70,9 +71,9 @@ const LISTENERS = {
           );
     },
     heard: {
-      'skip hold': false,
-      'HUD editor': false,
-      pilots: false,
+      'skip hold': NOW,
+      'HUD editor': NOW,
+      pilots: NOW,
       Settings: NOW,
       'pause with a quit armed': NOW,
     },
@@ -84,8 +85,8 @@ const LISTENERS = {
       return () => audio.init.mock.calls.length > 0;
     },
     heard: {
-      'skip hold': false,
-      'HUD editor': false,
+      'skip hold': NOW,
+      'HUD editor': NOW,
       pilots: true,
       Settings: true,
       'pause with a quit armed': NOW,
@@ -112,7 +113,7 @@ const LISTENERS = {
       monitor.showOverlay();
       return () => monitor.overlayElement.style.display === 'none';
     },
-    heard: { 'skip hold': false, 'HUD editor': false },
+    heard: { 'skip hold': NOW, 'HUD editor': NOW },
   },
   // app.js binds F8 and F9 inside its boot (not exported): a listener on
   // the same target and phase stands in for them.
@@ -125,7 +126,7 @@ const LISTENERS = {
       });
       return () => heard.mock.calls.length > 0;
     },
-    heard: { 'skip hold': false, 'HUD editor': false },
+    heard: { 'skip hold': NOW, 'HUD editor': NOW },
   },
   'replay notice (replaySession, window, bubble, once)': {
     bind: (rig) => {
@@ -134,9 +135,9 @@ const LISTENERS = {
       return () => !notice.isConnected;
     },
     heard: {
-      'skip hold': false,
-      'HUD editor': false,
-      pilots: false,
+      'skip hold': NOW,
+      'HUD editor': NOW,
+      pilots: NOW,
       Settings: NOW,
       'pause with a quit armed': NOW,
     },

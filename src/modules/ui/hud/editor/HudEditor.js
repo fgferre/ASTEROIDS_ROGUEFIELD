@@ -23,6 +23,7 @@ import {
 } from '../instruments/registry.js';
 import { EditorDialogs } from './editorDialogs.js';
 import { editorKey, editorPad } from './editorInput.js';
+import { inputLayers } from '../../../input/inputLayers.js';
 import {
   chromeMarkup,
   esc,
@@ -90,6 +91,8 @@ const FALLBACK_SIZES = {
   build: [230, 45],
 };
 
+// The pad's presses that move the focus in a dialog or panel, as on any screen.
+const PAD_MOVES = ['up', 'down', 'left', 'right', 'confirm'];
 // What tells the inspector's controls apart (their data attributes).
 const FOCUS_KEYS = ['model', 'visible', 'action', 'control', 'select'];
 
@@ -104,16 +107,44 @@ export class HudEditor {
    * `refresh()`: feeds the HUD the services' values again.
    * `wardenLive()`: a Warden or Herald bar is up for real (no sample then).
    * `device()`: 'keyboard' | 'gamepad', for the hints.
+   * `padPress(root, action)`: a d-pad move or A in `root`, as on any screen
+   *   (gamepadNav.js).
    */
-  constructor({ hud, settings, setLayout, refresh, wardenLive, device }) {
+  constructor({
+    hud,
+    settings,
+    setLayout,
+    refresh,
+    wardenLive,
+    device,
+    padPress,
+  }) {
     this.hud = hud;
     this.settings = settings;
     this.setLayout = setLayout;
     this.refresh = refresh;
     this.wardenLive = wardenLive;
     this.device = device;
+    this.padPress = padPress;
     this.state = null;
-    this.onKeyDown = (event) => editorKey(this, event);
+    // Open, on top of the input layer stack: every key is its own (none
+    // reaches a screen under it or the game); the pad moves in its dialog
+    // or panels, else drives the instruments; the pad's Start still passes
+    // (the run stays paused: UISystem).
+    this.inputLayer = {
+      name: 'hud-editor',
+      passes: ['pause'],
+      pointer: true,
+      onKey: (event) => {
+        editorKey(this, event);
+        return true;
+      },
+      onPad: (action) => {
+        const root = this.navRoot;
+        if (root && PAD_MOVES.includes(action)) this.padPress(root, action);
+        else this.handlePadNav(action);
+      },
+    };
     this.onResize = () => {
       this.applyPreview();
       this.render();
@@ -171,7 +202,7 @@ export class HudEditor {
     this.build(hud.layer);
     document.body.classList.add('is-hud-editing');
     hud.layer.classList.add('is-editing');
-    window.addEventListener('keydown', this.onKeyDown, true);
+    inputLayers.push(this.inputLayer);
     window.addEventListener('resize', this.onResize);
     this.setLayout(preset.items);
     // Today's values (and the ship's screen point, for its frames).
@@ -252,7 +283,7 @@ export class HudEditor {
   close() {
     const s = this.state;
     if (!s) return;
-    window.removeEventListener('keydown', this.onKeyDown, true);
+    inputLayers.remove(this.inputLayer);
     window.removeEventListener('resize', this.onResize);
     this.dialogs.dispose();
     window.clearTimeout(s.feedTimer);

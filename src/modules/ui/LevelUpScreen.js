@@ -443,8 +443,13 @@ export class LevelUpScreen {
     );
   }
 
+  // One pick per offer, by key, confirm or click: once one is taken the
+  // cards are leaving (locked) or gone (with Reduce Motion), and a second
+  // press in the same keystroke (the confirm, then the browser's Enter
+  // default on the focused card) takes nothing; the next offer's cards are
+  // locked as they show.
   selectUpgrade(upgradeId) {
-    if (!upgradeId) {
+    if (!upgradeId || !this.levelUpState.isVisible) {
       return;
     }
 

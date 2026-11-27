@@ -283,7 +283,7 @@ describe('Level-up card transition', () => {
       const cards = [0, 1].map((i) =>
         levelUp.createUpgradeOptionButton({ id: 'a' }, i)
       );
-      levelUp.levelUpState.buttons = cards;
+      Object.assign(levelUp.levelUpState, { isVisible: true, buttons: cards });
       const tap = (card, onArrow) =>
         card.listeners.click({
           target: { closest: () => (onArrow ? {} : null) },
@@ -573,7 +573,7 @@ describe('Level-up card choices', () => {
         levelUpScreen,
         chestCeremony: { openNext: () => false, clear: () => {} },
         flightBriefing: { openNext: () => false },
-        settingsPanel: { settingsState: { isOpen: false } },
+        settingsPanel: { holdRun: () => {} },
         onboarding: { cardPicked: () => {} },
         tacticalHud: { refreshHudFromServices: () => {} },
         queueTransmission: () => {},

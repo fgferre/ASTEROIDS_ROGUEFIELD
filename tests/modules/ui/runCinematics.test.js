@@ -8,6 +8,7 @@ import {
   endingBeats,
 } from '../../../src/core/cinematics.js';
 import UISystem from '../../../src/modules/UISystem.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 import { runModeFor } from '../../../src/core/runMode.js';
 import { AAAHudLayout } from '../../../src/modules/ui/AAAHudLayout.js';
 import { RunEndScreens } from '../../../src/modules/ui/RunEndScreens.js';
@@ -751,8 +752,9 @@ describe('RunCinematics', () => {
   });
 
   it('the press that picked the ending is no tap; a hold of the skip key skips it', () => {
-    // Window capture listeners run first on each event, as in the browser:
-    // one bound during an event's own handler misses that event.
+    // Window capture listeners run first on each event, as in the browser
+    // (the input layer stack's): a layer pushed during an event's own
+    // handler misses that event.
     const listeners = new Map();
     vi.stubGlobal('window', {
       setTimeout: (fn, ms) => setTimeout(fn, ms),
@@ -767,6 +769,7 @@ describe('RunCinematics', () => {
       requestAnimationFrame: (fn) => setTimeout(fn, 16),
       cancelAnimationFrame: (id) => clearTimeout(id),
     });
+    inputLayers.install(null);
     const body = fakeElement();
     body.dataset = {};
     const hint = {
@@ -799,7 +802,6 @@ describe('RunCinematics', () => {
           code: 'Space',
           repeat: false,
           preventDefault() {},
-          stopImmediatePropagation() {},
         })
       );
       target();

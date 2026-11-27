@@ -121,7 +121,7 @@ pinTable('Codex over the menu', (rig) => rig.open.codex(), [
   ],
 ]);
 
-// The Codex's own is-settings-open check (lot 2) holds its arrows.
+// Settings, on top of the stack, keeps the Codex's arrows.
 pinTable(
   'Settings over the Codex',
   (rig) => {
@@ -427,6 +427,42 @@ describe('menus, hidden rules today', () => {
   afterEach(() => {
     expect(rig.errors()).toEqual([]);
     rig.destroy();
+  });
+
+  it('Settings does not open over the title gate (the game is not ready; its key wakes it): F10 there opens nothing', () => {
+    rig.open.gate();
+    rig.tap('Escape'); // back on the gate
+    rig.tap('F10');
+    expect(rig.snapshot()).toMatchObject({ gate: true, settings: false });
+  });
+
+  it('Settings opens over the pilots and takes their keys and pad', () => {
+    rig.open.gate({ pilots: true });
+    rig.tap('F10');
+    expect(rig.snapshot()).toMatchObject({
+      pilots: true,
+      settings: true,
+      top: 'settings',
+    });
+    rig.tap('Enter');
+    rig.send('pad:A');
+    expect(rig.snapshot()).toMatchObject({ pilots: true, settings: true });
+    rig.send('pad:B'); // closes Settings only
+    expect(rig.snapshot()).toMatchObject({ pilots: true, settings: false });
+    rig.tap('F10');
+    rig.tap('Escape');
+    expect(rig.snapshot()).toMatchObject({ pilots: true, settings: false });
+  });
+
+  it('no gap in the loading screen: F10 on the gate just pressed (its start under way) opens nothing, and the pilots that come take Enter', () => {
+    rig.open.gate();
+    rig.tap('Escape'); // back on the gate
+    rig.tap('Enter'); // its start: the pilots come in 1 s
+    rig.tap('F10');
+    rig.wait(1000);
+    expect(rig.snapshot()).toMatchObject({ pilots: true, settings: false });
+    rig.tap('Enter');
+    expect(rig.snapshot().pilots).toBe(false);
   });
 
   it('S and the down arrow stop at the document on the way down (password managers): a bubbling listener never hears them, a capturing one does; in a text field they pass', () => {

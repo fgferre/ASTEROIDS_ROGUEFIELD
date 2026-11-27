@@ -11,6 +11,7 @@ import {
   SCREEN_INPUT_LOCKOUT_MS,
   liftHudInstruments,
 } from './LevelUpScreen.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 export class FlightBriefing {
   /**
@@ -22,6 +23,15 @@ export class FlightBriefing {
     this.ui = ui;
     this.pending = false;
     this.lockedUntil = null;
+    // Up, on the input layer stack: the confirm continues (no keys of its
+    // own; nothing for the pad to move in, its A is the confirm); the pause
+    // key still goes to the game.
+    this.inputLayer = {
+      name: 'flight',
+      element: null,
+      passes: ['pause'],
+      onConfirm: () => this.continue(),
+    };
     // The card is taken: the briefing waits for showGameUI.
     ui.registerEventListener('upgrade-modern-flight', () => {
       this.pending = true;
@@ -30,7 +40,6 @@ export class FlightBriefing {
     ui.registerEventListener('control-scheme-changed', ({ scheme } = {}) => {
       if (scheme === 'modern') this.pending = false;
     });
-    ui.registerEventListener('input-confirmed', () => this.continue());
     // A run starts or ends: nothing waits, nothing shows.
     ['game-started', 'player-died', 'run-won'].forEach((name) =>
       ui.registerEventListener(name, () => this.clear())
@@ -47,18 +56,19 @@ export class FlightBriefing {
     if (!this.pending || this.isVisible) return false;
     this.pending = false;
     this.lockedUntil = Date.now() + SCREEN_INPUT_LOCKOUT_MS;
+    inputLayers.push(this.inputLayer);
     this.ui.showScreen('flight', { overlay: true, show: true });
     liftHudInstruments(this.refs.screen);
     // The screen holds the focus: Enter is the confirm key, not a click.
-    this.refs.screen.focus({ preventScroll: true });
+    if (!inputLayers.covered(this.inputLayer)) {
+      this.refs.screen.focus({ preventScroll: true });
+    }
     return true;
   }
 
   /** Continue: modern flight from here on, back to play. */
   continue() {
     if (!this.isVisible || Date.now() < this.lockedUntil) return;
-    // Not under Settings: the confirm there is Settings' own.
-    if (document.body?.classList.contains('is-settings-open')) return;
     this.hide();
     this.ui.eventBus?.emit?.('modern-flight-engaged');
     this.ui.showGameUI();
@@ -66,6 +76,7 @@ export class FlightBriefing {
 
   hide() {
     this.lockedUntil = null;
+    inputLayers.remove(this.inputLayer);
     this.ui.showScreen('flight', {
       overlay: true,
       show: false,

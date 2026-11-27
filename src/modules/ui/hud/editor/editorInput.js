@@ -23,8 +23,8 @@ const PAD_STEP = 10;
 export function editorKey(editor, event) {
   const s = editor.state;
   if (!s) return;
-  // Nothing reaches the game or the other screens while editing.
-  event.stopImmediatePropagation();
+  // Nothing reaches the game or the other screens while editing: the key is
+  // its layer's alone (HudEditor.inputLayer).
   const { target, key } = event;
   const mod = event.ctrlKey || event.metaKey;
   const typing =

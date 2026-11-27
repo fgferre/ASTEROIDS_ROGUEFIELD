@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mountScreens } from '../../../__helpers__/screenRig.js';
-import { listenForHold } from '../../../../src/modules/ui/skipHold.js';
+import { HOLD_MS, listenForHold } from '../../../../src/modules/ui/skipHold.js';
 
 // Thrust (W) held in flight while a screen opens over the run, let go while
 // that screen is open or after it closed: what the game (InputSystem) sees.
@@ -91,7 +91,32 @@ describe('a key held in flight while a screen opens, today', () => {
     }
   );
 
-  it('a key pressed under the skip hold never reaches the game; its release, after the scene, passes and holds nothing', () => {
+  it('Space and W held through a hold that skipped the scene: their repeats and release after it move nothing (no strafe, thrust or confirm)', () => {
+    rig.state.paused = true;
+    const unbind = listenForHold(
+      () => unbind(),
+      () => {}
+    );
+    rig.bus.emit('cinematic-started', { kind: 'intro', holdsRun: true });
+    rig.keyDown('Space');
+    rig.keyDown('KeyW');
+    rig.wait(HOLD_MS + 100);
+    rig.dom.frame(); // the hold fills: the scene is skipped
+    rig.bus.emit('cinematic-ended', { kind: 'intro' });
+    rig.state.paused = false;
+    rig.wait(1);
+    const since = rig.record();
+    rig.keyDown('Space', { repeat: true });
+    rig.keyDown('KeyW', { repeat: true });
+    expect(thrust()).toBe(false);
+    expect(rig.input.isActionActive('strafeHold')).toBe(false);
+    rig.keyUp('Space');
+    rig.keyUp('KeyW');
+    expect(since('input-confirmed')).toBe(0);
+    expect([...rig.input.pendingStepPresses]).toEqual([]);
+  });
+
+  it('a key pressed under the skip hold moves nothing in the game (InputSystem hears it, the hold took it); its release, after the scene, passes and holds nothing', () => {
     const [, open, close] = SCREENS.at(-1);
     open(rig);
     const since = rig.record();
@@ -100,8 +125,9 @@ describe('a key held in flight while a screen opens, today', () => {
     close(rig);
     rig.keyUp('KeyW');
     expect(thrust()).toBe(false);
-    // the release only, and a 'released' for a thrust never pressed
-    expect(since('key-pressed')).toBe(1);
+    // the press and the release heard, and a 'released' for a thrust
+    // never pressed
+    expect(since('key-pressed')).toBe(2);
     expect(since('input-action')).toBe(1);
   });
 });

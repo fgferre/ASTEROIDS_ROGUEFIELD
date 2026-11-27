@@ -12,6 +12,7 @@
 import { applyStickDeadzone } from '../input/gamepadReading.js';
 import { GAMEPAD_FOCUSABLE_SELECTOR } from './gamepadNav.js';
 import { resolveService } from '../../core/serviceUtils.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 // Full tilt crosses the screen's height in 0.9 s. Not confirmed: felt on
 // his pad first.
@@ -42,7 +43,7 @@ function scrollerUnder(el) {
   return null;
 }
 
-/** Built by UISystem with itself (`ui`: padNav, hudEditor, dependencies). */
+/** Built by UISystem with itself (`ui`: padNav, dependencies). */
 export class PadPointer {
   constructor(ui) {
     this.ui = ui;
@@ -69,15 +70,11 @@ export class PadPointer {
     requestAnimationFrame(() => this.tick());
   }
 
-  /** A menu or overlay is up (not the flight itself). */
+  /** A menu or overlay is up (not the flight itself): the screen the pad
+   * navigates (the input layer stack's top, or the menu), or a top layer the
+   * pointer works over (the loading screen, the pilots, the HUD editor). */
   menuUp() {
-    const gate = document.getElementById('loading-screen');
-    return Boolean(
-      this.ui.padNav.screen() ||
-        this.ui.hudEditor.isOpen ||
-        document.querySelector('.pilot-screen') ||
-        (gate && !gate.classList.contains('hidden'))
-    );
+    return Boolean(this.ui.padNav.screen() || inputLayers.top()?.pointer);
   }
 
   hide() {
