@@ -9,8 +9,8 @@
 
 /** Screens a pad can navigate, topmost first (`#<id>-screen`). */
 export const GAMEPAD_NAV_SCREENS = Object.freeze([
-  'end-credits',
   'settings',
+  'end-credits',
   'codex',
   'hangar',
   'credits',
