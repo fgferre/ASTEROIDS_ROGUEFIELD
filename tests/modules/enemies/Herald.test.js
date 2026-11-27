@@ -172,6 +172,7 @@ describe('Herald', () => {
       if (event !== 'enemy-fired') return;
       bullets.push({
         enemyId: payload.enemyId,
+        pattern: payload.projectile.pattern,
         active: true,
         x: payload.position.x,
         y: payload.position.y,

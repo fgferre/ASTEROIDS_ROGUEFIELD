@@ -116,6 +116,7 @@ export class GamePools {
         trailMax: 0,
         enemyId: null,
         enemyType: null,
+        pattern: null,
         source: null,
         x: 0,
         y: 0,
@@ -160,6 +161,7 @@ export class GamePools {
         bullet.trailMax = 0;
         bullet.enemyId = null;
         bullet.enemyType = null;
+        bullet.pattern = null;
         bullet.source = null;
         bullet.x = 0;
         bullet.y = 0;

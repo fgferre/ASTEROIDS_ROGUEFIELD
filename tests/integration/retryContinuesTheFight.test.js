@@ -8,6 +8,7 @@ import {
   bossKindForLayer,
 } from '../../src/data/enemies/boss.js';
 import { BaseEnemy } from '../../src/modules/enemies/base/BaseEnemy.js';
+import { WEAPON_EVOLUTIONS } from '../../src/data/weapons.js';
 import {
   freezeSpawner,
   jumpToLayer,
@@ -95,6 +96,10 @@ const escortsOf = (game, boss) => {
 // by the same rule, so it would come back wrong unseen.
 const UNREAD = {
   system: 'the EnemySystem, a service: the rebuilt enemy is given the same one',
+  'Symbol(ASTEROIDS_ROGUEFIELD:asteroidPoolId)':
+    "its place in the pools: the snapshot's poolId, set again on the rebuilt enemy",
+  'Symbol(ASTEROIDS_ROGUEFIELD:factoryRegistered)':
+    "the spawner's mark of who registers it, set and cleared by the build itself",
   components:
     'built by the factory from the type at birth, the Retry rebuilds it the ' +
     'same way; no fight state in them (movement and weapon state live on the ' +
@@ -117,23 +122,43 @@ const isPlain = (value) => {
 function fields(root, game, unread) {
   const seen = new WeakSet();
   const owner = root.constructor.name;
+  const report = (field, what) => {
+    if (!UNREAD[field]) unread?.add(`${owner}.${field} holds a ${what}`);
+  };
+  // What the Retry's copy skips on the enemy itself: a key that is a Symbol
+  // or not enumerable.
+  for (const key of Object.getOwnPropertySymbols(root)) {
+    report(String(key), 'Symbol key');
+  }
+  for (const key of Object.getOwnPropertyNames(root)) {
+    if (!Object.prototype.propertyIsEnumerable.call(root, key)) {
+      report(key, 'hidden field');
+    }
+  }
   const write = (value, path) => {
-    if (typeof value === 'function' || value === undefined) return undefined;
+    const nested = path.includes('.');
+    const field = path.replace(/\.\d+(?=\.|$)/g, '[]');
+    if (value === undefined) return undefined;
+    // Inside plain data the copy keeps a function by reference; one of the
+    // enemy's own fields that is a function it leaves to the rebuilt enemy.
+    if (typeof value === 'function') {
+      if (nested) return `[function ${value.name}]`;
+      report(field, 'function');
+      return undefined;
+    }
     if (typeof value === 'number' && !Number.isFinite(value))
       return String(value);
     if (!value || typeof value !== 'object') return value;
     if (value instanceof RandomService)
       return `${value.seed >>> 0}/${value._state >>> 0}`;
-    if (value === game.services.player) return '[ship]';
+    if (value === game.services.player) {
+      if (!nested) report(field, 'reference to the ship');
+      return '[ship]';
+    }
     if (value !== root && value instanceof BaseEnemy)
       return `#${value.type}:${value.id}`;
     if (value !== root && !isPlain(value)) {
-      const field = path.replace(/\.\d+(?=\.|$)/g, '[]');
-      if (!UNREAD[field]) {
-        unread?.add(
-          `${owner}.${field} holds a ${value.constructor?.name ?? 'object'}`
-        );
-      }
+      report(field, value.constructor?.name ?? 'object');
       return `[${value.constructor?.name ?? 'object'}]`;
     }
     if (seen.has(value)) return '[seen]';
@@ -260,6 +285,37 @@ function dump(game, unread) {
     enemies,
     enemyBullets: game.services.combat.enemyBullets.map((b) =>
       fields(b, game, unread)
+    ),
+    // The cards' effects on enemies (burns, slows, pulls) and the pull wells;
+    // a burn's spread list as the enemies of it still alive.
+    cards: Object.fromEntries(
+      ['burns', 'slows', 'pulls'].map((name) => [
+        name,
+        [...game.services.combat.cards[name]].map(([enemy, entry]) =>
+          fields(
+            {
+              enemy,
+              ...entry,
+              ...(entry.spreadTo && {
+                spreadTo: entry.spreadTo.filter((e) => !e.destroyed),
+              }),
+            },
+            game,
+            unread
+          )
+        ),
+      ])
+    ),
+    wells: game.services.combat.cards.wells.map((well) =>
+      fields(well, game, unread)
+    ),
+    // The layer's counters: what the wave manager reports and keeps.
+    layer: JSON.parse(
+      JSON.stringify({
+        wave: game.services.enemies.waveState,
+        progress: game.services.enemies.waveManager.captureLayerProgress(),
+        spawnTimer: game.services.enemies.waveManager.spawnTimer,
+      })
     ),
     streams: streams(game.services),
   };
@@ -494,6 +550,49 @@ describe('a Retry continues the fight where it stopped', () => {
 
   it.each(enemyIds)('enemy %s, killed mid-life', (id) => {
     expectTheFightGoesOn(id, () => fight(id, setUpEnemy));
+  });
+
+  it.each(['prime', 'foundry-mother'])(
+    'boss %s, the ship killed during its entrance',
+    (id) => {
+      // Untouchable as it enters, but the step it is born in comes before
+      // its first update: the death is forced there.
+      const entering = (game) => {
+        const boss = spawnBoss(game, id);
+        game.step();
+        expect(boss.arrival).toBeTruthy();
+        return null;
+      };
+      expectTheFightGoesOn(id, () => fight(id, entering));
+    }
+  );
+
+  it('the cards burning, slowing and pulling enemies keep at it', () => {
+    // The calls the cards make on a hit (HitResolution): a Foundry Mother
+    // and an escort burning (the Solar Flare's spread list), an escort
+    // slowed, another pulled into a Singularity well; a little later, the
+    // death.
+    const withCards = (game) => {
+      const on = setUpBoss(game, 'foundry-mother');
+      const { cards } = game.services.combat;
+      const field = [];
+      game.services.enemies.forEachActiveEnemy((e) => field.push(e));
+      const boss = field.find((e) => e.type === 'boss');
+      const [first, second] = field.filter((e) => e.type === 'drone');
+      cards.ignite(boss, 40, WEAPON_EVOLUTIONS.thermal.burn, []);
+      cards.ignite(first, 40, WEAPON_EVOLUTIONS.thermal.burn, null);
+      cards.slows.set(first, {
+        id: first.id,
+        timer: WEAPON_EVOLUTIONS.field.slow.duration,
+      });
+      cards.pullToward(second, true, second.x + 40, second.y);
+      for (let i = 0; i < 20; i += 1) game.step();
+      expect(cards.burns.size + cards.slows.size + cards.pulls.size).toBe(4);
+      return on;
+    };
+    expectTheFightGoesOn('foundry-mother', () =>
+      fight('foundry-mother', withCards)
+    );
   });
 
   it('a layer played with cards, killed and retried', () => {

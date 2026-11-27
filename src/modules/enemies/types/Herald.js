@@ -275,14 +275,19 @@ export class Herald extends BaseEnemy {
   }
 
   // The combat system keeps the shards (pooled bullets); the Herald steers
-  // every one in flight that it fired, found by its id, so the shards a Retry
-  // puts back are under its hand again.
+  // every shard in flight that it fired, found by its id and the shot's
+  // kind, so the shards a Retry puts back are under its hand again.
   steerShards(target, deltaTime) {
     if (!target) return;
     const bullets = this.system?.getCachedCombat?.()?.enemyBullets ?? [];
     const maxTurn = this.data.shardTurnRate * deltaTime;
     for (const bullet of bullets) {
-      if (!bullet.active || bullet.destroyed || bullet.enemyId !== this.id) {
+      if (
+        !bullet.active ||
+        bullet.destroyed ||
+        bullet.enemyId !== this.id ||
+        bullet.pattern !== 'herald-shard'
+      ) {
         continue;
       }
       const heading = Math.atan2(bullet.vy, bullet.vx);

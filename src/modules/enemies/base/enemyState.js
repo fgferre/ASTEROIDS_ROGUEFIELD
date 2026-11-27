@@ -5,8 +5,10 @@
 // frozen object is shared config and is kept by reference; a random stream is
 // kept by where it stands; another enemy by its id, linked again once the
 // whole field is back (one already dead at the death, still named in a list,
-// stays the object it was). Anything else (a service, a component built at
-// birth, the ship) is left as the rebuilt enemy has it.
+// stays a dead stand-in of its kind). Inside its plain data a function or an
+// object of a class (the ship) is kept by reference; one of its own fields
+// that is not plain data (its system, the components built at birth) is left
+// as the rebuilt enemy has it.
 // tests/integration/retryContinuesTheFight.test.js reads the same way and
 // names every field it cannot read.
 import RandomService from '../../../core/RandomService.js';
@@ -14,6 +16,7 @@ import { BaseEnemy } from './BaseEnemy.js';
 
 const STREAM = Symbol('stream');
 const ENEMY = Symbol('enemy');
+const SAME = Symbol('same');
 
 const isPlain = (value) => {
   const proto = Object.getPrototypeOf(value);
@@ -23,8 +26,12 @@ const isPlain = (value) => {
 /** The enemy's own state, copied. */
 export function captureState(enemy) {
   const copies = new Map();
-  const copy = (value) => {
-    if (typeof value === 'function') return undefined;
+  // Nested in its plain data, a function or an object of a class (the ship,
+  // an entrance's easing) is kept by reference: the rebuilt enemy holds the
+  // same one. One of its own fields that is not plain data is left to the
+  // rebuilt enemy (its system, the components built at birth).
+  const copy = (value, nested) => {
+    if (typeof value === 'function') return nested ? value : undefined;
     if (!value || typeof value !== 'object' || Object.isFrozen(value)) {
       return value;
     }
@@ -43,15 +50,17 @@ export function captureState(enemy) {
     } else if (Array.isArray(value)) {
       out = [];
       copies.set(value, out);
-      for (const item of value) out.push(copy(item));
+      for (const item of value) out.push(copy(item, true));
     } else if (value instanceof Set) {
       out = new Set();
       copies.set(value, out);
-      for (const item of value) out.add(copy(item));
+      for (const item of value) out.add(copy(item, true));
     } else if (isPlain(value)) {
       out = {};
       copies.set(value, out);
-      for (const key of Object.keys(value)) out[key] = copy(value[key]);
+      for (const key of Object.keys(value)) out[key] = copy(value[key], true);
+    } else if (nested) {
+      out = { [SAME]: value };
     }
     copies.set(value, out);
     return out;
@@ -59,7 +68,7 @@ export function captureState(enemy) {
 
   const state = {};
   for (const key of Object.keys(enemy)) {
-    const copied = copy(enemy[key]);
+    const copied = copy(enemy[key], false);
     if (copied !== undefined || enemy[key] === undefined) state[key] = copied;
   }
   return state;
@@ -87,6 +96,8 @@ export function restoreState(enemy, state, findEnemy) {
           ? current
           : new RandomService(value[STREAM].seed);
       out.restore(value[STREAM]);
+    } else if (SAME in value) {
+      out = value[SAME];
     } else if (value[ENEMY]) {
       const { id, type, kind } = value[ENEMY];
       out =

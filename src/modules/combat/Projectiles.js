@@ -227,6 +227,8 @@ export class Projectiles {
     bullet.enemyId = data.enemyId ?? data.source?.id ?? data.enemy?.id ?? null;
     bullet.enemyType =
       data.enemyType ?? data.source?.type ?? data.enemy?.type ?? null;
+    // Its kind of shot ('herald-shard'...): a Herald finds its shards by it.
+    bullet.pattern = projectile.pattern ?? null;
     bullet.source = data.source
       ? { ...data.source }
       : bullet.enemyId || bullet.enemyType

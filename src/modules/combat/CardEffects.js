@@ -317,14 +317,49 @@ export class CardEffects {
     });
   }
 
-  // The card-roll count at death: kills after it roll on, and a retry
-  // (session/deathSnapshot.js) puts it back.
+  // At the death: the card-roll count (kills after it roll on), each enemy
+  // burning, slowed or pulled, by its id (the Retry rebuilds the field), its
+  // timers where they stood, and the pull wells; a retry
+  // (session/deathSnapshot.js) puts them back on the rebuilt enemies.
   getSnapshotState() {
-    return { cardRolls: this.cardRolls };
+    const byId = (effects) =>
+      [...effects.values()].map((entry) => ({
+        ...entry,
+        ...(entry.spreadTo && { spreadTo: entry.spreadTo.map((e) => e.id) }),
+      }));
+    return {
+      cardRolls: this.cardRolls,
+      burns: byId(this.burns),
+      slows: byId(this.slows),
+      pulls: byId(this.pulls),
+      wells: this.wells.map((well) => ({ ...well })),
+    };
   }
 
   restoreSnapshotState(snapshot) {
     this.cardRolls = snapshot.cardRolls;
+    const field = new Map();
+    this.enemies().forEachActiveEnemy((enemy) => field.set(enemy.id, enemy));
+    const back = (entries) =>
+      new Map(
+        entries
+          .filter(({ id }) => field.has(id))
+          .map((entry) => [
+            field.get(entry.id),
+            {
+              ...entry,
+              ...(entry.spreadTo && {
+                spreadTo: entry.spreadTo.flatMap((id) =>
+                  field.has(id) ? [field.get(id)] : []
+                ),
+              }),
+            },
+          ])
+      );
+    this.burns = back(snapshot.burns);
+    this.slows = back(snapshot.slows);
+    this.pulls = back(snapshot.pulls);
+    this.wells = snapshot.wells.map((well) => ({ ...well }));
     return true;
   }
 

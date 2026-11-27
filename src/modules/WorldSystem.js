@@ -264,6 +264,7 @@ class WorldSystem extends BaseSystem {
   reset(options) {
     super.reset(options);
     this.playerAlive = true;
+    this.shotsAtDeath = null;
     this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
   }
 }
