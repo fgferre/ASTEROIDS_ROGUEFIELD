@@ -92,6 +92,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-thermal-lens',
+          to: 'combat',
+          lands: 'cards.cardEffects.thermalLens',
           payload: { beamLengthMultiplier: 1.4, lanceDamageMultiplier: 1.15 },
         },
       ],

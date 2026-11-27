@@ -30,7 +30,9 @@ export default {
   levels: [
     {
       rank: 1,
-      effects: [{ type: 'event', event: 'card-salvage', payload: {} }],
+      effects: [
+        { type: 'event', event: 'card-salvage', to: 'hangar', payload: {} },
+      ],
     },
   ],
 };

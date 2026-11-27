@@ -42,6 +42,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-cooldown',
+          to: 'player',
           payload: { multiplier: 0.88 },
         },
       ],
@@ -52,6 +53,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-cooldown',
+          to: 'player',
           payload: { multiplier: 0.886 }, // Total: 0.78
         },
       ],
@@ -62,6 +64,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-cooldown',
+          to: 'player',
           payload: { multiplier: 0.897 }, // Total: 0.70
         },
       ],

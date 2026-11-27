@@ -34,6 +34,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-hull-repair',
+          to: 'player',
           payload: { fraction: 0.25 },
         },
       ],

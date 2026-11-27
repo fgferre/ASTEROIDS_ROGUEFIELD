@@ -16,6 +16,7 @@ import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
 import { FIRST_RUN_MODE } from '../core/runMode.js';
 import { DEFAULT_HULL_ID } from '../data/shipModels.js';
+import { routeCardEffects } from '../modules/cardEffectRoutes.js';
 import {
   isPilotStale,
   isProgressHeld,
@@ -135,10 +136,13 @@ export default class HangarService {
     eventBus.on('pickup-collected', ({ kind } = {}) => {
       if (kind === 'salvage') this.cacheSalvage += PICKUP_KINDS.salvage.salvage;
     });
-    // The Salvage Cache card: a pick with nothing left to offer, paid with the
-    // rest at the run's end, at the difficulty's rate.
-    eventBus.on('card-salvage', () => {
-      this.cacheSalvage += SALVAGE_PER_CARD_CACHE;
+    // The card effects routed to the Hangar (src/modules/cardEffectRoutes.js).
+    routeCardEffects(this, 'hangar', (event, fn) => eventBus.on(event, fn), {
+      // The Salvage Cache card: a pick with nothing left to offer, paid with
+      // the rest at the run's end, at the difficulty's rate.
+      'card-salvage': () => {
+        this.cacheSalvage += SALVAGE_PER_CARD_CACHE;
+      },
     });
     eventBus.on('player-died', (summary = {}) => this.award(summary));
     // A quit from the pause pays the layers already cleared, not the one in

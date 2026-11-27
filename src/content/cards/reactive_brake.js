@@ -46,6 +46,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-reactive-brake',
+          to: 'player',
+          lands: 'maneuvers.reactiveBrake',
           // proposta 20/10
           payload: {
             knockbackMultiplier: 1.5,
@@ -61,6 +63,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-reactive-brake',
+          to: 'player',
+          lands: 'maneuvers.reactiveBrake',
           // proposta 20/10
           payload: {
             knockbackMultiplier: 2,

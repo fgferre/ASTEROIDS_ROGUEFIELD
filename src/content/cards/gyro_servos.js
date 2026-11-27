@@ -54,6 +54,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-fire',
+          to: 'combat',
+          lands: 'cards.cardEffects.dashFire',
           payload: { cooldownMultiplier: 1 / 1.4, duration: 1 }, // proposta 20/10
         },
       ],
@@ -64,6 +66,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-fire',
+          to: 'combat',
+          lands: 'cards.cardEffects.dashFire',
           payload: { cooldownMultiplier: 1 / 1.8, duration: 1.5 }, // proposta 20/10
         },
       ],

@@ -32,6 +32,12 @@ export default {
         {
           type: 'event',
           event: 'upgrade-phase-dash',
+          to: 'player',
+          lands: {
+            'maneuvers.dashSpareMax': 'extraCharges',
+            'maneuvers.dashSpare': 'extraCharges',
+            'maneuvers.dashGhostLinger': 'ghostLinger',
+          },
           payload: { extraCharges: 1, ghostLinger: 2 }, // proposta 20/10
         },
       ],

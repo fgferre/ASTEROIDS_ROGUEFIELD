@@ -33,6 +33,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-lucky-fragment',
+          to: 'pickups',
+          lands: { rockDropChance: 'chance' },
           payload: { chance: 0.1 },
         },
       ],

@@ -46,11 +46,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { cooldownMultiplier: 0.74 },
         },
         {
           type: 'event',
           event: 'upgrade-hull-drain',
+          to: 'player',
+          lands: 'hullDrain',
           payload: { amount: 1, interval: 4, floorFraction: 0.2 },
         },
       ],

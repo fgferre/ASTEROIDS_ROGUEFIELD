@@ -31,6 +31,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-phase-skin',
+          to: 'player',
+          lands: { 'maneuvers.dashAfterInvulnerability': 'duration' },
           payload: { duration: 0.4 },
         },
       ],

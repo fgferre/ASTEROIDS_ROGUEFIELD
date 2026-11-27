@@ -41,6 +41,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-health-boost',
+          to: 'player',
           payload: { bonus: 50 },
         },
       ],
@@ -51,6 +52,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-health-boost',
+          to: 'player',
           payload: { bonus: 50 },
         },
       ],
@@ -61,6 +63,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-health-boost',
+          to: 'player',
           payload: { bonus: 75 },
         },
       ],
