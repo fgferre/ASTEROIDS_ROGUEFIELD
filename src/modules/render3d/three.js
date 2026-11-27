@@ -97,9 +97,46 @@ core.MeshStandardMaterial.prototype.onBeforeRender = function (_r, scene) {
 // The renderers sort as r128 did: its depth key, projected the same way.
 const projected = new core.Vector3();
 const screen = new core.Matrix4();
+
+// After a lost context comes back, three keeps the dead context's handles on
+// all it had uploaded and frees them when the game disposes those things
+// (the stopped menu shrinking its buffers as a run starts): the browser warns
+// for each ("delete: object does not belong to this context") and frees
+// nothing, that memory went with the context. Those deletes are dropped: only
+// an object made in an earlier life of the context, anything else as before.
+const FREES = {
+  createBuffer: 'deleteBuffer',
+  createFramebuffer: 'deleteFramebuffer',
+  createProgram: 'deleteProgram',
+  createRenderbuffer: 'deleteRenderbuffer',
+  createShader: 'deleteShader',
+  createTexture: 'deleteTexture',
+  createVertexArray: 'deleteVertexArray',
+};
+export function forgetDeadHandles(gl, canvas) {
+  let life = 0;
+  const born = new WeakMap();
+  canvas.addEventListener('webglcontextlost', () => (life += 1));
+  Object.entries(FREES).forEach(([make, free]) => {
+    const create = gl[make];
+    const remove = gl[free];
+    if (!create || !remove) return;
+    gl[make] = (...args) => {
+      const handle = create.apply(gl, args);
+      if (handle) born.set(handle, life);
+      return handle;
+    };
+    gl[free] = (handle) => {
+      if (born.has(handle) && born.get(handle) !== life) return;
+      remove.call(gl, handle);
+    };
+  });
+}
+
 class WebGLRenderer extends core.WebGLRenderer {
   constructor(...args) {
     super(...args);
+    forgetDeadHandles(this.getContext(), this.domElement);
     const depths = new Map();
     let camera = null;
     const render = this.render;

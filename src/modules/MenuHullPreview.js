@@ -170,9 +170,10 @@ export class MenuHullPreview {
 
   /**
    * The hull's own reflection sky (hullModel.js), as in the game, from the
-   * menu's `renderer` (its own generator), and again after a lost context.
+   * menu's `renderer` (its own generator), and again after a lost context,
+   * inside `seeded` (three names what it builds with Math.random).
    */
-  useSky(renderer) {
+  useSky(renderer, seeded) {
     const { hull, canopy } = this.materials;
     // not the turret: its dome mirrored the softboxes vivid blue (22/11)
     const materials = [...hull, canopy];
@@ -186,7 +187,9 @@ export class MenuHullPreview {
       pmrem.dispose();
     };
     dress();
-    renderer.domElement.addEventListener('webglcontextrestored', dress);
+    renderer.domElement.addEventListener('webglcontextrestored', () =>
+      seeded(dress)
+    );
   }
 
   build(definition) {

@@ -20,8 +20,19 @@ describe('a restored graphics context', () => {
       render: vi.fn(),
     };
     const dispose = vi.fn();
+    // three names what it builds with Math.random: rebuilt seeded
+    let inSeeded = false;
+    const seeded = vi.fn((fn) => {
+      inSeeded = true;
+      try {
+        return fn();
+      } finally {
+        inSeeded = false;
+      }
+    });
     // Called with `new`: a function, not an arrow (Vitest 4).
     const pmrem = vi.fn(function () {
+      expect(inSeeded).toBe(true);
       return {
         fromScene: () => ({ texture: { fresh: true, dispose } }),
         dispose() {},
@@ -34,7 +45,7 @@ describe('a restored graphics context', () => {
     scene.environment = first;
     const hullFirst = { dispose: vi.fn() };
     const hull = [{ envMap: hullFirst }, { envMap: hullFirst }];
-    watchContextRestore(fake, renderer, scene, space, hull);
+    watchContextRestore(fake, renderer, scene, space, hull, seeded);
 
     const camera = new THREE.PerspectiveCamera(50, 16 / 9, 10, CAMERA_FAR);
     camera.position.set(0, 550, 180);
@@ -50,6 +61,7 @@ describe('a restored graphics context', () => {
     expect(farBakes()).toBe(1);
 
     listeners.webglcontextrestored();
+    expect(seeded).toHaveBeenCalledTimes(1);
     expect(scene.environment.fresh).toBe(true);
     expect(first.dispose).toHaveBeenCalled();
     expect(hull.every((m) => m.envMap.fresh)).toBe(true);
