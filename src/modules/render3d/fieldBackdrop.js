@@ -55,7 +55,17 @@ function ringStructures(THREE) {
       new THREE.TorusGeometry(radius - tube, 3, 4, 120, arc),
       edge
     );
+    // None of these writes depth: only the order they draw in layers them.
+    // Each arc sorts at the centre of its circle (its bounding sphere is the
+    // whole circle's), a beam at its own middle: an edge, made after its
+    // band, draws over it, and a beam nearer than that centre over both.
+    // Three's own sphere sits mid-arc, and a band drawn over its edge halved
+    // the violet line.
     [band, rim].forEach((mesh) => {
+      mesh.geometry.boundingSphere = new THREE.Sphere(
+        new THREE.Vector3(),
+        radius + tube
+      );
       mesh.rotation.x = -Math.PI / 2;
       mesh.rotation.z = start;
       mesh.position.set(center.x, 0, center.z);

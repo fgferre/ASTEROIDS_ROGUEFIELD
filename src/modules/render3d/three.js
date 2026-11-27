@@ -63,16 +63,6 @@ core.MeshStandardMaterial.prototype.onBeforeRender = function (_r, scene) {
   }
 };
 
-// r128 ordered what it draws by each object's origin (see-through ones back
-// to front, solid ones front to back within a material); three now uses the
-// centre of the geometry's bounding sphere, which for an arc or a merged set
-// lies far from the origin, and flips pairs the game layered by that order:
-// a dark band drawn over its own lit rim, halving it, and the Ring's chunks,
-// whose pieces meet at the seams, showing a lamp r128 drew the hull over.
-// The renderers sort as r128 did: its depth key, projected the same way.
-const projected = new core.Vector3();
-const screen = new core.Matrix4();
-
 // After a lost context comes back, three keeps the dead context's handles on
 // all it had uploaded and frees them when the game disposes those things
 // (the stopped menu shrinking its buffers as a run starts): the browser warns
@@ -112,45 +102,6 @@ class WebGLRenderer extends core.WebGLRenderer {
   constructor(...args) {
     super(...args);
     forgetDeadHandles(this.getContext(), this.domElement);
-    const depths = new Map();
-    let camera = null;
-    const render = this.render;
-    this.render = (scene, view) => {
-      camera = view;
-      depths.clear();
-      return render.call(this, scene, view);
-    };
-    const depth = (object) => {
-      if (depths.size === 0) {
-        screen.multiplyMatrices(
-          camera.projectionMatrix,
-          camera.matrixWorldInverse
-        );
-      }
-      let z = depths.get(object);
-      if (z === undefined) {
-        z = projected
-          .setFromMatrixPosition(object.matrixWorld)
-          .applyMatrix4(screen).z;
-        depths.set(object, z);
-      }
-      return z;
-    };
-    this.setOpaqueSort(
-      (a, b) =>
-        a.groupOrder - b.groupOrder ||
-        a.renderOrder - b.renderOrder ||
-        a.material.id - b.material.id ||
-        depth(a.object) - depth(b.object) ||
-        a.id - b.id
-    );
-    this.setTransparentSort(
-      (a, b) =>
-        a.groupOrder - b.groupOrder ||
-        a.renderOrder - b.renderOrder ||
-        depth(b.object) - depth(a.object) ||
-        a.id - b.id
-    );
   }
 }
 
