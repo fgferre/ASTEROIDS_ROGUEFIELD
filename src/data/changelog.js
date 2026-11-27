@@ -47,6 +47,7 @@ export const NEXT = {
     'Card texts no longer promise what a weapon cannot get: the Afterburn Lance sells no lock-on range to weapons that never aim or cannot reach that far (the Shard Halo, the Furnace Corona, the Arc Caster and the Scatter Coil), and the Heat Sink, the Overclocked Core, Gyro Servos and the Targeting Matrix tell the Halo what its speed-up really is: the blades may cut the same enemy again sooner.', // not confirmed
     "Launching from the map a sector that begins with a head start (every sector after the first), the scenes before the run (the story, the journey, the descent) no longer sit under a gold tint: the head start's level-up flash stayed lit over them until the run began.", // not confirmed
     "A flying tip (the dash, the shield, the first moves) still on screen when Sovereign falls no longer stays over the ending's scenes or dim behind its choice: it leaves at the last blow, and since it was not used the next run teaches it again.", // not confirmed
+    'A flying tip still on screen when a sector is won or the ship is lost no longer shows faintly through the victory or game-over screen, across its title; it is back with the ship on a Retry.', // not confirmed
   ],
   unseen: [
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",
