@@ -109,17 +109,10 @@ class WebGLRenderer extends core.WebGLRenderer {
 // target). The composers draw the scene into their targets and its materials
 // expect ACES there, as r128 gave it, a glow with toneMapped false left out
 // (one full-screen pass after the scene could not leave it out): their two
-// targets count as an output, in linear. Their depth keeps r128's 16 bits
-// (r158 made it 24): a glow drawn at the heart of a crystal or a shot showed
-// through its body's front at that precision, and the bloom is tuned on it.
+// targets count as an output, in linear.
 function asOutput(target) {
   target.isXRRenderTarget = true;
   target.texture.colorSpace = core.LinearSRGBColorSpace;
-  target.depthTexture = new core.DepthTexture(
-    target.width,
-    target.height,
-    core.UnsignedShortType
-  );
 }
 
 class EffectComposer extends Composer {
