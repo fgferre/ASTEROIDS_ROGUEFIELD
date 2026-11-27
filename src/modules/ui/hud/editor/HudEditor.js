@@ -11,8 +11,8 @@
 // layouts (built-in presets and the player's own, kept by the settings
 // service: layoutStore.js), undo and redo, the grid, the safe area, the
 // window shapes to preview, reset and layout codes. The run stays paused
-// behind; UISystem hides its screens on open and brings them back in
-// `onClose`.
+// behind; its door (ui/hudEditorDoor.js), which loads this file on the
+// first press, hides the screens on open and brings them back in `onClose`.
 
 import { DEFAULT_HUD_PRESET } from '../../../../data/ui/hudPresets.js';
 import { pickFocusTarget } from '../../gamepadNav.js';

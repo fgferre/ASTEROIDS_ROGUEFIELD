@@ -1,21 +1,32 @@
 // src/modules/UISystem.js
 
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
-import { bossRushStageTitle, directorFor } from '../data/layers.js';
-import { HERALD_KINDS } from '../data/enemies/herald.js';
-import { biomeForLayer } from '../data/biomes.js';
-import { localLayer, sectorById, sectorTitle } from '../data/sectors.js';
-import { STORY } from '../data/story.js';
+import { sectorById } from '../data/sectors.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { FIRST_RUN_MODE } from '../core/runMode.js';
+import { Onboarding } from './ui/onboarding.js';
 import {
-  Onboarding,
-  TIP_ACTIONS,
-  isStrafing,
-  onboardingPrompts,
-} from './ui/onboarding.js';
+  isOnboardingEnabled,
+  listenForLessons,
+  refreshMenuTips,
+  removeOnboardingCardsTip,
+  showOnboardingCardsTip,
+  showOnboardingTip,
+  updateOnboarding,
+} from './ui/onboardingTips.js';
 import { RunCinematics } from './ui/runCinematics.js';
+import {
+  handleLayerStarted,
+  listenForStory,
+  queueTransmission,
+  runModeOf,
+} from './ui/runStory.js';
+import {
+  handleScreenChanged,
+  holdSim,
+  showGameUI,
+  showScreen,
+} from './ui/screenSwitch.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
 import { LevelUpScreen } from './ui/LevelUpScreen.js';
 import { ChestCeremony } from './ui/ChestCeremony.js';
@@ -24,11 +35,7 @@ import { PauseScreen } from './ui/PauseScreen.js';
 import { RunEndScreens } from './ui/RunEndScreens.js';
 import { CreditsOverlay, fillChangelog } from './ui/CreditsOverlay.js';
 import { TacticalHud } from './ui/TacticalHud.js';
-import { HudEditor } from './ui/hud/editor/HudEditor.js';
-import {
-  activePreset,
-  instrumentCatalog,
-} from './ui/hud/editor/layoutStore.js';
+import { followHudLayout, openHudEditor } from './ui/hudEditorDoor.js';
 import { MainMenu } from './ui/MainMenu.js';
 import { HangarScreen } from './ui/HangarScreen.js';
 import { CampaignMap } from './ui/CampaignMap.js';
@@ -37,27 +44,14 @@ import { cacheStaticNodes } from './ui/domRefs.js';
 import { ViewportScaling } from './ui/viewportScaling.js';
 import {
   TransmissionQueue,
-  bossRushTransmission,
-  chapterTransmission,
-  stageTransmission,
   deathTransmission,
   hangarTransmission,
-  heraldTransmission,
-  sightingTransmission,
   winTransmissions,
-  wardenTransmission,
 } from './ui/transmissions.js';
 import { GamepadMenuNav } from './ui/gamepadNav.js';
 import { PadPointer } from './ui/padPointer.js';
 import { setSkipPad } from './ui/skipHold.js';
 import { inputLayers } from './input/inputLayers.js';
-
-// The overlays that pause a run over its HUD: cards, chest, flight briefing.
-const CARD_OVERLAYS = ['levelup', 'chest', 'flight'];
-
-/** The kind of run being played (src/core/runMode.js): the session's. */
-const runModeOf = (ui) =>
-  resolveService('game-session', ui.dependencies)?.mode ?? FIRST_RUN_MODE;
 
 class UISystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -105,7 +99,7 @@ class UISystem extends BaseSystem {
     setSkipPad(() => resolveService('input', this.dependencies)?.gamepad);
     this.onboarding = new Onboarding(
       {
-        showTip: (id) => this.showOnboardingTip(id),
+        showTip: (id) => showOnboardingTip(this, id),
         hideTip: () => this.tacticalHud.layout?.hideOnboardingTip(),
       },
       (id) => this.eventBus?.emit('onboarding-step', { id })
@@ -149,17 +143,9 @@ class UISystem extends BaseSystem {
         );
       },
     });
-    this.hudEditor = new HudEditor({
-      hud: () => this.tacticalHud.layout,
-      settings: this.settings,
-      setLayout: (items) => this.tacticalHud.setLayout(items),
-      refresh: () => this.tacticalHud.refreshHudFromServices(true),
-      wardenLive: () =>
-        Boolean(this.tacticalHud.layout?.slotState('warden')?.active),
-      device: () =>
-        resolveService('input', this.dependencies).getActiveDevice(),
-      padPress: (root, action) => this.padNav.press(root, action),
-    });
+    // Built when its file first arrives (ui/hudEditorDoor.js).
+    this.hudEditor = null;
+    this.hudEditorArriving = null;
     this.settingsPanel = new SettingsPanel({
       refs: this.domRefs.settings,
       pauseSettingsBtn: this.domRefs.pause.settingsBtn,
@@ -322,54 +308,15 @@ class UISystem extends BaseSystem {
     this.viewport.initializeViewportScaling();
   }
 
-  /** The HUD Layout setting's layout on the HUD; the editor owns it while open. */
+  /** The HUD Layout setting's layout on the HUD (app.js, the settings). */
   followHudLayout(video) {
-    if (!this.hudEditor.isOpen) {
-      this.tacticalHud.setLayout(
-        activePreset(video, instrumentCatalog()).items
-      );
-    }
+    followHudLayout(this, video);
   }
 
-  /** Settings → Edit HUD Layout or the pause screen's Edit HUD: the HUD
-   * editor over a paused run's HUD, or over the idle field from the menu;
-   * the screens it covers come back when it closes. */
+  /** Settings → Edit HUD Layout or the pause screen's Edit HUD; the first
+   * time, once the editor's file has come (ui/hudEditorDoor.js). */
   openHudEditor() {
-    if (this.hudEditor.isOpen || !this.tacticalHud.layout) {
-      return;
-    }
-    const { settingsState } = this.settingsPanel;
-    const settingsFrom = settingsState.isOpen ? settingsState.source : null;
-    const screen = resolveService('game-state', this.dependencies).getScreen();
-    const inRun = ['playing', 'levelup', 'chest'].includes(screen);
-    const coveredScreen = ['levelup', 'chest'].includes(screen)
-      ? document.getElementById(`${screen}-screen`)
-      : null;
-    const coveredScreenWasHidden =
-      coveredScreen?.classList.contains('hidden') ?? true;
-    const pause = document.getElementById('pause-screen');
-    const menu = document.getElementById('menu-screen');
-    const gameUI = document.getElementById('game-ui');
-    this.settingsPanel.closeSettingsPanel({ resumeRun: false });
-    pause.classList.add('hidden');
-    coveredScreen?.classList.add('hidden');
-    if (!inRun) {
-      menu.classList.add('hidden');
-      gameUI.classList.remove('hidden');
-    }
-    this.hudEditor.open({
-      onClose: () => {
-        if (inRun) {
-          pause.classList.toggle('hidden', !this.pauseScreen.currentPauseState);
-        } else {
-          gameUI.classList.add('hidden');
-          menu.classList.remove('hidden');
-        }
-        coveredScreen?.classList.toggle('hidden', coveredScreenWasHidden);
-        if (settingsFrom) this.settingsPanel.openSettingsPanel(settingsFrom);
-        else this.domRefs.pause.editHudBtn?.focus({ preventScroll: true });
-      },
-    });
+    return openHudEditor(this);
   }
 
   resolveSettingsService() {
@@ -381,74 +328,13 @@ class UISystem extends BaseSystem {
     return this.tacticalHud.handleBossEvent(eventName, data);
   }
 
-  handleLayerStarted(payload = {}) {
-    const hud = this.tacticalHud.layout;
-    if (!hud) {
-      return;
-    }
-    const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
-    this.transmissionLayer = layer;
-    const mode = runModeOf(this);
-    const { sector } = mode;
-    this.cinematics.prepareLayer(layer, mode);
-    // The intro's end shows this layer's title card.
-    if (this.cinematics.introActive) return;
-    const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
-    const biome = biomeForLayer(layer, sector);
-    const firstOfBiome = biome.layers[0] === layer;
-    const stage = mode.rushStage(layer);
-    const chapter = stage
-      ? bossRushStageTitle(stage)
-      : firstOfBiome
-        ? sectorTitle(sector, biome.title)
-        : mode.deepFieldAt(layer)
-          ? 'DEEP FIELD'
-          : '';
-    // A sector run counts its layers from its own first one.
-    hud.showLayerBanner(mode.shownLayer(layer), {
-      boss,
-      sentinel: Boolean(sector?.boss),
-      title: mode.layerBannerTitle,
-      chapter,
-      context: sector && !stage && firstOfBiome ? STORY.context[sector.id] : '',
-    });
-    if (firstOfBiome) {
-      this.queueTransmission(chapterTransmission(biome.id, sector?.id));
-    }
-    const said =
-      sector && stageTransmission(sector.id, localLayer(sector, layer));
-    if (said) this.queueTransmission(said);
-    if (stage === 1) {
-      this.queueTransmission(bossRushTransmission());
-    }
+  /** A layer's banner and lines (ui/runStory.js). */
+  handleLayerStarted(payload) {
+    handleLayerStarted(this, payload);
   }
 
-  /** Queues a Warden transmission and keeps the frame loop that plays it. */
-  queueTransmission(entry, { interrupt = false } = {}) {
-    const queue = this.transmissions;
-    if (!queue || !entry) return;
-    if (interrupt) {
-      queue.interrupt(entry);
-    } else {
-      queue.push(entry);
-    }
-    this.eventBus.emit('transmission-queued', entry);
-    if (this.transmissionRaf) {
-      return;
-    }
-    // Wall-clock UI timing like the HUD banners: it keeps playing while the
-    // run is paused, dead or won.
-    const tick = () => {
-      if (this.transmissions !== queue) {
-        this.transmissionRaf = null;
-        return;
-      }
-      queue.update(performance.now(), this.prefersReducedMotion());
-      this.transmissionRaf = queue.active
-        ? window.requestAnimationFrame(tick)
-        : null;
-    };
-    this.transmissionRaf = window.requestAnimationFrame(tick);
+  queueTransmission(entry, options) {
+    queueTransmission(this, entry, options);
   }
 
   setupEventListeners() {
@@ -470,45 +356,8 @@ class UISystem extends BaseSystem {
       'boss-defeated',
     ].forEach(registerBossEvent);
 
-    this.registerEventListener('wave-started', (payload = {}) => {
-      this.handleLayerStarted(payload);
-    });
-
-    this.registerEventListener('boss-warning', (payload = {}) => {
-      // Boss Rush: the breather names the next Warden.
-      const mode = runModeOf(this);
-      if (mode.warningShowsRushBanner) {
-        this.tacticalHud.layout?.showLayerBanner(payload.nextBossWave, {
-          boss: true,
-          title: mode.layerBannerTitle,
-          chapter: bossRushStageTitle(mode.rushStage(payload.nextBossWave)),
-        });
-      }
-      this.queueTransmission(
-        wardenTransmission(payload.nextBossWave, 'warning', mode.sector?.boss)
-      );
-    });
-
-    // A Warden's entrance: the letterbox until it closes up.
-    this.registerEventListener('boss-spawned', (payload = {}) => {
-      this.cinematics.startArrival(payload.enemy);
-    });
-    this.registerEventListener('boss-arrived', () => {
-      this.cinematics.endArrival();
-    });
-
-    // A boss with a line for its final phase speaks it as the phase begins.
-    this.registerEventListener('boss-phase-changed', ({ enemy, phase }) => {
-      if (phase !== enemy.phaseCount - 1) return;
-      this.queueTransmission(wardenTransmission(0, 'last', enemy.bossKind));
-    });
-    this.registerEventListener('boss-defeated', (payload = {}) => {
-      // A Warden whose death won the run: 'run-won' speaks for it.
-      if (this.runWon) return;
-      this.queueTransmission(
-        wardenTransmission(payload.wave, 'defeated', payload.enemy?.bossKind)
-      );
-    });
+    // The layers' banners, the Wardens' and Heralds' lines (ui/runStory.js).
+    listenForStory(this);
 
     this.registerEventListener('player-died', () => {
       if (this.runWon) return;
@@ -548,32 +397,6 @@ class UISystem extends BaseSystem {
       this.tacticalHud.onLayerModifierEnded(payload);
     });
 
-    // A Herald arrives under a violet banner, then speaks; Silence jams the
-    // radar while it lives (a new run clears it).
-    this.registerEventListener('herald-spawned', ({ kind } = {}) => {
-      const herald = HERALD_KINDS[kind];
-      if (!herald) return;
-      this.tacticalHud.layout?.showHeraldBanner(
-        herald.displayName,
-        herald.subtitle
-      );
-      if (herald.jamsRadar) this.tacticalHud.layout?.setRadarJammed(true);
-      this.queueTransmission(heraldTransmission(kind, 'spawned'));
-    });
-    this.registerEventListener('herald-defeated', ({ kind } = {}) => {
-      this.queueTransmission(heraldTransmission(kind, 'defeated'));
-      if (HERALD_KINDS[kind]?.jamsRadar) {
-        this.tacticalHud.layout?.setRadarJammed(false);
-      }
-    });
-    // The Ring names a machine the first time it is ever seen; not over the
-    // intro or once the run has ended.
-    this.registerEventListener('codex-discovered', ({ type } = {}) => {
-      if (this.cinematics.introActive || this.runWon || this.pilotDown) {
-        return;
-      }
-      this.queueTransmission(sightingTransmission(type));
-    });
     this.registerEventListener('game-started', () => {
       // A sector run returns to the campaign map when it ends.
       this.tacticalHud.onGameStarted();
@@ -619,7 +442,7 @@ class UISystem extends BaseSystem {
     this.registerEventListener('pause-state-changed', (data) => {
       // The pad's Start resumes from anywhere: the editor keeps the run
       // paused and asks before it closes.
-      if (this.hudEditor.isOpen) {
+      if (this.hudEditor?.isOpen) {
         if (!data?.isPaused) {
           queueMicrotask(() => this.eventBus.emit('toggle-pause'));
           this.hudEditor.requestClose();
@@ -633,7 +456,7 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('screen-changed', (payload = {}) => {
-      this.handleScreenChanged(payload);
+      handleScreenChanged(this, payload);
     });
 
     this.registerEventListener('hangar-purchased', ({ id } = {}) => {
@@ -657,7 +480,7 @@ class UISystem extends BaseSystem {
         return;
       }
       // The HUD editor holds the pause screen (pause-state-changed below).
-      if (this.hudEditor.isOpen) {
+      if (this.hudEditor?.isOpen) {
         return;
       }
       const appState = resolveService('game-state', this.dependencies);
@@ -709,7 +532,7 @@ class UISystem extends BaseSystem {
       this.cinematics.armTravel(payload);
       // After startNewRun has unpaused: the intro holds the first step.
       queueMicrotask(() => this.cinematics.startIntro());
-      this.removeOnboardingCardsTip();
+      removeOnboardingCardsTip();
       this.onboarding.menuActed('menu');
       if (this.isOnboardingEnabled()) {
         this.onboarding.start();
@@ -723,29 +546,8 @@ class UISystem extends BaseSystem {
         this.pilotDown = false;
       }
     });
-    this.registerEventListener('combat-mode-toggled', (toggled) => {
-      this.showOnboardingTip('mode', toggled);
-      this.eventBus?.emit('onboarding-step', { id: 'mode' });
-    });
-    this.registerEventListener('player-dashed', () => {
-      this.onboarding.dashed();
-    });
-    this.registerEventListener('shield-activated', () => {
-      this.onboarding.shieldRaised();
-    });
-    this.registerEventListener('upgrade-applied', () => {
-      this.onboarding.cardPicked();
-      this.removeOnboardingCardsTip();
-    });
-    // Opening the Hangar answers the line by its button; closing it, its own.
-    this.registerEventListener(
-      'ui-overlay-visibility-changed',
-      ({ overlay, isOpen } = {}) => {
-        if (overlay !== 'hangar') return;
-        this.onboarding.menuActed(isOpen ? 'salvage' : 'hangar');
-        this.refreshMenuTips(isOpen);
-      }
-    );
+    // The lessons' answers and the menu's lines (ui/onboardingTips.js).
+    listenForLessons(this);
     // No cards once the run has ended: over the victory or under the game
     // over; a run's first cards wait for its journey and intro.
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
@@ -849,7 +651,7 @@ class UISystem extends BaseSystem {
   handleInputDeviceChanged(device) {
     document.body.dataset.inputDevice = device;
     if (this.onboarding.shown && this.onboarding.current) {
-      this.showOnboardingTip(this.onboarding.current);
+      showOnboardingTip(this, this.onboarding.current);
     }
     this.padNav.refreshHints();
   }
@@ -876,7 +678,7 @@ class UISystem extends BaseSystem {
     if (change.category === 'gameplay' && change.key === 'onboardingTips') {
       if (change.value === false) {
         this.onboarding.stop();
-        this.removeOnboardingCardsTip();
+        removeOnboardingCardsTip();
       } else if (change.previous === false) {
         this.onboarding.replay();
       }
@@ -901,181 +703,25 @@ class UISystem extends BaseSystem {
    * editor's frames for the on-ship ones, where this frame drew them. */
   placeOnField() {
     this.tacticalHud.placeOnField();
-    this.hudEditor.followShip();
+    this.hudEditor?.followShip();
   }
 
   update(deltaTime) {
     this.tacticalHud.update(deltaTime);
-    // While active: a strafe tip set aside this run still counts when used.
-    if (this.onboarding.active) {
-      const input = resolveService('input', this.dependencies);
-      const player = resolveService('player', this.dependencies);
-      const moving = input.getMovementInput();
-      this.onboarding.update(deltaTime, {
-        moving: moving.up || moving.down || moving.left || moving.right,
-        strafing: isStrafing(input.stepFrame, player.controlScheme),
-        shieldReady: player.getShieldState().maxHits > 0,
-        bannerBusy: Boolean(this.tacticalHud.layout?.isBannerBusy()),
-        tipCovered: Boolean(this.tacticalHud.layout?.isNoticeShowing()),
-      });
-    }
+    updateOnboarding(this, deltaTime);
   }
 
-  handleScreenChanged(payload = {}) {
-    const screenName = payload?.screen;
-    if (typeof screenName !== 'string' || !screenName.length) {
-      return;
-    }
-
-    if (screenName === 'pause') {
-      this.showScreen('pause', { overlay: true, show: true, emitEvent: false });
-      return;
-    }
-
-    if (CARD_OVERLAYS.includes(screenName)) {
-      this.showScreen(screenName, {
-        overlay: true,
-        show: true,
-        emitEvent: false,
-      });
-      return;
-    }
-
-    if (screenName === 'gameover') {
-      this.runEndScreens.showGameOverScreen(payload);
-      return;
-    }
-
-    if (screenName === 'victory') {
-      const show = () => this.runEndScreens.showVictoryScreen(payload);
-      if (!this.cinematics.deferUntilEpilogueEnds(show)) {
-        show();
-      }
-      return;
-    }
-
-    this.showScreen(screenName, { emitEvent: false });
+  // Which screen shows (ui/screenSwitch.js).
+  showScreen(screenName, options) {
+    showScreen(this, screenName, options);
   }
 
-  showScreen(screenName, options = {}) {
-    const { overlay = false, show = true, emitEvent = true } = options;
-    try {
-      if (overlay) {
-        const target = document.getElementById(`${screenName}-screen`);
-        if (target) {
-          target.classList.toggle('hidden', !show);
-        }
-
-        // Keep game-ui visible for pause, card and run end overlays
-        if (
-          show &&
-          ['pause', ...CARD_OVERLAYS, 'gameover', 'victory'].includes(
-            screenName
-          )
-        ) {
-          const gameUI = document.getElementById('game-ui');
-          if (gameUI) gameUI.classList.remove('hidden');
-        }
-
-        // The session service pauses the game on any non-'playing' screen.
-        if (CARD_OVERLAYS.includes(screenName) && show && emitEvent) {
-          this.eventBus?.emit?.('screen-changed', { screen: screenName });
-        }
-        return;
-      }
-
-      // An open Settings stays over the change (a card picked under it would
-      // leave it open and unseen); its own close hides it.
-      const settings =
-        this.settingsPanel.settingsState.isOpen &&
-        this.domRefs.settings.overlay;
-      document.querySelectorAll('.screen').forEach((screen) => {
-        if (screen !== settings) screen.classList.add('hidden');
-      });
-
-      const gameUI = document.getElementById('game-ui');
-      if (gameUI) gameUI.classList.add('hidden');
-
-      if (this.settingsPanel.isOpenFrom('menu') && screenName !== 'menu') {
-        this.settingsPanel.closeSettingsPanel();
-      }
-
-      if (screenName === 'playing' || screenName === 'game') {
-        if (gameUI) gameUI.classList.remove('hidden');
-      } else {
-        const screen = document.getElementById(`${screenName}-screen`);
-        if (screen) screen.classList.remove('hidden');
-      }
-
-      const pauseOverlay = document.getElementById('pause-screen');
-      if (pauseOverlay) pauseOverlay.classList.add('hidden');
-
-      ['credits', 'changelog'].forEach((name) => {
-        const overlay = document.getElementById(`${name}-screen`);
-        if (overlay) {
-          overlay.classList.add('hidden');
-          overlay.setAttribute('aria-hidden', 'true');
-        }
-        document.body?.classList.remove(`is-${name}-open`);
-      });
-
-      this.creditsOverlay.markClosed();
-      this.changelogOverlay.markClosed();
-
-      this.codexScreen.closeCodex();
-      this.hangarScreen.closeHangar();
-      this.runEndScreens.markClosed();
-
-      if (screenName === 'menu') {
-        this.mainMenu.requestMenuShipSelectorRefresh();
-        this.mainMenu.refreshMenuStatus();
-        this.mainMenu.refreshBossRushLock();
-        this.campaignMap.menuShown();
-        this.refreshMenuTips();
-      }
-
-      if (emitEvent) {
-        this.eventBus?.emit?.('screen-changed', { screen: screenName });
-      }
-    } catch (error) {
-      console.error('[UISystem] Failed to show screen:', error);
-    }
+  showGameUI(options) {
+    showGameUI(this, options);
   }
 
-  /**
-   * Back to play; several level-ups at once deal their card choices first,
-   * then a chest waiting shows its cards.
-   */
-  showGameUI(options = {}) {
-    this.levelUpScreen.resetLevelUpState();
-    if (!this.runWon && !this.pilotDown) {
-      if (
-        resolveService('progression', this.dependencies).openNextLevelUpOffer()
-      )
-        return;
-
-      // A level-up overlay stays visible while another overlay is opened.
-      if (this.chestCeremony.queue?.length) {
-        this.showScreen('levelup', {
-          overlay: true,
-          show: false,
-          emitEvent: false,
-        });
-      }
-      if (this.chestCeremony.openNext()) return;
-      if (this.flightBriefing.openNext()) return;
-    }
-    this.showScreen('playing', options);
-    this.tacticalHud.refreshHudFromServices(true);
-    this.settingsPanel.holdRun();
-  }
-
-  /** A cinematic holds the run or lets it go: the session's pause flag alone
-   * (no pause screen, no fixed steps); let go under Settings, the run waits
-   * paused for it. */
   holdSim(held) {
-    resolveService('game-state', this.dependencies)?.setPaused(held);
-    if (!held) this.settingsPanel.holdRun();
+    holdSim(this, held);
   }
 
   /** GameSessionService clears the cards when a run starts or ends. */
@@ -1090,88 +736,17 @@ class UISystem extends BaseSystem {
     );
   }
 
+  // The onboarding on screen (ui/onboardingTips.js).
   isOnboardingEnabled() {
-    return (
-      !this.onboardingDisabled &&
-      this.resolveSettingsService()?.getSetting(
-        'gameplay',
-        'onboardingTips'
-      ) !== false
-    );
+    return isOnboardingEnabled(this);
   }
 
-  /** The in-play tip `id` (or the timed toggle notice) with the bound keys. */
-  showOnboardingTip(id, toggled = null) {
-    const controls =
-      this.resolveSettingsService()?.getCategoryValues('controls') || {};
-    const device = resolveService('input', this.dependencies).getActiveDevice();
-    const keys = {};
-    TIP_ACTIONS.forEach((action) => {
-      keys[action] = this.settingsPanel.formatBindingLabel(
-        controls[action]?.[device]?.[0],
-        device
-      );
-    });
-    const prompt = onboardingPrompts(
-      keys,
-      resolveService('player', this.dependencies)?.controlScheme,
-      device,
-      toggled
-    )[id];
-    const show = toggled ? 'showTimedNotice' : 'showOnboardingTip';
-    this.tacticalHud.layout?.[show](prompt.keys, prompt.text);
-  }
-
-  /** The cards tip in the level-up footer, on the first level-up only. */
   showOnboardingCardsTip(headStart) {
-    const device = resolveService('input', this.dependencies).getActiveDevice();
-    const text = this.onboarding.cardsTip(device, headStart);
-    const content = document.querySelector('#levelup-screen .levelup-content');
-    if (!text || !content || content.querySelector('.onboarding-cards-tip')) {
-      return;
-    }
-    const tip = document.createElement('p');
-    tip.className = 'levelup-hint onboarding-cards-tip';
-    tip.setAttribute('role', 'status');
-    tip.textContent = text;
-    content.appendChild(tip);
+    showOnboardingCardsTip(this, headStart);
   }
 
-  removeOnboardingCardsTip() {
-    document.querySelector('.onboarding-cards-tip')?.remove();
-  }
-
-  /**
-   * The menu's first-visit lines (ui/onboarding.js MENU_TIPS). Mission
-   * Control shows one at a time: the Launch line before the first flight,
-   * then, with nothing bought yet, the Hangar button's once Salvage buys
-   * something; the open Hangar shows its own, true for any pilot.
-   */
-  refreshMenuTips(hangarOpen = this.hangarScreen.hangarState.isOpen) {
-    const on = this.isOnboardingEnabled();
-    const { bought = true, affordable = false } =
-      resolveService('hangar', this.dependencies)?.purchaseState() ?? {};
-    const tip = (id, ready) => this.onboarding.menuTip(id, on && ready);
-    const launch = tip('menu', !this.onboarding.flown);
-    const salvage = tip(
-      'salvage',
-      !launch && !hangarOpen && !bought && affordable
-    );
-    const hangar = tip('hangar', hangarOpen);
-    const { menu, hangar: hangarRefs } = this.domRefs;
-    this.showMenuTip(menu.tip, launch);
-    this.showMenuTip(menu.hangarTip, salvage);
-    menu.hangarBtn?.classList.toggle('is-pointed', Boolean(salvage));
-    this.showMenuTip(hangarRefs.tip, hangar);
-  }
-
-  showMenuTip(node, tip) {
-    if (!node || node.dataset.tip === (tip?.text ?? '')) return;
-    node.dataset.tip = tip?.text ?? '';
-    node.hidden = !tip;
-    node.innerHTML = tip
-      ? `<span class="menu-tip__label">${tip.label}</span> <span class="menu-tip__text">${tip.text}</span>`
-      : '';
+  refreshMenuTips(hangarOpen) {
+    refreshMenuTips(this, hangarOpen);
   }
 }
 

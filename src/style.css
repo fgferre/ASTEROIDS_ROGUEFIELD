@@ -5969,6 +5969,29 @@ body.touch-play .hud-frame [data-touch-action]::after {
   box-shadow: 0 0 12px rgba(255, 49, 49, 0.35);
 }
 
+/* === HUD editor that did not load (ui/hudEditorDoor.js): the editor's own
+   toast (.hed-toast, editorStyles.js), over Settings or the pause screen === */
+.hud-editor-notice {
+  position: fixed;
+  top: 32px;
+  left: 50%;
+  z-index: 150;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 48px);
+  margin: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-align: center;
+  color: var(--text);
+  pointer-events: none;
+}
+
 /* === Door notice (mobileGuard): turn sideways; on a phone in the browser,
    how to add the game to the Home Screen. The turn line only while upright. */
 .door-notice {
