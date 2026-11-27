@@ -287,17 +287,6 @@ export function setupThree(seeded) {
     BLOOM.radius,
     BLOOM.threshold
   );
-  // The bloom chain defaults to 8-bit targets: in linear, its faint tail
-  // quantizes into steps that the sRGB encode turns into visible blocks.
-  [
-    bloomPass.renderTargetBright,
-    ...bloomPass.renderTargetsHorizontal,
-    ...bloomPass.renderTargetsVertical,
-  ].forEach((rt) => {
-    rt.texture.type = THREE.HalfFloatType;
-    // Full-screen quads only: nothing reads or tests depth here.
-    rt.depthBuffer = false;
-  });
   bloomPass.blackMip = new THREE.DataTexture(new Uint8Array(4), 1, 1);
   bloomPass.blackMip.needsUpdate = true;
   composer.addPass(bloomPass);

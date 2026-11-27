@@ -179,14 +179,6 @@ export function createOpeningScene(menu, random, shotName = null) {
     BLOOM.radius,
     BLOOM.threshold
   );
-  [
-    bloomPass.renderTargetBright,
-    ...bloomPass.renderTargetsHorizontal,
-    ...bloomPass.renderTargetsVertical,
-  ].forEach((rt) => {
-    rt.texture.type = THREE.HalfFloatType;
-    rt.depthBuffer = false;
-  });
   composer.addPass(bloomPass);
   const output = new THREE.ShaderPass(OUTPUT_SHADER);
   output.uniforms.uVignette.value = VIGNETTE;

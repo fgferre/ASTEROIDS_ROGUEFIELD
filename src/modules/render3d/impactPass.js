@@ -50,9 +50,10 @@ export function lensPull(slowFraction) {
  * GLSL for a pass that reads the composer's scene: `sceneAt(uv)` is the
  * scene plus the bloom's half-res result (`tBloom`, × `uBloom`: 1 on frames
  * the bloom ran), the sum UnrealBloomPass's own last draw would have left
- * in the scene target (additive, × its alpha), tone-mapped with three's ACES
- * at `toneMappingExposure` (the scene draws in linear HDR: three tone-maps
- * only what it draws to the screen). sceneSetup.js foldBloom, toneAtEnd.
+ * in the scene target (premultiplied additive: its colour added as it is),
+ * tone-mapped with three's ACES at `toneMappingExposure` (the scene draws in
+ * linear HDR: three tone-maps only what it draws to the screen).
+ * sceneSetup.js foldBloom, toneAtEnd.
  */
 export const SCENE_READ = `
 #include <tonemapping_pars_fragment>
@@ -60,9 +61,8 @@ uniform sampler2D tDiffuse;
 uniform sampler2D tBloom;
 uniform float uBloom;
 vec3 sceneAt(vec2 uv) {
-  vec4 bloom = texture2D(tBloom, uv);
   return ACESFilmicToneMapping(
-    texture2D(tDiffuse, uv).rgb + uBloom * bloom.a * bloom.rgb
+    texture2D(tDiffuse, uv).rgb + uBloom * texture2D(tBloom, uv).rgb
   );
 }`;
 

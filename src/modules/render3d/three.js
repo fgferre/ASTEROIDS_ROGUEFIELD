@@ -11,7 +11,7 @@ import * as core from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
-import { UnrealBloomPass as BloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 
 // Colours as r128 read them: a hex or a Color is used as given, never
@@ -102,124 +102,6 @@ class WebGLRenderer extends core.WebGLRenderer {
   constructor(...args) {
     super(...args);
     forgetDeadHandles(this.getContext(), this.domElement);
-  }
-}
-
-// The bloom's blur and composite as r128 to r178 drew them, which the game's
-// glows are tuned on: r187 doubled the kernels, narrowed the Gaussian to a
-// third of them and tripled the composite, so every halo came out tighter.
-// Its bright pass weighs light as r128's did (0.299, 0.587, 0.114): three's
-// luminance since (0.2126, 0.7152, 0.0722) kept a strong red or blue lamp
-// under the threshold and its halo went out, and let more greens through.
-const QUAD_VERTEX = `varying vec2 vUv;
-void main() {
-  vUv = uv;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
-
-function blurMaterial(radius) {
-  const weights = Array.from(
-    { length: radius },
-    (_, i) => (0.39894 * Math.exp((-0.5 * i * i) / (radius * radius))) / radius
-  );
-  return new core.ShaderMaterial({
-    defines: { KERNEL_RADIUS: radius },
-    uniforms: {
-      colorTexture: { value: null },
-      invSize: { value: new core.Vector2(0.5, 0.5) },
-      direction: { value: new core.Vector2(0.5, 0.5) },
-      gaussianCoefficients: { value: weights },
-    },
-    vertexShader: QUAD_VERTEX,
-    fragmentShader: `varying vec2 vUv;
-uniform sampler2D colorTexture;
-uniform vec2 invSize;
-uniform vec2 direction;
-uniform float gaussianCoefficients[KERNEL_RADIUS];
-void main() {
-  float weightSum = gaussianCoefficients[0];
-  vec3 diffuseSum = texture2D(colorTexture, vUv).rgb * weightSum;
-  for (int i = 1; i < KERNEL_RADIUS; i++) {
-    float w = gaussianCoefficients[i];
-    vec2 uvOffset = direction * invSize * float(i);
-    diffuseSum += (texture2D(colorTexture, vUv + uvOffset).rgb
-      + texture2D(colorTexture, vUv - uvOffset).rgb) * w;
-    weightSum += 2.0 * w;
-  }
-  gl_FragColor = vec4(diffuseSum / weightSum, 1.0);
-}`,
-  });
-}
-
-function compositeMaterial(mips, uniforms) {
-  const term = (i) =>
-    `lerpBloomFactor(bloomFactors[${i}]) * vec4(bloomTintColors[${i}], 1.0) * texture2D(blurTexture${i + 1}, vUv)`;
-  return new core.ShaderMaterial({
-    defines: { NUM_MIPS: mips },
-    uniforms,
-    vertexShader: QUAD_VERTEX,
-    fragmentShader: `varying vec2 vUv;
-uniform sampler2D blurTexture1;
-uniform sampler2D blurTexture2;
-uniform sampler2D blurTexture3;
-uniform sampler2D blurTexture4;
-uniform sampler2D blurTexture5;
-uniform float bloomStrength;
-uniform float bloomRadius;
-uniform float bloomFactors[NUM_MIPS];
-uniform vec3 bloomTintColors[NUM_MIPS];
-float lerpBloomFactor(const in float factor) {
-  float mirrorFactor = 1.2 - factor;
-  return mix(factor, mirrorFactor, bloomRadius);
-}
-void main() {
-  gl_FragColor = bloomStrength * (${[0, 1, 2, 3, 4].map(term).join(' + ')});
-}`,
-  });
-}
-
-// Every bloom step is one opaque full-screen quad, so the clears before the
-// bright pass and each blur are wiped at once: only the composite's (the
-// second clear of the first horizontal target) and the screen's run. The
-// frame is bit-identical.
-class UnrealBloomPass extends BloomPass {
-  constructor(...args) {
-    super(...args);
-    this.separableBlurMaterials = this.separableBlurMaterials.map((own, i) => {
-      const old = blurMaterial([3, 5, 7, 9, 11][i]);
-      old.uniforms.invSize.value.copy(own.uniforms.invSize.value);
-      own.dispose();
-      return old;
-    });
-    const own = this.compositeMaterial;
-    this.compositeMaterial = compositeMaterial(this.nMips, own.uniforms);
-    own.dispose();
-    const bright = this.materialHighPassFilter;
-    const weighed = bright.fragmentShader.replace(
-      'float v = luminance( texel.xyz );',
-      'float v = dot( texel.xyz, vec3( 0.299, 0.587, 0.114 ) );'
-    );
-    if (weighed === bright.fragmentShader) {
-      throw new Error('three.js: the bloom bright pass changed');
-    }
-    bright.fragmentShader = weighed;
-  }
-
-  render(renderer, ...rest) {
-    const clear = renderer.clear;
-    const first = this.renderTargetsHorizontal[0];
-    let cleared = 0;
-    renderer.clear = (...args) => {
-      const target = renderer.getRenderTarget();
-      if (target === null || (target === first && cleared++ > 0)) {
-        clear.apply(renderer, args);
-      }
-    };
-    try {
-      return super.render(renderer, ...rest);
-    } finally {
-      renderer.clear = clear;
-    }
   }
 }
 
