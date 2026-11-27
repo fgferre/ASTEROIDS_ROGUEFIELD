@@ -152,6 +152,65 @@ function fields(root, game, unread) {
   return write(root, '');
 }
 
+// Plain objects (not frozen) reachable from `start` without entering an
+// enemy (nor, with `enter`, anything not plain), each with its first path.
+function plainObjects(start, label, enter) {
+  const found = new Map();
+  const seen = new Set();
+  const stack = Object.keys(start).map((k) => [start[k], `${label}.${k}`, 1]);
+  while (stack.length) {
+    const [value, path, depth] = stack.pop();
+    if (!value || typeof value !== 'object' || seen.has(value)) continue;
+    seen.add(value);
+    if (value instanceof BaseEnemy || value instanceof RandomService) continue;
+    if (value.nodeType || value === globalThis || depth > 8) continue;
+    const plain = isPlain(value);
+    if (!plain && !enter) continue;
+    if (plain && !Object.isFrozen(value) && !found.has(value)) {
+      found.set(value, path);
+    }
+    const entries =
+      value instanceof Map || value instanceof Set
+        ? [...value.entries()].map(([k, v], i) => [
+            value instanceof Set ? i : k,
+            v,
+          ])
+        : Object.keys(value).map((k) => [k, value[k]]);
+    for (const [k, v] of entries) stack.push([v, `${path}.${k}`, depth + 1]);
+  }
+  return found;
+}
+
+// An object an enemy holds that another enemy or a system holds too: the
+// Retry copies it, so the two would come back as two (the Herald of
+// Silence's shards were the combat system's bullets).
+function sharedWithOthers(game) {
+  const { enemies, physics, combat } = game.services;
+  const owners = new Map();
+  const note = (map) => {
+    for (const [object, path] of map) {
+      if (!owners.has(object)) owners.set(object, []);
+      owners.get(object).push(path);
+    }
+  };
+  enemies.forEachActiveEnemy((e) =>
+    note(plainObjects(e, `${e.type}#${e.id}`, false))
+  );
+  const fromEnemies = new Set(owners.keys());
+  for (const [name, service] of Object.entries({ enemies, physics, combat })) {
+    note(
+      new Map(
+        [...plainObjects(service, name, true)].filter(([o]) =>
+          fromEnemies.has(o)
+        )
+      )
+    );
+  }
+  return [...owners.values()]
+    .filter((paths) => paths.length > 1)
+    .map((paths) => paths.join(' = '));
+}
+
 // Every RandomService reachable from the services, by its shortest path.
 function streams(services) {
   const found = {};
@@ -319,6 +378,7 @@ function fight(id, setUp) {
   const attacking = setUp(game, id);
   const unread = new Set();
   const atDeath = dump(game, unread);
+  const shared = sharedWithOthers(game);
   retry(game);
   const afterRetry = dump(game, unread);
   const errorsBefore = console.error.mock.calls.length;
@@ -330,6 +390,7 @@ function fight(id, setUp) {
   return {
     atDeath,
     afterRetry,
+    shared,
     unread: [...unread].sort(),
     errors: console.error.mock.calls.slice(errorsBefore).map(String),
     attackEnded,
@@ -340,6 +401,7 @@ function fight(id, setUp) {
 function expectTheFightGoesOn(id, run) {
   const first = run();
   expect(first.unread).toEqual([]);
+  expect(first.shared).toEqual([]);
   const lost = differences(first.atDeath, first.afterRetry);
   expect(lost.join('\n')).toBe('');
   expect(first.errors.join('\n')).toBe('');
@@ -351,7 +413,8 @@ function expectTheFightGoesOn(id, run) {
 
 // A layer played for real: its spawner on (rocks of each variant it draws,
 // its enemies, Elites), the ship firing with the cards it is offered for
-// 30 s; then its death, the run's one Retry and 10 s more.
+// 30 s; then its death with enemy shots in the air, the run's one Retry and
+// 10 s more.
 function playedLayer() {
   const game = newGame();
   const { enemies, progression } = game.services;
@@ -367,14 +430,25 @@ function playedLayer() {
     }
   };
   play(1800);
+  // The death comes with enemy shots in the air.
+  const { combat } = game.services;
+  for (let i = 0; i < 1800 && !combat.enemyBullets.length; i += 1) play(1);
   const kills = enemies.sessionStats.totalKills;
   const unread = new Set();
   const atDeath = dump(game, unread);
+  const shared = sharedWithOthers(game);
   retry(game);
   const lost = differences(atDeath, dump(game, unread));
   game.services.player.setInvulnerableTimer(1e9);
   play(AFTER_STEPS);
-  return { kills, unread: [...unread].sort(), lost, end: dump(game) };
+  return {
+    kills,
+    shots: atDeath.enemyBullets.length,
+    unread: [...unread].sort(),
+    shared,
+    lost,
+    end: dump(game),
+  };
 }
 
 const bossIds = listContent('bosses').map(({ id }) => id);
@@ -401,7 +475,7 @@ describe('a Retry continues the fight where it stopped', () => {
     expect(bossIds.filter((id) => !ATTACKS[id])).toEqual([]);
   });
 
-  it('sees a changed clock (the same dump twice is equal)', () => {
+  it('sees a changed clock and an object two hold (the same dump twice is equal)', () => {
     const game = newGame();
     const spawned = spawnBoss(game, 'prime');
     for (let i = 0; i < 120; i += 1) game.step();
@@ -409,6 +483,9 @@ describe('a Retry continues the fight where it stopped', () => {
     expect(differences(a, dump(game))).toEqual([]);
     spawned.spreadTimer += 1;
     expect(differences(a, dump(game))).toHaveLength(1);
+    expect(sharedWithOthers(game)).toEqual([]);
+    spawned.held = game.services.combat.enemyBullets;
+    expect(sharedWithOthers(game)).toHaveLength(1);
   });
 
   it.each(bossIds)('boss %s, killed mid-attack', (id) => {
@@ -422,7 +499,9 @@ describe('a Retry continues the fight where it stopped', () => {
   it('a layer played with cards, killed and retried', () => {
     const first = playedLayer();
     expect(first.kills).toBeGreaterThan(0);
+    expect(first.shots).toBeGreaterThan(0);
     expect(first.unread).toEqual([]);
+    expect(first.shared).toEqual([]);
     expect(first.lost.join('\n')).toBe('');
     expect(differences(first.end, playedLayer().end).join('\n')).toBe('');
   });
