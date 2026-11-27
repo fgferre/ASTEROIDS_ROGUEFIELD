@@ -41,8 +41,6 @@ const ALLOWED = {
   'src/modules/menu/loadingScreen.js': 5,
   'src/modules/menu/pilotSelect.js': 1,
   'src/modules/ui/CampaignMap.js': 1,
-  'src/modules/ui/LevelUpScreen.js': 1,
-  'src/modules/ui/RunEndScreens.js': 1,
   'src/modules/ui/hud/editor/HudEditor.js': 1,
   'src/modules/input/inputLayers.js': 1,
   'src/modules/ui/padPointer.js': 1,

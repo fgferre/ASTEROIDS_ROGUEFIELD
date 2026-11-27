@@ -5,6 +5,7 @@ import { LEVEL_UP_SCREEN_DELAY_SECONDS } from '../../../src/core/GameConstants.j
 import RandomService from '../../../src/core/RandomService.js';
 import ProgressionSystem from '../../../src/modules/ProgressionSystem.js';
 import UISystem from '../../../src/modules/UISystem.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 import {
   EQUIP_CONFIRM_MS,
   LevelUpScreen,
@@ -35,12 +36,6 @@ function fakeNode(rect = { left: 0, top: 0, width: 0, height: 0 }, id = '') {
 const cardRect = (left) => ({ left, top: 200, width: 200, height: 300 });
 
 // The three screens whose keys choose, all closed.
-const noChoiceOnScreen = () => ({
-  levelUpScreen: { levelUpState: { isVisible: false } },
-  chestCeremony: { current: null },
-  runEndScreens: { choice: null },
-});
-
 describe('Level-up card transition', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
@@ -122,6 +117,7 @@ describe('Level-up card transition', () => {
         id === 'levelup-screen' ? screen : null;
       const cards = ['a', 'b'].map((id, i) => fakeNode(cardRect(i * 300), id));
       const levelUp = new LevelUpScreen({
+        refs: {},
         prefersReducedMotion: () => false,
         showGameUI: vi.fn(),
       });
@@ -240,6 +236,7 @@ describe('Level-up card transition', () => {
         levelUp.createUpgradeOptionButton(option, i)
       );
       Object.assign(levelUp.levelUpState, { options, buttons: cards });
+      inputLayers.push(levelUp.inputLayer); // up, on top
 
       levelUp.focusLevelUpOption(0);
       cards[1].listeners.mouseenter();
@@ -306,10 +303,6 @@ describe('Level-up card transition', () => {
     });
 
     it('a card key badge picks that card as a click would: locked, then taken, then banished', () => {
-      let onKey;
-      document.addEventListener = (name, fn) => {
-        if (name === 'keydown') onKey = fn;
-      };
       const progression = {
         applyUpgrade: vi.fn(() => false),
         banishUpgrade: vi.fn(),
@@ -324,7 +317,8 @@ describe('Level-up card transition', () => {
         buttons: ['a', 'b', 'c'].map((id) => fakeNode(undefined, id)),
         lockedUntil: Date.now() + 1,
       });
-      const press = (key) => onKey({ key, preventDefault() {} });
+      const press = (key) =>
+        levelUp.inputLayer.onKey({ key, preventDefault() {} });
 
       press('2');
       expect(progression.applyUpgrade).not.toHaveBeenCalled();
@@ -341,10 +335,6 @@ describe('Level-up card transition', () => {
     describe('Hold', () => {
       // A Hold button with `holds` for the run, over three cards a, b, c.
       function holdTable(holds) {
-        let onKey;
-        document.addEventListener = (name, fn) => {
-          if (name === 'keydown') onKey = fn;
-        };
         const count = { textContent: '' };
         const holdBtn = {
           ...fakeNode(),
@@ -399,7 +389,12 @@ describe('Level-up card transition', () => {
         });
         levelUp.updateLevelUpActionButtons();
         const press = (key, code) =>
-          onKey({ key, code, repeat: false, preventDefault() {} });
+          levelUp.inputLayer.onKey({
+            key,
+            code,
+            repeat: false,
+            preventDefault() {},
+          });
         return { levelUp, holdBtn, count, progression, press };
       }
 
@@ -438,10 +433,6 @@ describe('Level-up card transition', () => {
     describe('Equip for me', () => {
       // A head start at pick 2 of 5; `press(code)` is a key, `repeat` held.
       function equipTable() {
-        let onKey;
-        document.addEventListener = (name, fn) => {
-          if (name === 'keydown') onKey = fn;
-        };
         const label = { textContent: 'Equip for me' };
         const equipBtn = {
           ...fakeNode(),
@@ -473,7 +464,7 @@ describe('Level-up card transition', () => {
           buttons: ['a', 'b', 'c'].map((id) => fakeNode(undefined, id)),
         });
         const press = (key, code, repeat = false) =>
-          onKey({ key, code, repeat, preventDefault() {} });
+          levelUp.inputLayer.onKey({ key, code, repeat, preventDefault() {} });
         const armed = () => equipBtn.classes.has('is-armed');
         return { levelUp, equipBtn, label, headStart, press, armed };
       }
@@ -582,6 +573,7 @@ describe('Level-up card choices', () => {
         levelUpScreen,
         chestCeremony: { openNext: () => false, clear: () => {} },
         flightBriefing: { openNext: () => false },
+        settingsPanel: { settingsState: { isOpen: false } },
         onboarding: { cardPicked: () => {} },
         tacticalHud: { refreshHudFromServices: () => {} },
         queueTransmission: () => {},
@@ -743,7 +735,6 @@ describe('UISystem overlay handoffs', () => {
     );
     ui.dependencies = { serviceResolver: () => session };
     ui.settingsPanel = { handleSettingsMenuRequest };
-    Object.assign(ui, noChoiceOnScreen());
     ui.setupEventListeners();
 
     handlers.get('settings-menu-requested')({ source: 'gamepad' });
@@ -752,45 +743,6 @@ describe('UISystem overlay handoffs', () => {
     expect(handleSettingsMenuRequest).toHaveBeenCalledWith({
       source: 'playing',
     });
-  });
-
-  // Settings over a choice let its keys choose under them (outside audit 8,
-  // verdict B7): Enter or 1 picked a card and the run went on with Settings
-  // open and unseen; 2 picked and recorded an ending that played behind them.
-  it.each([
-    [
-      'the level-up cards',
-      (ui) => (ui.levelUpScreen.levelUpState.isVisible = true),
-    ],
-    ["a chest's ceremony", (ui) => (ui.chestCeremony.current = { cards: [] })],
-    ["the ending's choice", (ui) => (ui.runEndScreens.choice = { won: true })],
-  ])('does not open Settings over %s', (_, open) => {
-    const handlers = new Map();
-    const handleSettingsMenuRequest = vi.fn();
-    const ui = Object.setPrototypeOf(
-      {
-        eventBus: { emit: vi.fn() },
-        cinematics: { afterTravel: (show) => show() },
-        registerEventListener: (name, handler) => handlers.set(name, handler),
-      },
-      UISystem.prototype
-    );
-    ui.dependencies = {
-      serviceResolver: () => ({
-        getScreen: () => 'levelup',
-        isPaused: () => false,
-        getRawState: () => ({ sessionState: 'running' }),
-      }),
-    };
-    ui.settingsPanel = { handleSettingsMenuRequest };
-    Object.assign(ui, noChoiceOnScreen());
-    open(ui);
-    ui.setupEventListeners();
-
-    handlers.get('settings-menu-requested')({ source: 'keyboard' });
-
-    expect(handleSettingsMenuRequest).not.toHaveBeenCalled();
-    expect(ui.eventBus.emit).not.toHaveBeenCalledWith('toggle-pause');
   });
 
   it.each(['levelup', 'chest'])(

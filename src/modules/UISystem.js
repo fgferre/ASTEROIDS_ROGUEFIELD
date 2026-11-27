@@ -358,8 +358,13 @@ class UISystem extends BaseSystem {
       menu.classList.add('hidden');
       gameUI.classList.remove('hidden');
     }
+    // On top of the input layer stack while open (its own listener takes
+    // its keys): no screen under it hears one; the pad's Start still passes.
+    const editorLayer = { name: 'hud-editor', passes: ['pause'] };
+    inputLayers.push(editorLayer);
     this.hudEditor.open({
       onClose: () => {
+        inputLayers.remove(editorLayer);
         if (inRun) {
           pause.classList.toggle('hidden', !this.pauseScreen.currentPauseState);
         } else {
@@ -767,16 +772,6 @@ class UISystem extends BaseSystem {
       if (appState?.getRawState?.()?.sessionState === 'quitting') {
         return;
       }
-      // Not over a choice: its keys reached it under Settings, picking a card
-      // or recording an ending unseen while the run went on behind them
-      // (outside audit 8, verdict B7). Settings open again once it is made.
-      if (
-        this.levelUpScreen.levelUpState.isVisible ||
-        this.chestCeremony.current ||
-        this.runEndScreens.choice
-      ) {
-        return;
-      }
       let source = payload.source || 'menu';
       if (appState?.getScreen?.() === 'playing') {
         if (appState.isPaused?.()) {
@@ -833,11 +828,9 @@ class UISystem extends BaseSystem {
       this.levelUpScreen.handleLevelUpInputAction(payload);
     });
 
-    this.registerEventListener('input-confirmed', () => {
-      if (inputLayers.top()) return; // a screen on the stack takes it
-      this.levelUpScreen.handleLevelUpConfirm();
-      this.chestCeremony.continue();
-    });
+    // The screen on top of the input layer stack takes the confirm (the
+    // flight briefing, not on it yet, hears it itself, first).
+    this.registerEventListener('input-confirmed', () => inputLayers.confirm());
 
     this.registerEventListener('gamepad-ui-nav', (payload = {}) => {
       // The d-pad steps item by item: the pad's pointer goes (not while it
@@ -998,8 +991,13 @@ class UISystem extends BaseSystem {
         return;
       }
 
+      // An open Settings stays over the change (a card picked under it would
+      // leave it open and unseen); its own close hides it.
+      const settings =
+        this.settingsPanel.settingsState.isOpen &&
+        this.domRefs.settings.overlay;
       document.querySelectorAll('.screen').forEach((screen) => {
-        screen.classList.add('hidden');
+        if (screen !== settings) screen.classList.add('hidden');
       });
 
       const gameUI = document.getElementById('game-ui');
@@ -1033,7 +1031,7 @@ class UISystem extends BaseSystem {
 
       this.codexScreen.closeCodex();
       this.hangarScreen.closeHangar();
-      this.runEndScreens.markGameOverClosed();
+      this.runEndScreens.markClosed();
 
       if (screenName === 'menu') {
         this.mainMenu.requestMenuShipSelectorRefresh();
@@ -1076,6 +1074,12 @@ class UISystem extends BaseSystem {
     }
     this.showScreen('playing', options);
     this.tacticalHud.refreshHudFromServices(true);
+    // Settings opened over the cards outlives them: the run waits under it,
+    // as when it opens in flight.
+    if (this.settingsPanel.settingsState.isOpen) {
+      this.settingsPanel.settingsState.source = 'playing';
+      this.eventBus?.emit?.('toggle-pause');
+    }
   }
 
   /** GameSessionService clears the cards when a run starts or ends. */

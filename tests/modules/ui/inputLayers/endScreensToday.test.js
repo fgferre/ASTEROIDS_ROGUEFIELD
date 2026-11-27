@@ -441,8 +441,10 @@ pinTable(
 
 // Enter's default click lands on the focused card after the pick has reset
 // the cards (Reduce Motion: no exit animation keeps them locked), so the
-// card is taken twice here. A browser fires that click on the keypress
-// after the keydown; whether it does on a card just hidden is unchecked.
+// card is taken twice here, in the imitator only. Checked in headless
+// Chromium (27/11): the pick disables the cards first, the focused one loses
+// the focus, and Enter's default then presses nothing (one pick; without the
+// disable, two). The imitator does not blur a disabled button.
 pinTable(
   'pad on the level-up alone',
   (rig) => {

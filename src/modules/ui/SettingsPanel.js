@@ -73,11 +73,13 @@ export class SettingsPanel {
       capture: null,
       previousFocus: null,
     };
-    // Open, on top of the input layer stack: the game's actions pass none.
+    // Open, on top of the input layer stack (and staying there): the game's
+    // actions pass none.
     this.inputLayer = {
       name: 'settings',
       element: refs.overlay,
       passes: [],
+      staysOnTop: true,
       onKey: (event) => this.handleSettingsKeyDown(event),
     };
     this.initializeSettingsMetadata();

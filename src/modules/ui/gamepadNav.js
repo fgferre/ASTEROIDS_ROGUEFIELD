@@ -195,7 +195,7 @@ const hintMarkup = ([glyphs, label]) =>
 /**
  * The pad's side of every menu and overlay. `ui` is the UISystem: its
  * screens (settingsPanel, codexScreen, hangarScreen, creditsOverlay,
- * mainMenu, runEndScreens, hudEditor, levelUpScreen) and its eventBus.
+ * mainMenu, runEndScreens, hudEditor) and its eventBus.
  */
 export class GamepadMenuNav {
   constructor(ui) {
@@ -205,11 +205,11 @@ export class GamepadMenuNav {
     this.hints = null;
   }
 
-  /** The topmost visible screen a pad can navigate: the input layer
-   * stack's top (input/inputLayers.js), else the first of the list, or null
-   * (also while the PRESS START gate or the pilots cover the menu: they read
-   * the pad; and while the remote link covers it, inert: the run is
-   * starting). */
+  /** The screen a pad navigates: the input layer stack's top
+   * (input/inputLayers.js) when it is shown, with its `layer`; with none on
+   * the stack, the first of the list shown; or null (also while the PRESS
+   * START gate or the pilots cover the menu: they read the pad; and while
+   * the remote link covers it, inert: the run is starting). */
   screen() {
     const shown = (element) =>
       element &&
@@ -217,8 +217,11 @@ export class GamepadMenuNav {
       !element.classList.contains('hidden') &&
       !element.classList.contains('menu-screen--gated');
     const layer = inputLayers.top();
-    if (shown(layer?.element))
-      return { id: layer.name, element: layer.element };
+    if (layer) {
+      return shown(layer.element)
+        ? { id: layer.name, element: layer.element, layer }
+        : null;
+    }
     for (const id of GAMEPAD_NAV_SCREENS) {
       const element = document.getElementById(`${id}-screen`);
       if (shown(element)) return { id, element };
@@ -227,9 +230,9 @@ export class GamepadMenuNav {
   }
 
   /** One pad press (InputSystem 'gamepad-ui-nav'): d-pad/stick move the
-   * focus, A presses, B goes back, LB/RB switch tabs, X/Y reroll and banish
-   * on the level-up screen (whose cards follow the move and confirm
-   * bindings). */
+   * focus, A presses, B goes back, LB/RB switch tabs; a layer with its own
+   * pad map takes the press instead (the level-up's X/Y reroll and banish,
+   * its cards following the move and confirm bindings). */
   handle(action) {
     const { ui } = this;
     // The HUD editor drives its instruments; its dialogs and panels move
@@ -253,9 +256,9 @@ export class GamepadMenuNav {
       }
       return;
     }
-    const { id, element } = screen;
-    if (id === 'levelup') {
-      ui.levelUpScreen.handleGamepadNav(action);
+    const { id, element, layer } = screen;
+    if (layer?.onPad) {
+      layer.onPad(action);
       return;
     }
     if (this.editing && !this.editing.isConnected) this.editing = null;

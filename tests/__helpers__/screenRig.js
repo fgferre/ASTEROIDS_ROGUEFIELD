@@ -758,7 +758,7 @@ export function mountScreens() {
         bus.emit('pause-state-changed', { isPaused: true });
         return ui.pauseScreen;
       },
-      /** Settings as F10 asks for it (refused over a choice, today). */
+      /** Settings as F10 asks for it. */
       settings() {
         dom.tap('F10');
         return ui.settingsPanel;

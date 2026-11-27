@@ -386,6 +386,12 @@ select {
   z-index: 130;
 }
 
+/* Settings opens over any other overlay (the input layer stack keeps it on
+   top), so it is drawn over them too. */
+#settings-screen {
+  z-index: 131;
+}
+
 /* Shared panel surface: pause, settings, credits */
 .pause-content,
 .settings-container,

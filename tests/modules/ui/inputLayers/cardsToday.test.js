@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mountScreens, pinTable } from '../../../__helpers__/screenRig.js';
+import {
+  CARDS,
+  mountScreens,
+  pinTable,
+} from '../../../__helpers__/screenRig.js';
+import { listenForHold } from '../../../../src/modules/ui/skipHold.js';
 
 // What the keyboard, the pad and a confirm on the bus do TODAY on the card
 // screens (level-up, chest, flight briefing, the ending's choice) and with
 // Settings over them, before one layer stack takes the input from the
 // screens' global listeners. Each row: the input, then what changed (see
-// screenRig.js `effects`). Rows named "LEAK today" are the input reaching
-// the screen below, or the refusal (d1014459) that hides it: the stack
-// flips exactly those; every other row must come out the same.
-const LEAK = true;
+// screenRig.js `effects`). Rows the layer stack flipped (the input reached
+// the screen below, or the refusal of d1014459 hid it) say what is now
+// true; every other row must come out the same.
 // A card taken: the cards leave and the flight is back (the pad's list has
 // no screen up then).
 const picked = (id) => ({
@@ -42,7 +46,17 @@ pinTable('level-up over the flight', (rig) => rig.open.levelUp(), [
   ['KeyQ', { sent: {}, prevented: false }],
   ['Escape', { sent: { 'toggle-pause': 1 }, prevented: false }],
   ['KeyP', { sent: { 'toggle-pause': 1 }, prevented: false }],
-  ['F10', { sent: { 'settings-menu-requested': 1 }, prevented: false }, LEAK],
+  [
+    'F10',
+    {
+      top: 'settings',
+      focus: 'settings:game',
+      settings: true,
+      sent: { 'settings-menu-requested': 1 },
+      prevented: false,
+    },
+    'Settings opens over it',
+  ],
   [
     'pad:A',
     { ...picked('a'), pad: 'levelup:confirm', sent: { 'input-confirmed': 1 } },
@@ -55,7 +69,16 @@ pinTable('level-up over the flight', (rig) => rig.open.levelUp(), [
   ['pad:RIGHT', { focus: 'card:b', card: 1, pad: 'levelup:right', sent: {} }],
   ['pad:DOWN', { focus: 'card:b', card: 1, pad: 'levelup:down', sent: {} }],
   ['pad:START', { sent: { 'toggle-pause': 1 } }],
-  ['pad:VIEW', { sent: { 'settings-menu-requested': 1 } }, LEAK],
+  [
+    'pad:VIEW',
+    {
+      top: 'settings',
+      focus: 'settings:game',
+      settings: true,
+      sent: { 'settings-menu-requested': 1 },
+    },
+    'Settings opens over it',
+  ],
   ['bus:confirm', { ...picked('a'), sent: { 'input-confirmed': 1 } }],
 ]);
 
@@ -71,11 +94,30 @@ pinTable('chest over the flight', (rig) => rig.open.chest(), [
   ],
   ['Digit1', { sent: {}, prevented: false }],
   ['Escape', { sent: { 'toggle-pause': 1 }, prevented: false }],
-  ['F10', { sent: { 'settings-menu-requested': 1 }, prevented: false }, LEAK],
+  [
+    'F10',
+    {
+      top: 'settings',
+      focus: 'settings:game',
+      settings: true,
+      sent: { 'settings-menu-requested': 1 },
+      prevented: false,
+    },
+    'Settings opens over it',
+  ],
   ['pad:A', { ...CHEST_DONE, sent: { 'input-confirmed': 1 } }],
   ['pad:B', { sent: {} }],
   ['pad:START', { sent: { 'toggle-pause': 1 } }],
-  ['pad:VIEW', { sent: { 'settings-menu-requested': 1 } }, LEAK],
+  [
+    'pad:VIEW',
+    {
+      top: 'settings',
+      focus: 'settings:game',
+      settings: true,
+      sent: { 'settings-menu-requested': 1 },
+    },
+    'Settings opens over it',
+  ],
   ['bus:confirm', { ...CHEST_DONE, sent: { 'input-confirmed': 1 } }],
 ]);
 
@@ -150,7 +192,17 @@ pinTable("the ending's choice over the run", (rig) => rig.open.choice(), [
   ['ArrowLeft', { sent: {}, prevented: true }],
   ['Enter', { sent: { 'input-confirmed': 1 }, prevented: false }],
   ['Escape', { sent: { 'toggle-pause': 1 }, prevented: false }],
-  ['F10', { sent: { 'settings-menu-requested': 1 }, prevented: false }, LEAK],
+  [
+    'F10',
+    {
+      top: 'settings',
+      focus: 'settings:game',
+      settings: true,
+      sent: { 'settings-menu-requested': 1 },
+      prevented: false,
+    },
+    'Settings opens over it',
+  ],
   [
     'pad:A',
     {
@@ -163,17 +215,26 @@ pinTable("the ending's choice over the run", (rig) => rig.open.choice(), [
   ],
   ['pad:B', { pad: 'back:ending', sent: {} }],
   ['pad:RIGHT', { pad: 'press:ending', sent: {} }],
-  ['pad:VIEW', { sent: { 'settings-menu-requested': 1 } }, LEAK],
+  [
+    'pad:VIEW',
+    {
+      top: 'settings',
+      focus: 'settings:game',
+      settings: true,
+      sent: { 'settings-menu-requested': 1 },
+    },
+    'Settings opens over it',
+  ],
   ['bus:confirm', { sent: { 'input-confirmed': 1 } }],
 ]);
 
-// The refusal keeps Settings shut over the cards (rows F10 and pad:VIEW
-// above); opened past it, as it would open without the refusal (the source
-// the request carries off flight). The pick leaves Settings open but hidden
-// (showGameUI hides every screen): the original defect. Since the layer
-// stack, the bus confirm stops at Settings (Enter, A); the cards' own keys
-// still reach them until they are a layer.
+// Settings opened over the cards as F10 opens it off flight (the source the
+// request carries). Before the layer stack their keys, the pad and the
+// confirm reached the cards under it, and the pick left Settings open but
+// hidden (showGameUI hid every screen): the original defect. Settings is on
+// top now and keeps everything.
 const CONFIRM_STOPS = 'the confirm stops at Settings, on top: nothing taken';
+const UNDER = 'the screen under Settings hears nothing';
 pinTable(
   'Settings forced open over the level-up',
   (rig) => {
@@ -181,23 +242,15 @@ pinTable(
     rig.ui.settingsPanel.openSettingsPanel('keyboard');
   },
   [
-    ['Digit1', { ...picked('a'), sent: {}, prevented: true }, LEAK],
+    ['Digit1', { sent: {}, prevented: false }, UNDER],
     [
       'Enter',
       { sent: { 'input-confirmed': 1 }, prevented: false },
       CONFIRM_STOPS,
     ],
-    [
-      'ArrowRight',
-      { focus: 'card:b', card: 1, sent: {}, prevented: true },
-      LEAK,
-    ],
-    [
-      'ArrowDown',
-      { focus: 'card:b', card: 1, sent: {}, prevented: true },
-      LEAK,
-    ],
-    ['KeyR', { rerolls: 1, sent: {}, prevented: false }, LEAK],
+    ['ArrowRight', { sent: {}, prevented: true }, UNDER],
+    ['ArrowDown', { sent: {}, prevented: true }, UNDER],
+    ['KeyR', { sent: {}, prevented: false }, UNDER],
     [
       'Escape',
       {
@@ -224,11 +277,7 @@ pinTable(
       },
     ],
     ['pad:X', { sent: {} }],
-    [
-      'pad:RIGHT',
-      { focus: 'card:b', card: 1, pad: 'press:settings', sent: {} },
-      LEAK,
-    ],
+    ['pad:RIGHT', { pad: 'press:settings', sent: {} }, UNDER],
     ['bus:confirm', { sent: { 'input-confirmed': 1 } }, CONFIRM_STOPS],
   ]
 );
@@ -281,16 +330,8 @@ pinTable(
     rig.ui.settingsPanel.openSettingsPanel('keyboard');
   },
   [
-    [
-      'Digit1',
-      { choice: false, ending: 'severance', sent: {}, prevented: true },
-      LEAK,
-    ],
-    [
-      'ArrowRight',
-      { focus: 'ending:stewardship', sent: {}, prevented: true },
-      LEAK,
-    ],
+    ['Digit1', { sent: {}, prevented: false }, UNDER],
+    ['ArrowRight', { sent: {}, prevented: true }, UNDER],
     ['Enter', { sent: { 'input-confirmed': 1 }, prevented: false }],
     [
       'Escape',
@@ -445,5 +486,185 @@ describe('card screens, hidden rules today', () => {
     expect(rig.progression.applyUpgrade).not.toHaveBeenCalled();
     expect(rig.tap('Space').defaultPrevented).toBe(false);
     expect(rig.progression.applyUpgrade).toHaveBeenCalledWith('a');
+  });
+});
+
+// The original losses (outside audit 8, B7), now with Settings opened by F10
+// over each choice: no key, pad button or confirm that chooses there chooses
+// anything under it, and Escape gives the choice back as it was, shown.
+const CHOICES = [
+  ['the level-up', (rig) => rig.open.levelUp(), 'levelup'],
+  ['the chest', (rig) => rig.open.chest(), 'chest'],
+  ["the ending's choice", (rig) => rig.open.choice(), 'ending'],
+];
+const EVERY_PICK = [
+  'Digit1',
+  'Digit2',
+  'Enter',
+  'Space',
+  'ArrowRight',
+  'KeyR',
+  'KeyB',
+  'KeyH',
+  'KeyQ',
+  'pad:A',
+  'pad:X',
+  'pad:Y',
+  'pad:LB',
+  'pad:RIGHT',
+  'bus:confirm',
+];
+
+describe('Settings open over a choice', () => {
+  let rig;
+  beforeEach(() => (rig = mountScreens()));
+  afterEach(() => {
+    expect(rig.errors()).toEqual([]);
+    rig.destroy();
+  });
+  const shown = (id) =>
+    !rig.dom.document
+      .getElementById(`${id}-screen`)
+      .classList.contains('hidden');
+  // Everything but the pad's own record of where its presses went.
+  const state = () => {
+    const { pad: _pad, ...rest } = rig.snapshot();
+    return rest;
+  };
+
+  it.each(CHOICES)(
+    'over %s, nothing is chosen under it; closing Settings gives it back intact and shown',
+    (_name, open, id) => {
+      open(rig);
+      const before = state();
+      rig.tap('F10');
+      expect(rig.snapshot()).toMatchObject({ settings: true, top: 'settings' });
+      EVERY_PICK.forEach((input) => rig.send(input));
+      rig.wait();
+      rig.tap('Escape');
+      expect(state()).toEqual(before);
+      expect(shown(id)).toBe(true);
+    }
+  );
+
+  it('a screen change under it (a card taken, back to play) leaves Settings open and shown', () => {
+    rig.open.levelUp();
+    rig.tap('F10');
+    rig.ui.showGameUI();
+    expect(rig.snapshot()).toMatchObject({ settings: true, top: 'settings' });
+    expect(shown('settings')).toBe(true);
+  });
+
+  it("opened before the choice's options wake, it keeps the focus: Enter chooses no ending unseen", () => {
+    rig.fly();
+    rig.state.screen = 'victory';
+    rig.state.sessionState = 'victory';
+    rig.ui.runEndScreens.showEndingChoice({ data: {} });
+    rig.tap('F10');
+    rig.wait();
+    expect(rig.snapshot().focus).toBe('settings:game');
+    rig.send('Enter+click');
+    expect(rig.snapshot()).toMatchObject({ choice: true, ending: '' });
+  });
+
+  // A choice that shows while Settings is up goes under it.
+  it('the cards that come after a scene Settings was opened over wait under it; nothing takes one', () => {
+    rig.fly();
+    rig.state.paused = true;
+    const stop = listenForHold(
+      () => {},
+      () => {}
+    );
+    rig.bus.emit('cinematic-started', { kind: 'intro', holdsRun: true });
+    rig.send('pad:VIEW');
+    stop();
+    rig.bus.emit('cinematic-ended', { kind: 'intro' });
+    rig.state.paused = false;
+    rig.wait(1);
+    rig.bus.emit('upgrade-options-ready', {
+      level: 3,
+      options: CARDS.map((id) => ({ id })),
+    });
+    rig.wait();
+    expect(rig.snapshot()).toMatchObject({ top: 'settings', levelUp: true });
+    ['Digit1', 'Enter+click', 'pad:A', 'bus:confirm'].forEach((input) =>
+      rig.send(input)
+    );
+    expect(rig.snapshot().picked).toBe('');
+    rig.tap('Escape');
+    expect(rig.snapshot()).toMatchObject({ top: 'levelup', levelUp: true });
+  });
+
+  it('opened as a picked card leaves (motion on), it stays on top and the run waits paused under it; closing it resumes', () => {
+    rig.dom.document.body.classList.remove('motion-reduced');
+    rig.dom.window.matchMedia = () => ({ matches: false });
+    rig.open.levelUp();
+    rig.tap('Digit1');
+    rig.tap('F10');
+    rig.wait(2000);
+    expect(rig.snapshot()).toMatchObject({
+      top: 'settings',
+      screen: 'playing',
+      pause: true,
+    });
+    expect(rig.state.paused).toBe(true);
+    rig.tap('Escape');
+    expect(rig.state.paused).toBe(false);
+  });
+
+  it('the victory that shows while it is up goes under it and takes no focus: Enter presses nothing on it', () => {
+    rig.fly();
+    rig.state.screen = 'victory';
+    rig.state.sessionState = 'victory';
+    rig.tap('F10');
+    rig.bus.emit('screen-changed', { screen: 'victory', data: {} });
+    rig.wait();
+    expect(rig.snapshot()).toMatchObject({
+      top: 'settings',
+      focus: 'settings:game',
+    });
+    rig.send('Enter+click');
+    expect(rig.snapshot().session).toBe('');
+  });
+
+  it('the HUD editor opened from it over the cards: no key, pad button or confirm takes a card', () => {
+    rig.open.levelUp();
+    rig.tap('F10');
+    rig.ui.openHudEditor();
+    expect(rig.ui.hudEditor.isOpen).toBe(true);
+    ['Digit1', 'Enter', 'ArrowRight', 'pad:A', 'bus:confirm'].forEach((input) =>
+      rig.send(input)
+    );
+    expect(rig.snapshot()).toMatchObject({
+      levelUp: true,
+      card: 0,
+      picked: '',
+    });
+  });
+});
+
+describe('the cards take their own keys', () => {
+  let rig;
+  beforeEach(() => (rig = mountScreens()));
+  afterEach(() => {
+    expect(rig.errors()).toEqual([]);
+    rig.destroy();
+  });
+
+  it('a card picked by its key fires no flight press bound to that key in the run it resumes', () => {
+    const dash = rig.ui.settings.getSetting('controls', 'dash');
+    rig.ui.settings.setSetting('controls', 'dash', {
+      ...dash,
+      keyboard: ['Digit1'],
+    });
+    rig.fly();
+    rig.tap('Digit1');
+    expect([...rig.input.pendingStepPresses]).toEqual(['dash']);
+    rig.input.pendingStepPresses.clear();
+
+    rig.open.levelUp();
+    rig.tap('Digit1');
+    expect(rig.snapshot()).toMatchObject({ picked: 'a', screen: 'playing' });
+    expect([...rig.input.pendingStepPresses]).toEqual([]);
   });
 });

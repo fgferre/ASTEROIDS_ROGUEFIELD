@@ -5,18 +5,24 @@
 // opened on top; empty, the menu or the flight has the input. Only the top
 // layer hears a key, from the one keydown listener here (window capture,
 // bound by InputSystem before any screen's); the pad moves in the top
-// layer's screen (ui/gamepadNav.js) and a bus confirm stops at it (UISystem).
+// layer's screen (ui/gamepadNav.js) and the bus confirm goes to it alone
+// (`confirm`).
 // A key a layer takes is not stopped: the listeners that are not screens
 // (InputSystem, the audio unlock, F3, F8/F9, the pad pointer) still hear
 // it. The game's actions under a layer pass only when it lists them, and
 // this is the one place that says when Settings may open: InputSystem asks
 // `passes(action, event)`.
 //
-// A layer: { name, element, onKey, passes }. `name` is its screen's id,
-// `element` its `#<name>-screen`; `onKey(event)` returns true when the key
-// is the layer's alone (none of the game's actions on it pass) and calls
+// A layer: { name, element, onKey, onPad, onConfirm, passes }. `name` is
+// its screen's id, `element` its `#<name>-screen` (null: nothing there for
+// the pad to move in); `onKey(event)` returns true when the key is the
+// layer's alone (none of the game's actions on it pass) and calls
 // preventDefault itself where the browser's own action must not run;
-// `passes` lists the game's actions that still reach the game under it.
+// `onPad(action)` takes the pad's menu presses instead of the focus moving
+// in `element`; `onConfirm()` the bus confirm; `passes` lists the game's
+// actions that still reach the game under it; `staysOnTop` (Settings): a
+// screen that opens while it is up goes under it. All but `name` and
+// `passes` may be left out.
 
 // Settings opens over any screen but the ending's acts: they do not hold the
 // run and play on wall-clock time (their beats, the renderer's beat
@@ -38,7 +44,7 @@ class InputLayerStack {
     this.bus = null;
     this.onKeyDown = (event) => {
       const layer = this.top();
-      this.key = { event, layer, taken: Boolean(layer?.onKey(event)) };
+      this.key = { event, layer, taken: Boolean(layer?.onKey?.(event)) };
     };
     this.onCinematicStarted = (event) => (this.cinematic = event?.kind);
     this.onCinematicEnded = () => (this.cinematic = null);
@@ -60,10 +66,13 @@ class InputLayerStack {
     bus?.on('cinematic-ended', this.onCinematicEnded);
   }
 
-  /** A screen opened: its layer goes on top. */
+  /** A screen opened: its layer goes on top, or under Settings when that
+   * is up (the cards after a scene, the victory after the epilogue): what
+   * is shown under Settings hears nothing until it closes. */
   push(layer) {
     this.remove(layer);
-    this.layers.push(layer);
+    const under = this.top()?.staysOnTop ? 1 : 0;
+    this.layers.splice(this.layers.length - under, 0, layer);
   }
 
   /** A screen closed: its layer leaves, wherever it is. */
@@ -75,14 +84,29 @@ class InputLayerStack {
     return this.layers.at(-1) ?? null;
   }
 
+  /** Another screen is on top of `layer` (Settings): `layer` must not take
+   * the focus, or Enter would press its button unseen. */
+  covered(layer) {
+    const top = this.top();
+    return Boolean(top) && top !== layer;
+  }
+
   /** The layer that was on top when the keydown `event` came (it may have
    * closed since); for no event, or any other, the one on top now. */
   layerFor(event) {
     return event && this.key?.event === event ? this.key.layer : this.top();
   }
 
-  /** Whether the game's `action` ('pause', 'openSettings') from `event` (a
-   * keydown; none for the pad) reaches the game. */
+  /** The bus confirm (Enter, Space, the pad's A; UISystem): the top
+   * layer's alone. One card screen is up at a time (the chest and the
+   * briefing wait for the cards: UISystem.showGameUI), each with its 400 ms
+   * lockout, so the confirm that closes one never also takes the next. */
+  confirm() {
+    this.top()?.onConfirm?.();
+  }
+
+  /** Whether the game's `action` (the pause, Settings, a flight press) from
+   * `event` (a keydown; none for the pad or touch) reaches the game. */
   passes(action, event) {
     if (event && this.key?.event === event && this.key.taken) return false;
     if (action === 'openSettings') {

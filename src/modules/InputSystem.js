@@ -478,8 +478,9 @@ class InputSystem {
 
     const stepField = STEP_PRESS_FIELDS[action];
     if (stepField) {
-      // A press made on the pause screen must not fire on resume.
-      if (this.isGameRunning()) {
+      // A press made on the pause screen must not fire on resume, nor one a
+      // screen took (a card picked by its key resumes the run under it).
+      if (this.isGameRunning() && inputLayers.passes(action, context.event)) {
         this.pendingStepPresses.add(stepField);
       }
       return;

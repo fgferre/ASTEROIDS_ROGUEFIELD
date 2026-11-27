@@ -19,6 +19,7 @@ export function cacheStaticNodes() {
       totalKills: null,
     },
     levelUp: {
+      screen: document.getElementById('levelup-screen') || null,
       container: document.getElementById('upgrades-container') || null,
       text: document.getElementById('levelup-text') || null,
       level: document.getElementById('levelup-level') || null,
@@ -57,6 +58,8 @@ export function cacheStaticNodes() {
       hints: [...document.querySelectorAll('#restart-game-btn kbd')],
     },
     victory: {
+      screen: document.getElementById('victory-screen') || null,
+      choiceScreen: document.getElementById('ending-screen') || null,
       body: document.getElementById('victory-body') || null,
       invite: document.getElementById('victory-invite') || null,
       continueBtn: document.getElementById('victory-continue-btn') || null,
