@@ -646,5 +646,7 @@ describe('a Retry continues the fight where it stopped', () => {
     expect(first.shared).toEqual([]);
     expect(first.lost.join('\n')).toBe('');
     expect(differences(first.end, playedLayer().end).join('\n')).toBe('');
-  });
+    // About 2 s alone; with four suites sharing the machine it passed the
+    // 20 s default (27/11), and its steps are what it checks.
+  }, 90_000);
 });
