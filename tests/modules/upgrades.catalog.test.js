@@ -390,7 +390,7 @@ describe('R5.4 cards in a running game', () => {
     const { player } = game.services;
     game.eventBus.emit('dash-pressed');
     game.step();
-    while (player.dashTimer > 0) game.step();
+    while (player.maneuvers.dashTimer > 0) game.step();
     return player.invulnerableTimer;
   }
 

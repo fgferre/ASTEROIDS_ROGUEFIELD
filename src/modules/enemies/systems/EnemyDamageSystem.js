@@ -443,9 +443,9 @@ class EnemyDamageSystem {
       return { applied: false };
     }
 
-    const wasShieldActive = Boolean(player.isShieldActive);
-    const previousShieldHP = Number.isFinite(player.shieldHP)
-      ? player.shieldHP
+    const wasShieldActive = Boolean(player.shield.isShieldActive);
+    const previousShieldHP = Number.isFinite(player.shield.shieldHP)
+      ? player.shield.shieldHP
       : 0;
     const previousHealth = Number.isFinite(player.health)
       ? player.health
@@ -455,8 +455,8 @@ class EnemyDamageSystem {
     const currentHealth = Number.isFinite(player.health)
       ? player.health
       : previousHealth;
-    const currentShieldHP = Number.isFinite(player.shieldHP)
-      ? player.shieldHP
+    const currentShieldHP = Number.isFinite(player.shield.shieldHP)
+      ? player.shield.shieldHP
       : 0;
 
     const healthChanged =

@@ -363,7 +363,7 @@ function placeShip(player) {
 function holdShip(player) {
   let steered = false;
   const intervalId = setInterval(() => {
-    const input = player.cachedMovementInput;
+    const input = player.movementInput.cachedMovementInput;
     if (
       input?.up ||
       input?.down ||

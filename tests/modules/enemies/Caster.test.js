@@ -20,6 +20,7 @@ const setup = (playerAt) => {
     velocity: { vx: 0, vy: 0 },
     getVelocity: () => player.velocity,
     takeDamage: vi.fn(() => 80),
+    shield: {},
   };
   const eventBus = { emit: vi.fn() };
   const damage = new EnemyDamageSystem({

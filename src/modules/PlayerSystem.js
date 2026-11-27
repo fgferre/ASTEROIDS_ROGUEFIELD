@@ -38,22 +38,6 @@ import {
 // 16/11).
 const MOMENTUM_SPEED_FRACTION = 0.6;
 
-// Each of `names` on `target` reads and sets that field on `owner`, live: a
-// player module's fields other systems and tests still use on the player,
-// and the player's own fields the modules use through their `ship` view.
-function exposeFields(target, owner, names) {
-  names.forEach((name) => {
-    Object.defineProperty(target, name, {
-      get: () => owner[name],
-      set: (value) => {
-        owner[name] = value;
-      },
-      configurable: true,
-      enumerable: true,
-    });
-  });
-}
-
 class PlayerSystem extends BaseSystem {
   constructor(config = {}) {
     const { position, dependencies } = PlayerSystem.normalizeConfig(config);
@@ -65,7 +49,6 @@ class PlayerSystem extends BaseSystem {
     });
 
     this.movementInput = new MovementInput();
-    exposeFields(this, this.movementInput, ['cachedMovementInput']);
     const controls = resolveService(
       'settings',
       this.dependencies
@@ -94,43 +77,20 @@ class PlayerSystem extends BaseSystem {
     this.targetAngle = 0; // Para rotação suave (futuro)
     this.angularVelocity = 0;
 
-    // The ship's own fields the player modules read and set, live: other
-    // systems and tests replace them, so no module keeps a copy.
-    const ship = {};
-    exposeFields(ship, this, [
-      'position',
-      'velocity',
-      'angle',
-      'angularVelocity',
-      'controlScheme',
-      'invulnerableTimer',
-      '_quitExplosionHidden',
-    ]);
+    // The player modules read and set the ship's own fields (position,
+    // velocity, angle...) on the player itself, live: other systems and tests
+    // replace them, so no module keeps a copy.
     this.maneuvers = new PlayerManeuvers({
-      ship,
+      ship: this,
       getEventBus: () => this.eventBus,
     });
-    exposeFields(this, this.maneuvers, [
-      'dashTimer',
-      'dashCooldownTimer',
-      'dashCooldown',
-      'dashGhosts',
-      'dashGhostsDropped',
-      'dashRammed',
-      'dashContactDamage',
-    ]);
     this.flight = new PlayerFlight({
-      ship,
+      ship: this,
       maneuvers: this.maneuvers,
     });
     // Each run starts classic, gliding, aimed by the nose; cards lift each of
     // the three.
     this.beginNewFlight();
-    exposeFields(this, this.flight, [
-      'maxSpeed',
-      'acceleration',
-      'brakingDamping',
-    ]);
 
     // === STATS DO JOGADOR ===
     this.health = 100;
@@ -164,7 +124,6 @@ class PlayerSystem extends BaseSystem {
       getLocalDirection: (dx, dy) => this.getLocalDirection(dx, dy),
       getAccent: () => this.currentHull.visual.accent,
     });
-    exposeFields(this, this.thrusters, ['lastThrusterState']);
 
     // === WEAPON RECOIL ===
     this.recoilOffset = { x: 0, y: 0 };
@@ -174,11 +133,6 @@ class PlayerSystem extends BaseSystem {
       getEventBus: () => this.eventBus,
       getPosition: () => this.getPosition(),
     });
-    exposeFields(this, this.shield, [
-      'isShieldActive',
-      'shieldHP',
-      'shieldMaxHP',
-    ]);
     this.invulnerableTimer = 0;
     // The win's invulnerability (guardSteadily) leaves the ship unblinking.
     this.steadyGuard = false;

@@ -28,7 +28,7 @@ function makeCombat(list = []) {
   const eventBus = createEventBusMock();
   const player = {
     isDead: false,
-    dashTimer: 0,
+    maneuvers: { dashTimer: 0 },
     position: { x: 100, y: 300 },
     getPosition() {
       return { ...this.position };
@@ -55,11 +55,11 @@ function makeCombat(list = []) {
 
 // A dash from x = 100 to x = 132 along y = 300, in two frames.
 function dash(combat, player) {
-  player.dashTimer = 0.1;
+  player.maneuvers.dashTimer = 0.1;
   combat.updateWeaponEffects(FRAME);
   player.position.x = 132;
   combat.updateWeaponEffects(FRAME);
-  player.dashTimer = 0;
+  player.maneuvers.dashTimer = 0;
 }
 
 describe('Afterburn (Maneuver synergy)', () => {
@@ -93,7 +93,7 @@ describe('Afterburn (Maneuver synergy)', () => {
 
   it('leaves no fire where a Blink hides the ship', () => {
     const { combat, player } = makeCombat();
-    player.dashTimer = 0.1;
+    player.maneuvers.dashTimer = 0.1;
     player._quitExplosionHidden = true;
     combat.updateWeaponEffects(FRAME);
     player.position.x = 132;

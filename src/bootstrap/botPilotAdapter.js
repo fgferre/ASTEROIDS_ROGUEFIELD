@@ -154,7 +154,7 @@ export function readWorld(services, time, memory = new WeakMap()) {
     acceleration: player.flight.acceleration,
     damping: player.flight.baseLinearDamping,
     braking: player.flight.brakingDamping,
-    dashReady: player.maneuvers.canDash() && !(player.dashTimer > 0),
+    dashReady: player.maneuvers.canDash() && !(player.maneuvers.dashTimer > 0),
     dashImpulse: DASH_IMPULSE * player.maneuvers.dashDistanceMultiplier,
     shieldReady:
       shield.shieldUpgradeLevel > 0 &&

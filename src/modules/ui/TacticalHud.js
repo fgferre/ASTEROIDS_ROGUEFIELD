@@ -225,8 +225,8 @@ export class TacticalHud {
           Number(shieldState.currentHP ?? shieldState.currentHits ?? 0) || 0;
         maxShield = Number(shieldState.maxHP ?? shieldState.maxHits ?? 0) || 0;
       } else {
-        shield = Number(player?.shieldHP ?? 0) || 0;
-        maxShield = Number(player?.shieldMaxHP ?? 0) || 0;
+        shield = Number(player?.shield?.shieldHP ?? 0) || 0;
+        maxShield = Number(player?.shield?.shieldMaxHP ?? 0) || 0;
       }
 
       // The broken shield's cooldown (player/shield.js), read as it runs.

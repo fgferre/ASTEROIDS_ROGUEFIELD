@@ -98,7 +98,7 @@ export function createDash(mirror, THREE, scene, rim) {
 // win's steady guard and a hit the shield took whole (holdBlink) do not.
 export function updateGuard(mirror, player, time) {
   const invulnerable = player.invulnerableTimer > 0;
-  if (player.dashTimer > 0) mirror.dashGuard = true;
+  if (player.maneuvers.dashTimer > 0) mirror.dashGuard = true;
   else if (!invulnerable) mirror.dashGuard = false;
   mirror.blink.value =
     invulnerable &&
@@ -110,7 +110,7 @@ export function updateGuard(mirror, player, time) {
   const dashShield = invulnerable && mirror.dashGuard;
   mirror.rim.copy(dashShield ? mirror.dashRimRgb : mirror.rimRgb);
   // the shield shell already reads as protection; the ring would sit inside it
-  mirror.dashRing.visible = dashShield && !player.isShieldActive;
+  mirror.dashRing.visible = dashShield && !player.shield.isShieldActive;
 }
 
 export function updateGhosts(mirror, list) {
