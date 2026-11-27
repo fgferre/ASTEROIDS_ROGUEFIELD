@@ -279,7 +279,9 @@ export class PlayerMirror {
     if (hidden) {
       this.light.intensity = 0;
       this.trailCount = 0;
-      player?.dashGhosts?.forEach((ghost) => this.hiddenGhosts.add(ghost));
+      player?.maneuvers.dashGhosts?.forEach((ghost) =>
+        this.hiddenGhosts.add(ghost)
+      );
       hideGhosts(this);
       this.flareFan.visible = false;
       return;
@@ -309,13 +311,13 @@ export class PlayerMirror {
       hull: player.maxHealth > 0 ? player.health / player.maxHealth : 1,
       cruise: CRUISE_SCALE,
     });
-    lightNeedles(this, player.lastThrusterState, dt);
+    lightNeedles(this, player.thrusters.lastThrusterState, dt);
     lightRetros(this, player, geometry, thrust.aux || 0, dt);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
     updateGuard(this, player, time);
 
-    updateGhosts(this, player.dashGhosts);
+    updateGhosts(this, player.maneuvers.dashGhosts);
 
     updateTrail(this, player, ribbons, geometry, main, cos, sin);
   }
@@ -337,7 +339,7 @@ export class PlayerMirror {
    * spring over `dt` s; level under reduced motion.
    */
   updateTilt(player, dt, reduced) {
-    const jets = player.lastThrusterState;
+    const jets = player.thrusters.lastThrusterState;
     const turn = jets.turnR - jets.turnL;
     const flank = TILT_FLANK * (jets.brakePort - jets.brakeStarboard);
     const lean = Math.abs(turn) >= Math.abs(flank) ? turn : flank;

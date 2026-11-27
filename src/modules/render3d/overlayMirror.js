@@ -331,24 +331,25 @@ export class WardLinks {
 // turret's axis at the height of the barrel aimed at that lock, so it reads
 // as coming out of the turret from any camera angle.
 export function mirrorLocks(t, combat) {
-  if (!combat || combat.aimMode === 'manual') return;
-  const rank = combat.targetingUpgradeLevel || 0;
+  if (!combat || combat.targeting.aimMode === 'manual') return;
+  const rank = combat.targeting.targetingUpgradeLevel || 0;
   if (rank < 1) return;
   const { ribbons, accentRgb } = t;
   const multi = rank >= 3;
-  const locks = combat.currentLockAssignments || [];
+  const locks = combat.targeting.currentLockAssignments || [];
   const pulse = Math.max(
     0,
     Math.min(
       1,
-      combat.targetIndicatorPulse / (combat.targetPulseDuration || 0.0001)
+      combat.targeting.targetIndicatorPulse /
+        (combat.targeting.targetPulseDuration || 0.0001)
     )
   );
-  const count = locks.length || (combat.currentTarget ? 1 : 0);
+  const count = locks.length || (combat.targeting.currentTarget ? 1 : 0);
   for (let i = 0; i < count; i += 1) {
     if (!multi && i > 0) break;
     const lock = locks[i];
-    const target = lock ? lock.enemy : combat.currentTarget;
+    const target = lock ? lock.enemy : combat.targeting.currentTarget;
     if (!target || target.destroyed) continue;
     const base = i === 0 ? combat.lockHighlightAlpha : combat.lockLineAlpha;
     const alpha = Math.min(1, (base || 0.6) + pulse * 0.25);
@@ -384,7 +385,7 @@ export function mirrorLocks(t, combat) {
   }
 
   if (rank < 2 || !combat.usingDynamicPrediction()) return;
-  const points = combat.predictedAimPoints || [];
+  const points = combat.targeting.predictedAimPoints || [];
   for (let i = 0; i < points.length; i += 1) {
     const point = points[i];
     if (!point?.position || (!multi && point.index > 0)) continue;

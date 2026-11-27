@@ -230,14 +230,18 @@ export class PlayerContact {
     if (player.invulnerableTimer > 0) {
       // Ram Plating: a dashing ship hits each enemy it touches once per dash.
       if (
-        player.dashTimer > 0 &&
-        player.dashContactDamage > 0 &&
-        !player.dashRammed.has(asteroid)
+        player.maneuvers.dashTimer > 0 &&
+        player.maneuvers.dashContactDamage > 0 &&
+        !player.maneuvers.dashRammed.has(asteroid)
       ) {
-        player.dashRammed.add(asteroid);
-        enemiesSystem.applyDamage(asteroid, player.dashContactDamage, {
-          source: { hitPosition: result.impactPosition },
-        });
+        player.maneuvers.dashRammed.add(asteroid);
+        enemiesSystem.applyDamage(
+          asteroid,
+          player.maneuvers.dashContactDamage,
+          {
+            source: { hitPosition: result.impactPosition },
+          }
+        );
       }
       finalizeBossFeedback(0);
       return result;

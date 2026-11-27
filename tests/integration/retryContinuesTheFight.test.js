@@ -283,7 +283,7 @@ function dump(game, unread) {
   });
   return {
     enemies,
-    enemyBullets: game.services.combat.enemyBullets.map((b) =>
+    enemyBullets: game.services.combat.projectiles.enemyBullets.map((b) =>
       fields(b, game, unread)
     ),
     // The cards' effects on enemies (burns, slows, pulls) and the pull wells;
@@ -489,7 +489,8 @@ function playedLayer() {
   play(1800);
   // The death comes with enemy shots in the air.
   const { combat } = game.services;
-  for (let i = 0; i < 1800 && !combat.enemyBullets.length; i += 1) play(1);
+  for (let i = 0; i < 1800 && !combat.projectiles.enemyBullets.length; i += 1)
+    play(1);
   const kills = enemies.sessionStats.totalKills;
   const unread = new Set();
   const atDeath = dump(game, unread);
@@ -541,7 +542,7 @@ describe('a Retry continues the fight where it stopped', () => {
     spawned.spreadTimer += 1;
     expect(differences(a, dump(game))).toHaveLength(1);
     expect(sharedWithOthers(game)).toEqual([]);
-    spawned.held = game.services.combat.enemyBullets;
+    spawned.held = game.services.combat.projectiles.enemyBullets;
     expect(sharedWithOthers(game)).toHaveLength(1);
   });
 
@@ -637,6 +638,8 @@ describe('a Retry continues the fight where it stopped', () => {
     expectTheFightGoesOn('field', () => fight('field', onTheField));
   });
 
+  // Two whole layers played: 4 s alone, but over 20 s when the machine runs
+  // several suites at once, so this case has its own, generous limit.
   it('a layer played with cards, killed and retried', () => {
     const first = playedLayer();
     expect(first.kills).toBeGreaterThan(0);
@@ -645,5 +648,5 @@ describe('a Retry continues the fight where it stopped', () => {
     expect(first.shared).toEqual([]);
     expect(first.lost.join('\n')).toBe('');
     expect(differences(first.end, playedLayer().end).join('\n')).toBe('');
-  });
+  }, 90_000);
 });

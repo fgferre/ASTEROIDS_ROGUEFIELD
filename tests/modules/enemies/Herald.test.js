@@ -167,7 +167,7 @@ describe('Herald', () => {
   it('Silence steers its shard toward the ship', () => {
     const { system, player, run } = createHerald('silence');
     const bullets = [];
-    system.getCachedCombat = () => ({ enemyBullets: bullets });
+    system.getCachedCombat = () => ({ projectiles: { enemyBullets: bullets } });
     system.eventBus.emit.mockImplementation((event, payload) => {
       if (event !== 'enemy-fired') return;
       bullets.push({
@@ -199,7 +199,7 @@ describe('Herald', () => {
       weapon: () => null,
       burstFlak: () => {},
     });
-    system.getCachedCombat = () => projectiles;
+    system.getCachedCombat = () => ({ projectiles });
     system.eventBus.emit.mockImplementation((event, payload) => {
       if (event === 'enemy-fired') projectiles.createEnemyBullet(payload);
     });

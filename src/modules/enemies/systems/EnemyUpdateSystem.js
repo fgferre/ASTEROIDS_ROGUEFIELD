@@ -125,9 +125,11 @@ export class EnemyUpdateSystem {
     const facade = this.facade;
     const asteroids = this.ctx?.asteroids ?? [];
 
+    // Counted only while the development log listens (every frame).
     if (
-      !facade?._lastEnemyUpdateLog ||
-      Date.now() - facade._lastEnemyUpdateLog > 1000
+      GameDebugLogger.isEnabled &&
+      (!facade?._lastEnemyUpdateLog ||
+        Date.now() - facade._lastEnemyUpdateLog > 1000)
     ) {
       const enemyTypes = Array.isArray(asteroids)
         ? asteroids

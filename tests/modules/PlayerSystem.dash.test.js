@@ -64,9 +64,9 @@ describe('PlayerSystem dash', () => {
     );
 
     steps(player, 15);
-    expect(player.dashGhosts.length).toBeGreaterThan(0);
+    expect(player.maneuvers.dashGhosts.length).toBeGreaterThan(0);
     steps(player, 10); // past the dash and its decay
-    expect(player.dashGhostsDropped).toBe(DASH_GHOST_COUNT);
+    expect(player.maneuvers.dashGhostsDropped).toBe(DASH_GHOST_COUNT);
     expect(
       Math.hypot(player.velocity.vx, player.velocity.vy)
     ).toBeLessThanOrEqual(SHIP_MAX_SPEED);
@@ -77,7 +77,7 @@ describe('PlayerSystem dash', () => {
     const { player, eventBus } = makePlayer();
     eventBus.emit('dash-pressed');
     player.update(DELTA_TIME);
-    while (player.dashTimer > 0) player.update(DELTA_TIME);
+    while (player.maneuvers.dashTimer > 0) player.update(DELTA_TIME);
     const speed = () => Math.hypot(player.velocity.vx, player.velocity.vy);
     let previous = speed();
     expect(previous).toBeGreaterThan(1.5 * SHIP_MAX_SPEED);
@@ -184,16 +184,16 @@ describe('Maneuver cards on the dash', () => {
   };
 
   function dash(player, eventBus) {
-    player.dashCooldownTimer = 0;
+    player.maneuvers.dashCooldownTimer = 0;
     eventBus.emit('dash-pressed');
     player.update(DELTA_TIME);
   }
 
   it('Afterburner: dash cooldown -30% on top of the hull and Hangar', () => {
     const { player, eventBus } = makePlayer();
-    const base = player.dashCooldown;
+    const base = player.maneuvers.dashCooldown;
     takeCard(eventBus, 'afterburner');
-    expect(player.dashCooldown).toBeCloseTo(base * 0.7, 2);
+    expect(player.maneuvers.dashCooldown).toBeCloseTo(base * 0.7, 2);
   });
 
   it('Inertial Dampers: the dash covers 50% more ground', () => {
@@ -201,7 +201,7 @@ describe('Maneuver cards on the dash', () => {
       const { player, eventBus } = makePlayer();
       if (card) takeCard(eventBus, card);
       dash(player, eventBus);
-      while (player.dashTimer > 0) player.update(DELTA_TIME);
+      while (player.maneuvers.dashTimer > 0) player.update(DELTA_TIME);
       return player.position.x - 400;
     };
     // A shade over 50%: the auto-brake takes the same off both.
@@ -213,10 +213,10 @@ describe('Maneuver cards on the dash', () => {
   it('Ghost Drive: two dashes back to back; the spare refills one cooldown after the first', () => {
     const { player, eventBus } = makePlayer();
     const press = () => {
-      const before = player.dashTimer;
+      const before = player.maneuvers.dashTimer;
       eventBus.emit('dash-pressed');
       player.update(DELTA_TIME);
-      return player.dashTimer > before;
+      return player.maneuvers.dashTimer > before;
     };
     takeCard(eventBus, 'phase_dash');
     expect(press()).toBe(true);
@@ -248,7 +248,7 @@ describe('Maneuver cards on the dash', () => {
         player,
         Math.round((DASH_DURATION + DASH_GHOST_LIFE * 1.2) / DELTA_TIME)
       );
-      return player.dashGhosts.length;
+      return player.maneuvers.dashGhosts.length;
     };
     expect(ghostsLeft()).toBe(0);
     expect(ghostsLeft('phase_dash')).toBeGreaterThan(0);

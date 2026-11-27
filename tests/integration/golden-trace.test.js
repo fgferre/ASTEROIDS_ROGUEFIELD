@@ -153,8 +153,8 @@ function frameState({ player, enemies, combat, progression, 'xp-orbs': orbs }) {
   return [
     `p${player.position.x},${player.position.y},${player.angle},${player.health}`,
     `e${foes.join(';')}`,
-    `b${combat.bullets.length}:${points(combat.bullets)}`,
-    `x${combat.enemyBullets.length}:${points(combat.enemyBullets)}`,
+    `b${combat.projectiles.bullets.length}:${points(combat.projectiles.bullets)}`,
+    `x${combat.projectiles.enemyBullets.length}:${points(combat.projectiles.enemyBullets)}`,
     `o${orbs.getActiveOrbs().length}`,
     `k${enemies.sessionStats.totalKills},${progression.totalExperience},${progression.level}`,
   ].join('|');

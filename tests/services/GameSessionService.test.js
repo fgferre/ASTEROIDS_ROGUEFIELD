@@ -636,11 +636,11 @@ describe('GameSessionService.resetSystems with the real service manifest', () =>
     const { combat } = game.services;
     game.session.startNewRun({ source: 'test' });
     combat.createBullet({ x: 100, y: 100 }, { x: 200, y: 100 }, 1);
-    expect(combat.bullets).toHaveLength(1);
+    expect(combat.projectiles.bullets).toHaveLength(1);
 
     game.session.startNewRun({ source: 'test' });
 
-    expect(combat.bullets).toHaveLength(0);
+    expect(combat.projectiles.bullets).toHaveLength(0);
   });
 
   it('clears field pickups and chests when a new run starts', () => {

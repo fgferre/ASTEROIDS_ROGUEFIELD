@@ -446,7 +446,7 @@ export function shotSpeed(scene, distance) {
     damage: 1,
     lifetime: 100,
   });
-  const shot = scene.combat.enemyBullets.at(-1);
+  const shot = scene.combat.projectiles.enemyBullets.at(-1);
   if (!shot) return { value: 0, trigger: 0 };
   let flown = 0;
   let prev = null;

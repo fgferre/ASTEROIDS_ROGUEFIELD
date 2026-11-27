@@ -113,6 +113,10 @@ export class FieldBackdrop {
       }),
       DEBRIS_COUNT
     );
+    // Never culled: they grow in and out with each place and drift, and three
+    // culls an instanced mesh by one sphere round its instances worked out
+    // once; the far ones went missing at the edge of the ending's views.
+    this.debris.frustumCulled = false;
     this.debrisState = [];
     for (let i = 0; i < DEBRIS_COUNT; i += 1) {
       const depth = 520 + random() * 520;

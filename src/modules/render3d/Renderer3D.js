@@ -28,6 +28,7 @@ import { getViewport } from '../../core/viewport.js';
 import { BiomeTransition } from '../../data/biomes.js';
 import { resolveService } from '../../core/serviceUtils.js';
 import { PALETTE } from '../../data/constants/palette.js';
+import { ENDING_SECTOR } from '../../data/story.js';
 import { HALF_H, HALF_W } from './batches.js';
 import { CameraRig } from './cameraRig.js';
 import { EndingScene, isRevelationBeat } from './endingScene.js';
@@ -62,7 +63,7 @@ import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, SCENE_FOV, setupThree } from './sceneSetup.js';
 import { StoryScene } from './storyScene.js';
 import { TravelScene } from './travelScene.js';
-import { warmUp } from './warmUp.js';
+import { warmEnding, warmUp } from './warmUp.js';
 
 // proposta 18/10: Settings > Bloom Intensity scales the preset's strength
 // (Bloom off is the toggle, which drops the pass).
@@ -240,10 +241,11 @@ class Renderer3D extends BaseSystem {
     });
     this.registerEventListener('wave-started', (payload = {}) => {
       // A sector run shows its sector's look (the run's mode).
-      this.biome.enterLayer(
-        payload.wave,
-        this.cachedEnemies?.waveManager?.mode.sector
-      );
+      const sector = this.cachedEnemies?.waveManager?.mode.sector;
+      this.biome.enterLayer(payload.wave, sector);
+      // The last sector reached with no journey (the dev ?final=1 door):
+      // the ending warms before the fight, as the journey would have.
+      if (sector?.id === ENDING_SECTOR) warmEnding(this);
       this.camera.trigger('waveStart');
     });
     // What opens the camera director's wide view (core/cameraDirector.js).
@@ -419,7 +421,7 @@ class Renderer3D extends BaseSystem {
   // line out to its reach, at the Gravity Brake's strength: in fast, letting
   // go over its last third; `allowed` with the screen pass on.
   aimTrench(allowed) {
-    const trench = this.cachedCombat?.trench;
+    const trench = this.cachedCombat?.weapons.trench;
     if (!allowed || !trench) {
       this.impact.line(0.5, 0.5, 1, 0, 1, 1, 0);
       return;
@@ -475,6 +477,11 @@ class Renderer3D extends BaseSystem {
       this.cachedPlayer,
       freeze?.kind === 'travel' ? freeze.t : null
     );
+    // The way to the Crucible warms its ending (warmUp.js) at the cut into
+    // the journey (one held frame, ~80 ms, once a page). Not at the story's
+    // start: its lights key other programs, and the warm compiled a hundred
+    // more there, holding 0.35 to 2.5 s.
+    if (to === ENDING_SECTOR) warmEnding(this);
     return true;
   }
 
@@ -533,6 +540,9 @@ class Renderer3D extends BaseSystem {
   playEndingBeat(id, durationMs, ending) {
     const kind = isRevelationBeat(id) ? 'revelation' : 'ending';
     const drawn = this.startCinematic(holdIntroStart, 1, true, kind);
+    // Warmed on the way to the Crucible; a door that skips it (the dev
+    // ?content= capture) warms it here, or the last image has no slip.
+    if (drawn) warmEnding(this);
     return drawn && this.ending.start(id, durationMs, ending);
   }
 
@@ -660,8 +670,8 @@ class Renderer3D extends BaseSystem {
     if (player?.position) visit(player.position, player, 'angle', null);
     const combat = this.cachedCombat;
     const lists = [
-      combat?.bullets,
-      combat?.enemyBullets,
+      combat?.projectiles.bullets,
+      combat?.projectiles.enemyBullets,
       this.cachedPickups?.pickups,
       this.cachedXPOrbs?.xpOrbs,
       this.cachedHealthHearts?.hearts,
@@ -1077,7 +1087,7 @@ class Renderer3D extends BaseSystem {
         }
       }
     };
-    scan(this.cachedCombat?.enemyBullets || []);
+    scan(this.cachedCombat?.projectiles.enemyBullets || []);
     scan(this.cachedEnemies?.getActiveEnemies() || []);
     return out;
   }

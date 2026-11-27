@@ -41,11 +41,14 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
 
       playerState.multishot = 2;
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
 
       expect(captured.length).toBe(1);
       expect(captured[0].centerlineTarget).toBeDefined();
@@ -64,12 +67,15 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
 
       // Force no-target firing path: clear the target locks.
-      combat.currentTarget = null;
-      combat.currentTargetLocks = [];
-      combat.currentLockAssignments = [];
+      combat.targeting.currentTarget = null;
+      combat.targeting.currentTargetLocks = [];
+      combat.targeting.currentLockAssignments = [];
 
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
 
       expect(captured.length).toBe(1);
       expect(captured[0].centerlineTarget).toBeDefined();
@@ -162,20 +168,23 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const { combat, playerState } = setupCombatHarness({ multishot: 2 });
       playerState.multishot = 2;
       combat.setSpreadMode('concentrated');
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-      const fired = combat.bullets.slice(before);
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(2);
 
       // Compute aim direction angles (atan2 of vy / vx). All angles should differ
       // by ≤ small epsilon since both lanes point at parallel-translated targets.
       const playerPos = player.getPosition();
-      const enemy = combat.currentTarget;
+      const enemy = combat.targeting.currentTarget;
       const cx = enemy.x - playerPos.x;
       const cy = enemy.y - playerPos.y;
       const centerAngle = Math.atan2(cy, cx);
@@ -192,18 +201,21 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const { combat, playerState } = setupCombatHarness({ multishot: 2 });
       playerState.multishot = 2;
       combat.setSpreadMode('fan');
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-      const fired = combat.bullets.slice(before);
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(2);
 
       const playerPos = player.getPosition();
-      const enemy = combat.currentTarget;
+      const enemy = combat.targeting.currentTarget;
       const centerAngle = Math.atan2(
         enemy.y - playerPos.y,
         enemy.x - playerPos.x
@@ -218,18 +230,21 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const { combat, playerState } = setupCombatHarness({ multishot: 4 });
       playerState.multishot = 4;
       combat.setSpreadMode('concentrated');
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-      const fired = combat.bullets.slice(before);
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(4);
 
       const playerPos = player.getPosition();
-      const enemy = combat.currentTarget;
+      const enemy = combat.targeting.currentTarget;
       const centerAngle = Math.atan2(
         enemy.y - playerPos.y,
         enemy.x - playerPos.x
@@ -246,14 +261,17 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.setSpreadMode('concentrated');
 
       // Clear target to force fireForward path.
-      combat.currentTarget = null;
-      combat.currentTargetLocks = [];
-      combat.currentLockAssignments = [];
+      combat.targeting.currentTarget = null;
+      combat.targeting.currentTargetLocks = [];
+      combat.targeting.currentLockAssignments = [];
 
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-      const fired = combat.bullets.slice(before);
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
+      const fired = combat.projectiles.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(3);
 
@@ -469,15 +487,17 @@ describe('FIX-05 centerline invariant + toggles', () => {
       baseEnemy.health = 10000;
       baseEnemy.maxHealth = 10000;
       combat.lastKnownPlayerStats = { multishot: 4, damage: 10 };
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
       // Sanity: rank-3, single enemy, 4 duplicate lock slots.
-      expect(combat.targetingUpgradeLevel).toBe(3);
-      expect(combat.currentLockAssignments.length).toBeGreaterThanOrEqual(2);
+      expect(combat.targeting.targetingUpgradeLevel).toBe(3);
+      expect(
+        combat.targeting.currentLockAssignments.length
+      ).toBeGreaterThanOrEqual(2);
       // All assignment slots point to the same enemy.
       const distinctEnemyIds = new Set(
-        combat.currentLockAssignments.map((a) => a.enemy?.id)
+        combat.targeting.currentLockAssignments.map((a) => a.enemy?.id)
       );
       expect(distinctEnemyIds.size).toBe(1);
 
@@ -495,7 +515,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // C4 invariant: the map's stored aim for the duplicate-lock enemy
       // MUST be the centerline (predicted), NOT the lane-offset value
       // computed for any single slot. Tolerance: 1e-6 (float identity).
-      const stored = combat.predictedAimPointsMap.get(baseEnemy.id);
+      const stored = combat.targeting.predictedAimPointsMap.get(baseEnemy.id);
       expect(stored).toBeDefined();
       expect(Math.abs(stored.x - predicted.x)).toBeLessThan(0.0001);
       expect(Math.abs(stored.y - predicted.y)).toBeLessThan(0.0001);
@@ -523,7 +543,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
       baseEnemy.health = 10000;
       baseEnemy.maxHealth = 10000;
       combat.lastKnownPlayerStats = { multishot: 4, damage: 10 };
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
       // Capture the weapon-fired payload.
@@ -533,7 +553,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
 
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       if (typeof off === 'function') off();
 
       expect(captured).not.toBeNull();
@@ -600,12 +623,15 @@ describe('FIX-05 centerline invariant + toggles', () => {
         });
         playerState.multishot = 4;
         combat.setSpreadMode(spreadMode);
-        combat.targetUpdateTimer = 0;
+        combat.targeting.targetUpdateTimer = 0;
         combat.updateTargeting(0);
-        const before = combat.bullets.length;
+        const before = combat.projectiles.bullets.length;
         const player = combat.getCachedPlayer();
-        combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-        return combat.bullets.slice(before);
+        combat.handleShooting(
+          combat.weapons.shootCooldown + 0.001,
+          player.getStats()
+        );
+        return combat.projectiles.bullets.slice(before);
       }
 
       const firedConc = rank3FireAt('concentrated');
@@ -634,7 +660,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
       playerState.multishot = 4;
       combat.setSpreadMode('concentrated');
-      combat.targetUpdateTimer = 0;
+      combat.targeting.targetUpdateTimer = 0;
       combat.updateTargeting(0);
 
       // Pre-condition: only one assignment in the non-rank-3 path.
@@ -642,25 +668,28 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // collapses to [currentTarget] when no rank-3 multi-lock) into
       // `assignments`. If a future refactor breaks this invariant, the
       // _concentratedLanes cache could anchor on a stale enemy.
-      const lockTargets = combat.currentTargetLocks?.length
-        ? combat.currentTargetLocks
-        : combat.currentTarget
-          ? [combat.currentTarget]
+      const lockTargets = combat.targeting.currentTargetLocks?.length
+        ? combat.targeting.currentTargetLocks
+        : combat.targeting.currentTarget
+          ? [combat.targeting.currentTarget]
           : [];
       expect(lockTargets.length).toBe(1);
 
       // Fire and verify all bullets aim at parallel lanes around the SAME
       // anchor enemy. If F4's scenario were real, later shots would aim at
       // different enemies → velocity angles would diverge.
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-      const fired = combat.bullets.slice(before);
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
+      const fired = combat.projectiles.bullets.slice(before);
       expect(fired.length).toBeGreaterThanOrEqual(2);
 
       // All angles must be near-identical (parallel-lane invariant).
       const playerPos = player.getPosition();
-      const target = combat.currentTarget;
+      const target = combat.targeting.currentTarget;
       const centerAngle = Math.atan2(
         target.y - playerPos.y,
         target.x - playerPos.x
@@ -681,10 +710,13 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       // Case 1: with getTurretAngle, manual fire uses the turret heading (=== 0 in
       // harness mock). Bullet velocity should point +x.
-      const before = combat.bullets.length;
+      const before = combat.projectiles.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-      const fired = combat.bullets.slice(before);
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
+      const fired = combat.projectiles.bullets.slice(before);
       expect(fired.length).toBe(1);
       expect(fired[0].vx).toBeGreaterThan(0);
       expect(Math.abs(fired[0].vy)).toBeLessThan(0.001);
@@ -695,9 +727,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const savedGetAngle = broken.getTurretAngle;
       broken.getTurretAngle = undefined;
       // Force the cooldown to clear immediately so this fire goes through.
-      combat.lastShotTime = combat.shootCooldown;
+      combat.weapons.lastShotTime = combat.weapons.shootCooldown;
       expect(() =>
-        combat.handleShooting(combat.shootCooldown + 0.001, {
+        combat.handleShooting(combat.weapons.shootCooldown + 0.001, {
           multishot: 1,
           damage: 10,
         })

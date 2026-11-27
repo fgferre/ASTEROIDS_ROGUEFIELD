@@ -24,11 +24,6 @@ export async function warmUp(r, onProgress) {
     () => drawEverything(r),
     // The story's freighter (seconds): every campaign launch tells it.
     () => r.warmStory(),
-    // The ending's last image, on the story's Wake (seeded: three names
-    // programs with Math.random).
-    () => r.seeded(() => r.ending.warm(compile, r.graphics.postProcessing)),
-    // The ending's beats at home, in the story's scene.
-    () => r.seeded(() => r.ending.warmHome(r.three.camera)),
   ];
   for (let i = 0; i < steps.length; i += 1) {
     if (!r.failed) steps[i]();
@@ -43,6 +38,22 @@ export async function warmUp(r, onProgress) {
 // on/off), the current preset's last: a quality step in a fight then finds
 // its programs built (compiling them there froze a frame 150 ms, seconds
 // on a cold shader cache). Programs keep the uniforms of their last build.
+/**
+ * The ending's last image, on the story's Wake, and its beats at home, in the
+ * story's scene: no longer on every player's loading screen (the outside
+ * review, 26/11), only on the way to the last sector (Renderer3D: the
+ * journey to the Crucible, or its first layer when no journey led there).
+ * Once a page; seeded, as three names programs with Math.random.
+ */
+export function warmEnding(r) {
+  if (r.endingWarmed || r.failed) return;
+  r.endingWarmed = true;
+  r.seeded(() =>
+    r.ending.warm(() => compileScene(r), r.graphics.postProcessing)
+  );
+  r.seeded(() => r.ending.warmHome(r.three.camera));
+}
+
 export function compileScene(r) {
   const q = r.quality.settings;
   const variants = new Map();

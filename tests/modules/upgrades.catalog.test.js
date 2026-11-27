@@ -94,7 +94,7 @@ function makeCombat(list = []) {
 
 const fireLance = (combat) => {
   combat.createBullet(PLAYER, { x: 400, y: 300 }, DAMAGE);
-  return combat.bullets[combat.bullets.length - 1];
+  return combat.projectiles.bullets[combat.projectiles.bullets.length - 1];
 };
 
 describe('R5.4 cards on the weapon (CombatSystem)', () => {
@@ -166,7 +166,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     for (let shot = 0; shot < BEAM.every; shot += 1) {
       harmonic.combat.handleShooting(1, stats);
     }
-    expect(harmonic.combat.bullets[0].damage).toBe(DAMAGE);
+    expect(harmonic.combat.projectiles.bullets[0].damage).toBe(DAMAGE);
     expect(far.health).toBeLessThan(100);
   });
 
@@ -254,7 +254,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     combat.updateWeaponEffects(1 / 60);
     expect(near.health).toBe(100 - 40);
     expect(far.health).toBe(100);
-    expect(combat.arcs).toHaveLength(1);
+    expect(combat.cards.arcs).toHaveLength(1);
   });
 
   it('Chain Capacitor: one more chain jump with Chain Lance, else a 10% double hit', () => {
@@ -285,7 +285,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     const { combat, eventBus } = makeCombat([near, far, boss]);
     const shotNear = { x: 260, y: 300, vx: -200, vy: 0 };
     const shotFar = { x: 400, y: 300, vx: -200, vy: 0 };
-    combat.enemyBullets.push(shotNear, shotFar);
+    combat.projectiles.enemyBullets.push(shotNear, shotFar);
     takeCard(eventBus, 'gravity_brake', 3);
     combat.updateWeaponEffects(0.5);
     expect(near.x).toBeCloseTo(250 - 100 * 0.5 * 0.5, 6);
@@ -312,7 +312,7 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
     // Rank 3: sparks at full damage chain until one fails to kill.
     const full = sparked(3);
     expect(full.healths).toEqual([0, 0, 100 - DAMAGE]);
-    expect(full.combat.arcs).toHaveLength(2);
+    expect(full.combat.cards.arcs).toHaveLength(2);
     // No kill, no spark.
     const tough = makeEnemy('tough', 200, 300);
     const other = makeEnemy('other', 250, 300);
@@ -349,15 +349,15 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
 
   it('Gyro Servos 2: fire rate +80% for 1.5 s after a dash', () => {
     const { combat, eventBus } = makeCombat();
-    const cooldown = combat.shootCooldown;
+    const cooldown = combat.weapons.shootCooldown;
     takeCard(eventBus, 'gyro_servos');
-    expect(combat.shootCooldown).toBeCloseTo(cooldown, 9);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(cooldown, 9);
     eventBus.emit('player-dashed', {});
-    expect(combat.shootCooldown).toBeCloseTo(cooldown / 1.8, 9);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(cooldown / 1.8, 9);
     combat.updateWeaponEffects(1.4);
-    expect(combat.shootCooldown).toBeCloseTo(cooldown / 1.8, 9);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(cooldown / 1.8, 9);
     combat.updateWeaponEffects(0.2);
-    expect(combat.shootCooldown).toBeCloseTo(cooldown, 9);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(cooldown, 9);
   });
 });
 
@@ -390,7 +390,7 @@ describe('R5.4 cards in a running game', () => {
     const { player } = game.services;
     game.eventBus.emit('dash-pressed');
     game.step();
-    while (player.dashTimer > 0) game.step();
+    while (player.maneuvers.dashTimer > 0) game.step();
     return player.invulnerableTimer;
   }
 
@@ -488,9 +488,9 @@ describe('R5.4 cards in a running game', () => {
     const game = startGame();
     const { player, progression, combat } = game.services;
     player.setInvulnerableTimer(1e9);
-    const cooldown = combat.shootCooldown;
+    const cooldown = combat.weapons.shootCooldown;
     progression.applyUpgrade('overclocked_core');
-    expect(combat.shootCooldown).toBeCloseTo(cooldown * 0.74, 6);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(cooldown * 0.74, 6);
 
     const start = player.health;
     stepFor(game, 8.5);

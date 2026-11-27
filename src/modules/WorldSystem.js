@@ -92,7 +92,7 @@ class WorldSystem extends BaseSystem {
   recordFamilyForm(kind, family) {
     const timeline = this.enemies.sessionStats.timeline;
     if (timeline.some((e) => e.kind === kind && e.family === family)) return;
-    const { weaponId } = this.combat;
+    const { weaponId } = this.combat.weapons;
     const { name } = familyForm(family, weaponId, kind === 'apex');
     this.recordRunEvent({ kind, family, weaponId, name });
   }

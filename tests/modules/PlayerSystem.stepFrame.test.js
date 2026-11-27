@@ -41,7 +41,7 @@ describe('PlayerSystem flies by the step frame', () => {
     input.onKeyDown(keyEvent('Space'));
     input.onKeyDown(keyEvent('KeyD'));
     step();
-    expect(player.cachedMovementInput).toMatchObject({
+    expect(player.movementInput.cachedMovementInput).toMatchObject({
       right: true,
       strafeHold: true,
     });
@@ -50,7 +50,7 @@ describe('PlayerSystem flies by the step frame', () => {
     input.onKeyUp(keyEvent('KeyD'));
     fake.set({ axes: [1, 0, 0, -1] });
     step();
-    expect(player.cachedMovementInput).toEqual({
+    expect(player.movementInput.cachedMovementInput).toEqual({
       up: false,
       down: false,
       left: false,
@@ -70,12 +70,15 @@ describe('PlayerSystem flies by the step frame', () => {
     input.onKeyDown(keyEvent('KeyW'));
     step();
     // A driver steering the ship between steps (profileHarness.js).
-    player.cachedMovementInput.right = true;
+    player.movementInput.cachedMovementInput.right = true;
     player.update(1 / 60);
-    expect(player.cachedMovementInput).toMatchObject({ up: true, right: true });
+    expect(player.movementInput.cachedMovementInput).toMatchObject({
+      up: true,
+      right: true,
+    });
 
     step();
-    expect(player.cachedMovementInput).toMatchObject({
+    expect(player.movementInput.cachedMovementInput).toMatchObject({
       up: true,
       right: false,
     });

@@ -232,7 +232,7 @@ export function lightEngines(
  * cruise (acceleration over damping, ~90 px/s).
  */
 export function startBurst(mirror, player, cos, sin) {
-  if (player.enginesIdle || player.dashTimer > 0) return 0;
+  if (player.enginesIdle || player.maneuvers.dashTimer > 0) return 0;
   const { velocity, flight } = player;
   const cruise = flight.acceleration / flight.baseLinearDamping;
   const along = (velocity.vx * cos + velocity.vy * sin) / cruise;

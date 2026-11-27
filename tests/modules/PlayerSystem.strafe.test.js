@@ -108,7 +108,7 @@ describe('PlayerSystem control schemes', () => {
         });
         player.updatePosition(DELTA_TIME);
       }
-      return { main: player.lastThrusterState.main, pilot };
+      return { main: player.thrusters.lastThrusterState.main, pilot };
     };
     expect(shownMain({ up: true }).main).toBe(1);
     expect(shownMain({ pad: true, moveX: 0, moveY: 0, up: true }).main).toBe(1);
