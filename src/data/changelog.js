@@ -79,6 +79,7 @@ export const NEXT = {
     'The interface, the menu background, the reward code and the run session now find the services they use the one way the rest of the game does, instead of through shortcuts and nicknames of their own, and a test keeps those from coming back; each finds the same service as before, so nothing changes in play.', // not confirmed
     'The kind of run (the Descent, the Daily Field, the Boss Rush or a campaign sector) is now settled once when a run starts, in one place that every part of the game asks, instead of seven copies learnt at different moments; every layer, record, medal, Salvage, banner and recording comes out the same, so nobody notices.', // not confirmed
     "The 3D renderer's loading-screen warm-up moves to a file of its own, so the renderer can be changed again without passing its line limit; it prepares the same things in the same order at the same moment, so nobody notices.", // not confirmed
+    "The recorded matches are now also checked against a recording made on GitHub's own machines, an empty error handler fails the code check, three unused developer scripts are gone, and a test address holding a card that is spent when picked (Hull Patch, Salvage Cache) no longer hangs the page.", // not confirmed
   ],
 };
 
