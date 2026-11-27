@@ -29,10 +29,6 @@ const DEATH_STEPS = 180; // the field plays on 3 s under the end screen
 const WARMUP_LIMIT = 3600; // steps a boss gets to start an attack
 const AFTER_STEPS = 600; // the fight played on after the Retry
 
-// Not fixed yet (a ratchet: it only shrinks, a listed case that passes fails,
-// and it is gone, empty, before the branch is joined).
-const NOT_YET = new Set(['prime', 'foundry-mother', 'shade']);
-
 // A Herald's strike, announced (its windup) and not yet thrown.
 const heraldWindup = (b) => b.cycleTimer > 0 && b.cycleTimer <= b.cycleWindup();
 
@@ -344,10 +340,6 @@ function expectTheFightGoesOn(id, run) {
   const first = run();
   expect(first.unread).toEqual([]);
   const lost = differences(first.atDeath, first.afterRetry);
-  if (NOT_YET.has(id)) {
-    expect(lost, `${id} passes: take it off NOT_YET`).not.toEqual([]);
-    return;
-  }
   expect(lost.join('\n')).toBe('');
   expect(first.errors.join('\n')).toBe('');
   expect(first.attackEnded, `${id}'s attack never ended`).toBe(true);

@@ -74,7 +74,6 @@ export class Herald extends BaseEnemy {
     this.shardTimer = 0;
     this.orbitAngle = null;
     this.blinkTarget = null;
-    this.shards = [];
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
   }
@@ -273,25 +272,19 @@ export class Herald extends BaseEnemy {
     const { shardSpeed, shardDamage, shardLifetime } = this.data;
     const angle = Math.atan2(target.y - this.y, target.x - this.x);
     this.fire(angle, shardSpeed, shardDamage, 'herald-shard', shardLifetime);
-    // The combat system keeps the bullet; the Herald steers it. Bullets are
-    // pooled: a shard that burned out since the last steer can come back as
-    // this one, already in the list.
-    const bullets = this.system?.getCachedCombat?.()?.enemyBullets;
-    const bullet = bullets?.[bullets.length - 1];
-    if (bullet?.enemyId === this.id && !this.shards.includes(bullet)) {
-      this.shards.push(bullet);
-    }
   }
 
+  // The combat system keeps the shards (pooled bullets); the Herald steers
+  // every one in flight that it fired, found by its id, so the shards a Retry
+  // puts back are under its hand again.
   steerShards(target, deltaTime) {
-    if (!this.shards.length) return;
-    this.shards = this.shards.filter(
-      (bullet) =>
-        bullet.active && !bullet.destroyed && bullet.enemyId === this.id
-    );
     if (!target) return;
+    const bullets = this.system?.getCachedCombat?.()?.enemyBullets ?? [];
     const maxTurn = this.data.shardTurnRate * deltaTime;
-    for (const bullet of this.shards) {
+    for (const bullet of bullets) {
+      if (!bullet.active || bullet.destroyed || bullet.enemyId !== this.id) {
+        continue;
+      }
       const heading = Math.atan2(bullet.vy, bullet.vx);
       const wanted = Math.atan2(target.y - bullet.y, target.x - bullet.x);
       let turn = (wanted - heading) % TAU;
@@ -321,7 +314,6 @@ export class Herald extends BaseEnemy {
   onDestroyed(source, context = {}) {
     this.destroyed = true;
     this.blinkTarget = null;
-    this.shards = [];
     this.getEventBus()?.emit?.('herald-defeated', {
       kind: this.heraldKind,
       x: this.x,

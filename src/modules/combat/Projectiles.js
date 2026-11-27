@@ -595,6 +595,21 @@ export class Projectiles {
     }
   }
 
+  /** The enemy shots in flight, copied at the death for a Retry. */
+  getSnapshotState() {
+    return this.enemyBullets.map((bullet) => structuredClone(bullet));
+  }
+
+  /** The enemy shots in flight back as they were at the death. */
+  restoreSnapshotState(bullets) {
+    this.clearEnemyBullets();
+    for (const saved of bullets) {
+      const bullet = GamePools.bullets.acquire();
+      Object.assign(bullet, structuredClone(saved));
+      this.enemyBullets.push(bullet);
+    }
+  }
+
   clearEnemyBullets() {
     if (!Array.isArray(this.enemyBullets) || !this.enemyBullets.length) {
       this.enemyBullets = [];

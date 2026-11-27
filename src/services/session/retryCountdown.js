@@ -252,11 +252,18 @@ export class RetryCountdown {
     }
 
     // After every reset above (rebuilding the field, physics-reset,
-    // world-reset reseed them): the layer's draws go on from the death
-    // (outside audit 8, verdict A9).
+    // world-reset reseed or clear them): the layer's draws go on from the
+    // death (outside audit 8, verdict A9).
     if (snapshot.enemies?.random) {
       resolveService('enemies', this.services).restoreRandomStreams(
         snapshot.enemies.random
+      );
+    }
+    // The enemy shots that were in flight at the death fly on (a snapshot
+    // taken outside a death has none).
+    if (snapshot.combat) {
+      resolveService('combat', this.services).restoreSnapshotState(
+        snapshot.combat
       );
     }
 

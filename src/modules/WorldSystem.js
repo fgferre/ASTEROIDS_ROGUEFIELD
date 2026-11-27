@@ -21,6 +21,8 @@ class WorldSystem extends BaseSystem {
     this.playerAlive = true;
     // Warden id → run time it arrived (its fight starts there).
     this.wardenArrivals = new Map();
+    // The enemy shots in flight at the last death (handlePlayerDeath).
+    this.shotsAtDeath = null;
 
     this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
   }
@@ -245,6 +247,10 @@ class WorldSystem extends BaseSystem {
       position: playerPosition, // CRITICAL: Add position for explosion!
       killedBy: player?.lastDamageSource ?? null,
     };
+
+    // The enemy shots in flight at this instant, for a Retry: the combat
+    // system clears them as it hears the death (session/deathSnapshot.js).
+    this.shotsAtDeath = this.combat.getSnapshotState();
 
     // Emit player-died FIRST so explosion triggers
     this.eventBus?.emit?.('player-died', data);

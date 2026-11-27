@@ -217,7 +217,7 @@ describe('Herald', () => {
     herald.steerShards(player.position, STEP);
 
     expect(second).toBe(first);
-    expect(herald.shards).toEqual([second]);
+    expect(projectiles.enemyBullets).toEqual([second]);
     expect(Math.abs(Math.atan2(second.vy, second.vx) - before)).toBeCloseTo(
       HERALD_KINDS.silence.shardTurnRate * STEP,
       9
