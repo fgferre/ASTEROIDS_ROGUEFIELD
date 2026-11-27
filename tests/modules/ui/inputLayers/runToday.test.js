@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mountScreens, pinTable } from '../../../__helpers__/screenRig.js';
+import { mountScreens, PAD, pinTable } from '../../../__helpers__/screenRig.js';
+import { HOLD_MS } from '../../../../src/modules/ui/skipHold.js';
 import { listenForHold } from '../../../../src/modules/ui/skipHold.js';
 import { inputLayers } from '../../../../src/modules/input/inputLayers.js';
 import { RunCinematics } from '../../../../src/modules/ui/runCinematics.js';
@@ -261,6 +262,9 @@ pinTable(
       { top: 'pause', focus: 'pause-resume-btn', sent: { 'toggle-pause': 2 } },
     ],
     ['pad:B', { top: 'pause', focus: 'pause-edit-hud-btn', sent: {} }],
+    // Settings does not open over it: the editor is Settings' own page,
+    // drawn above it.
+    ['pad:VIEW', { sent: {} }],
   ]
 );
 
@@ -399,6 +403,75 @@ describe("the run's screens, hidden rules today", () => {
     rig.tap('Escape');
     expect(rig.state.paused).toBe(false);
     expect(rig.snapshot()).toMatchObject({ settings: false, pause: false });
+  });
+
+  it('a Retry whose countdown ends under Settings leaves the run paused under it; closing Settings resumes it', () => {
+    rig.bus.emit('screen-changed', { screen: 'gameover', data: {} });
+    rig.wait();
+    rig.open.settings();
+    // The countdown's end (retryCountdown.completeRetryRespawn): the
+    // session's screen is 'playing' as it says so.
+    rig.state.screen = 'playing';
+    rig.state.sessionState = 'running';
+    rig.bus.emit('screen-changed', {
+      screen: 'playing',
+      source: 'retry-complete',
+    });
+    expect(rig.state.paused).toBe(true);
+    expect(rig.snapshot()).toMatchObject({ top: 'settings', settings: true });
+    rig.tap('Escape');
+    expect(rig.state.paused).toBe(false);
+    expect(rig.snapshot()).toMatchObject({ top: null, settings: false });
+  });
+
+  it('a key held in flight moves no ship while a screen is up, and does again once it closes', () => {
+    rig.fly();
+    rig.keyDown('KeyW');
+    expect(rig.input.sampleInputFrame().up).toBe(true);
+    rig.open.settings();
+    expect(rig.input.sampleInputFrame().up).toBe(false);
+    rig.tap('Escape');
+    expect(rig.input.sampleInputFrame().up).toBe(true);
+    rig.keyUp('KeyW');
+  });
+
+  it('Settings over a held Space drops the hold: nothing skips or steps under it, and once closed a fresh hold counts from zero', () => {
+    startCinematic(rig);
+    rig.keyDown('Space');
+    rig.dom.frame();
+    rig.send('pad:VIEW');
+    expect(rig.snapshot()).toMatchObject({ top: 'settings' });
+    rig.wait(HOLD_MS + 100);
+    rig.dom.frame();
+    rig.keyUp('Space');
+    expect(rig.snapshot()).toMatchObject({ skipped: 0, nextLine: 0 });
+    rig.tap('Escape');
+    rig.send('hold:Space');
+    expect(rig.snapshot()).toMatchObject({ skipped: 1, nextLine: 0 });
+  });
+
+  it('Settings over a held Start drops the hold without a next line; Start still down once it closes starts nothing, only a fresh press does', () => {
+    startCinematic(rig);
+    const pads = (...pressed) => {
+      rig.gamepad.set({ pressed });
+      rig.dom.frame();
+    };
+    pads(PAD.START);
+    pads(PAD.START, PAD.VIEW);
+    pads(PAD.START);
+    expect(rig.snapshot()).toMatchObject({ top: 'settings' });
+    rig.wait(HOLD_MS + 100);
+    pads(PAD.START);
+    expect(rig.snapshot()).toMatchObject({ skipped: 0, nextLine: 0 });
+    rig.tap('Escape');
+    pads(PAD.START);
+    rig.wait(HOLD_MS + 100);
+    pads(PAD.START);
+    pads();
+    expect(rig.snapshot()).toMatchObject({ skipped: 0, nextLine: 0 });
+    pads(PAD.START);
+    pads();
+    expect(rig.snapshot()).toMatchObject({ skipped: 0, nextLine: 1 });
   });
 
   it('the skip hold lets key releases through to the game; the press is heard and moves nothing', () => {

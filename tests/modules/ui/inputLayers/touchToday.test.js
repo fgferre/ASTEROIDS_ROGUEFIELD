@@ -52,15 +52,17 @@ describe('the SKIP button with Settings over the scene, today', () => {
     rig.destroy();
   });
 
-  it('Settings opened by the pad over a scene: SKIP, shown (z-index 9500), takes no tap or hold under it', () => {
+  it('Settings opened by the pad over a scene: SKIP (z-index 9500) steps aside at once, takes no tap or hold under it, and is back once Settings closes', () => {
     const answers = startCinematic(rig);
     rig.tap('KeyW'); // shows the hint
+    const hint = rig.dom.document.querySelector('.skip-hold');
+    expect(hint.classList.contains('is-showing')).toBe(true);
     rig.send('pad:VIEW'); // opens Settings
     expect(rig.ui.settingsPanel.settingsState.isOpen).toBe(true);
-    const skip = rig.dom.document.querySelector('.skip-hold__button');
-    expect(skip.closest('.skip-hold').classList.contains('is-showing')).toBe(
-      true
-    );
+    // Hidden at once (style.css: no fade), so a touch there reaches Settings.
+    expect(hint.classList.contains('is-showing')).toBe(false);
+    expect(hint.classList.contains('is-covered')).toBe(true);
+    const skip = hint.querySelector('.skip-hold__button');
     tap(skip);
     const init = { bubbles: true, pointerId: 1, isTrusted: true };
     skip.dispatchEvent(new FakeEvent('pointerdown', init));
@@ -69,6 +71,9 @@ describe('the SKIP button with Settings over the scene, today', () => {
     skip.dispatchEvent(new FakeEvent('pointerup', init));
     expect(answers).toEqual({ skip: 0, next: 0 });
     expect(rig.ui.settingsPanel.settingsState.isOpen).toBe(true);
+    rig.tap('Escape');
+    rig.dom.frame();
+    expect(hint.classList.contains('is-covered')).toBe(false);
   });
 
   it('a tap on Settings over a scene reaches Settings (before the stack the hold swallowed it on its way down)', () => {
