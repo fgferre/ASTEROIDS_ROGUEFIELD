@@ -51,6 +51,7 @@ describe('MenuHullPreview', () => {
   it.each(['default-hull', 'solar-slicer', 'bastion'])(
     'fits %s inside an off-centre stage while it spins',
     (hullId) => {
+      vi.stubGlobal('window', { innerWidth: 1600, innerHeight: 900 });
       const stage = { left: 900, top: 520, width: 520, height: 130 };
       const element = { getBoundingClientRect: () => stage };
       const camera = new THREE.PerspectiveCamera(60, 1600 / 900, 0.1, 1000);
@@ -89,58 +90,37 @@ describe('MenuHullPreview', () => {
       expect(maxY - minY).toBeGreaterThan(stage.height * 0.6);
     }
   );
-
-  it('reads the stage box once, and again after a resize', () => {
+  // The stage moves without changing size when the menu scrolls.
+  it('follows a stage that moved without changing size', () => {
+    vi.stubGlobal('window', { innerWidth: 1600, innerHeight: 900 });
+    let top = 100;
     const element = {
-      getBoundingClientRect: vi.fn(() => ({
-        left: 0,
-        top: 0,
-        width: 400,
-        height: 300,
-      })),
+      getBoundingClientRect: () => ({
+        left: 900,
+        top,
+        width: 520,
+        height: 130,
+      }),
     };
-    const preview = new MenuHullPreview(THREE, new THREE.Group());
+    const camera = new THREE.PerspectiveCamera(60, 1600 / 900, 0.1, 1000);
+    const preview = new MenuHullPreview(THREE, camera);
     preview.setHull('default-hull');
-    for (let i = 0; i < 5; i += 1) preview.update(1 / 60, element, false);
-    expect(element.getBoundingClientRect).toHaveBeenCalledTimes(1);
-
-    resizeObservers[0].callback();
+    const centreY = () => {
+      camera.updateMatrixWorld(true);
+      const centre = new THREE.Box3()
+        .setFromObject(preview.hull)
+        .getCenter(new THREE.Vector3())
+        .project(camera);
+      return ((1 - centre.y) / 2) * 900;
+    };
     preview.update(1 / 60, element, false);
-    expect(element.getBoundingClientRect).toHaveBeenCalledTimes(2);
-
-    windowListeners.resize.forEach((listener) => listener());
+    const first = centreY();
+    top = 600;
     preview.update(1 / 60, element, false);
-    expect(element.getBoundingClientRect).toHaveBeenCalledTimes(3);
-
-    preview.release();
-    expect(resizeObservers[0].disconnect).toHaveBeenCalled();
-    expect(windowListeners.resize.size).toBe(0);
+    expect(centreY() - first).toBeGreaterThan(400);
   });
 });
 
-let resizeObservers;
-let windowListeners;
 // the hull's livery paints in a canvas
-beforeEach(() => {
-  vi.stubGlobal('document', createCanvasDocumentStub());
-  resizeObservers = [];
-  windowListeners = { resize: new Set() };
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      constructor(callback) {
-        this.callback = callback;
-        this.observe = vi.fn();
-        this.disconnect = vi.fn();
-        resizeObservers.push(this);
-      }
-    }
-  );
-  vi.stubGlobal('window', {
-    innerWidth: 1600,
-    innerHeight: 900,
-    addEventListener: (type, fn) => windowListeners[type].add(fn),
-    removeEventListener: (type, fn) => windowListeners[type].delete(fn),
-  });
-});
+beforeEach(() => vi.stubGlobal('document', createCanvasDocumentStub()));
 afterEach(() => vi.unstubAllGlobals());
