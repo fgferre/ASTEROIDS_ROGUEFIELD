@@ -97,27 +97,16 @@ describe('Renderer3D.warmUp', () => {
     const progress = [];
     // The story is untold here: its freighter is made too.
     renderer.story = { warm: vi.fn() };
-    // The ending's last image: built on the story's Wake once it is made,
-    // compiled and drawn into the composer's target.
-    renderer.ending = {
-      warm: vi.fn((compile, post) => {
-        expect(renderer.story.warm).toHaveBeenCalledTimes(1);
-        expect(post).toBe(true);
-        compile();
-      }),
-      // its beats at home, in the story's scene, once the story is made
-      warmHome: vi.fn(() => {
-        expect(renderer.story.warm).toHaveBeenCalledTimes(1);
-      }),
-    };
+    // The ending waits for the way to the Crucible.
+    renderer.ending = { warm: vi.fn(), warmHome: vi.fn() };
 
     const done = renderer.warmUp((value) => progress.push(value));
     await vi.runAllTimersAsync();
     await done;
     vi.useRealTimers();
     expect(renderer.story.warm).toHaveBeenCalledTimes(1);
-    expect(renderer.ending.warm).toHaveBeenCalledTimes(1);
-    expect(renderer.ending.warmHome).toHaveBeenCalledTimes(1);
+    expect(renderer.ending.warm).not.toHaveBeenCalled();
+    expect(renderer.ending.warmHome).not.toHaveBeenCalled();
 
     const kinds = create.mock.calls.map(([kind]) => kind);
     for (const kind of [...KNOWN_KINDS, 'boss-choir', 'boss-null']) {
@@ -185,6 +174,45 @@ describe('Renderer3D.warmUp', () => {
     progress.forEach((value, i) =>
       expect(value).toBeGreaterThan(i ? progress[i - 1] : 0)
     );
+  });
+
+  it('warms the ending once, on the journey to the Crucible only', () => {
+    const { renderer } = warmable();
+    renderer.ready();
+    renderer.ending = {
+      // compiled and drawn into the composer's target
+      warm: vi.fn((compile, post) => {
+        expect(post).toBe(true);
+        compile();
+      }),
+      warmHome: vi.fn(),
+    };
+    renderer.travel = { start: vi.fn() };
+    renderer.startCinematic = () => true;
+    renderer.playTravel({ to: 'debris-wake', durationMs: 1000 });
+    expect(renderer.ending.warm).not.toHaveBeenCalled();
+    renderer.playTravel({ to: 'the-crucible', durationMs: 1000 });
+    renderer.playTravel({ to: 'the-crucible', durationMs: 1000 });
+    expect(renderer.ending.warm).toHaveBeenCalledTimes(1);
+    expect(renderer.ending.warmHome).toHaveBeenCalledTimes(1);
+  });
+
+  it("warms the ending as the Crucible's first layer starts with no journey (?final=1)", () => {
+    const eventBus = createEventBusMock();
+    const renderer = new Renderer3D({
+      eventBus,
+      enemies: { waveManager: { mode: { sector: { id: 'the-crucible' } } } },
+      'menu-background': { withSeededMathRandom: seeded },
+    });
+    renderer.three = { camera: {} };
+    renderer.graphics = { postProcessing: true };
+    renderer.biome = { enterLayer: vi.fn() };
+    renderer.camera = { trigger: vi.fn() };
+    renderer.ending = { warm: vi.fn(), warmHome: vi.fn() };
+    eventBus.emit('wave-started', { wave: 19 });
+    eventBus.emit('wave-started', { wave: 20 });
+    expect(renderer.ending.warm).toHaveBeenCalledTimes(1);
+    expect(renderer.ending.warmHome).toHaveBeenCalledTimes(1);
   });
 
   it('compiles every preset program variant, the current preset last', () => {
