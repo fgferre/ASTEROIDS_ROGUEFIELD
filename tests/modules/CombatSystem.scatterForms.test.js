@@ -103,7 +103,7 @@ describe('Scatter Coil family forms', () => {
     expect(bolt.damage).toBeCloseTo(full * 0.5, 9);
     combat.processBulletHit(bolt, ahead, combat.cachedEnemies);
     expect(bolt.hit).toBe(true); // Grapeshot glances once
-    expect(combat.flakBursts).toHaveLength(2);
+    expect(combat.weapons.flakBursts).toHaveLength(2);
     expect(ahead.health).toBeCloseTo(100 - full * 0.5, 6);
     expect(behind.health).toBe(100);
 
@@ -200,14 +200,14 @@ describe('Scatter Coil family forms', () => {
     const bolt = centreBolt(combat);
 
     combat.processBulletHit(bolt, target, combat.cachedEnemies);
-    expect(combat.flakBursts).toHaveLength(0);
+    expect(combat.weapons.flakBursts).toHaveLength(0);
     expect(side.health).toBe(100);
     combat.updateWeaponEffects(0.1);
     combat.updateWeaponEffects(0.1);
     expect(side.y).toBeLessThan(330);
-    expect(combat.flakBursts).toHaveLength(0);
+    expect(combat.weapons.flakBursts).toHaveLength(0);
     combat.updateWeaponEffects(0.1);
-    expect(combat.flakBursts).toHaveLength(1);
+    expect(combat.weapons.flakBursts).toHaveLength(1);
     expect(side.health).toBeCloseTo(100 - bolt.shrapnel, 6);
     expect(outside.y).toBe(385);
     expect(outside.health).toBe(100);

@@ -312,7 +312,7 @@ function composeBoss({ id }, { enemies }) {
 // The weapon's own card switches to it; the ship's default weapon has none.
 function composeWeapon({ id, item }, { enemies, progression, combat }) {
   if (item.card) applyCard(progression, item.card.id);
-  if (combat.weaponId !== id) {
+  if (combat.weapons.weaponId !== id) {
     console.warn(`[contentScene] No card switches the ship to "${id}".`);
   }
   spawnTargets(enemies);

@@ -94,10 +94,10 @@ function seenRate(shape, value, time, memory, turn = false) {
 // The turret's reach with the weapon it carries (px): what its shots or
 // strikes get to, never past the turret's own targeting range.
 export function weaponReach(combat) {
-  const form = combat.weaponForm;
+  const form = combat.weapons.weapon;
   const shot =
     form?.projectile?.range ??
-    combat.bulletSpeed * (combat.weapons?.bulletLifetime || 0);
+    combat.weapons.bulletSpeed * (combat.weapons?.bulletLifetime || 0);
   const reaches = (form?.fire || []).map(
     (p) =>
       p.range ?? p.length ?? p.acquire ?? p.sweep?.reach ?? p.radius ?? shot
@@ -132,7 +132,7 @@ function glideOf(player, combat) {
     // No drag: the shared loot terms' terminal speed (push ÷ drag) is the
     // top speed.
     damping: accel / maxSpeed,
-    bulletSpeed: combat.bulletSpeed,
+    bulletSpeed: combat.weapons.bulletSpeed,
   };
 }
 

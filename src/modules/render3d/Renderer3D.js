@@ -419,7 +419,7 @@ class Renderer3D extends BaseSystem {
   // line out to its reach, at the Gravity Brake's strength: in fast, letting
   // go over its last third; `allowed` with the screen pass on.
   aimTrench(allowed) {
-    const trench = this.cachedCombat?.trench;
+    const trench = this.cachedCombat?.weapons.trench;
     if (!allowed || !trench) {
       this.impact.line(0.5, 0.5, 1, 0, 1, 1, 0);
       return;

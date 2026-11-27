@@ -403,109 +403,7 @@ class CombatSystem extends BaseSystem {
   }
 
   // === WEAPONS (combat/Weapons.js) ===
-  // Weapons owns the guns. The 3D renderer and the weapons, upgrade and aim
-  // suites read these fields on the combat object; the aim
-  // suite writes lastShotTime.
-  get weaponId() {
-    return this.weapons.weaponId;
-  }
-
-  get evolutions() {
-    return this.weapons.evolutions;
-  }
-
-  get lanceLook() {
-    return this.weapons.lanceLook;
-  }
-
-  get trailLength() {
-    return this.weapons.trailLength;
-  }
-
-  get beams() {
-    return this.weapons.beams;
-  }
-
-  get scars() {
-    return this.weapons.scars;
-  }
-
-  get flung() {
-    return this.weapons.flung;
-  }
-
-  get shards() {
-    return this.weapons.shards;
-  }
-
-  get trench() {
-    return this.weapons.trench;
-  }
-
-  get flakBursts() {
-    return this.weapons.flakBursts;
-  }
-
-  get glances() {
-    return this.weapons.glances;
-  }
-
-  get kindled() {
-    return this.weapons.kindled;
-  }
-
-  get implosions() {
-    return this.weapons.implosions;
-  }
-
-  get scraps() {
-    return this.weapons.scraps;
-  }
-
-  get lodged() {
-    return this.weapons.lodged;
-  }
-
-  get thermite() {
-    return this.weapons.thermite;
-  }
-
-  get gravityWells() {
-    return this.weapons.gravityWells;
-  }
-
-  // firePatterns.js: the 3D weapon mirror draws them.
-  get blades() {
-    return this.weapons.blades;
-  }
-
-  get pulses() {
-    return this.weapons.pulses;
-  }
-
-  get weaponForm() {
-    return this.weapons.weapon;
-  }
-
-  get bulletSpeed() {
-    return this.weapons.bulletSpeed;
-  }
-
-  get shootCooldown() {
-    return this.weapons.shootCooldown;
-  }
-
-  get baseShootCooldown() {
-    return this.weapons.baseShootCooldown;
-  }
-
-  get lastShotTime() {
-    return this.weapons.lastShotTime;
-  }
-
-  set lastShotTime(value) {
-    this.weapons.lastShotTime = value;
-  }
+  // Weapons owns the guns; readers ask it (combat.weapons.beams).
 
   // Called on the combat object: the HUD and the run recap read the weapon
   // state, the test helpers and suites fire, lay lanes and evolve.
@@ -624,7 +522,7 @@ class CombatSystem extends BaseSystem {
     super.reset();
     this.projectiles.reset();
     this.targeting.clearLocks();
-    this.lastShotTime = 0;
+    this.weapons.lastShotTime = 0;
     this.resetWeaponState();
     // Fix-pass-2 (C5): restore the in-run toggle defaults so the next run
     // starts at concentrated + auto regardless of how the previous run ended.

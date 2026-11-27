@@ -57,7 +57,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.slice(before);
 
       expect(fired.length).toBe(3);
@@ -307,7 +310,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.setAimMode('manual');
 
       const before = combat.bullets.length;
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.slice(before);
 
       expect(fired.length).toBe(3);
@@ -368,7 +374,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.setAimMode('manual');
 
       const before = combat.bullets.length;
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.slice(before);
 
       expect(fired.length).toBe(1);
@@ -388,16 +397,16 @@ describe('FIX-05 centerline invariant + toggles', () => {
         cooldownMultiplier: 0.92,
       });
 
-      const cooldownBefore = combat.shootCooldown;
-      const expectedReduction = combat.baseShootCooldown * 0.92;
+      const cooldownBefore = combat.weapons.shootCooldown;
+      const expectedReduction = combat.weapons.baseShootCooldown * 0.92;
       expect(cooldownBefore).toBeCloseTo(expectedReduction, 5);
 
       combat.setAimMode('manual');
       // Cooldown stat preserved — it's a weapon stat, not an aim behavior.
-      expect(combat.shootCooldown).toBeCloseTo(cooldownBefore, 5);
+      expect(combat.weapons.shootCooldown).toBeCloseTo(cooldownBefore, 5);
 
       combat.setAimMode('auto');
-      expect(combat.shootCooldown).toBeCloseTo(cooldownBefore, 5);
+      expect(combat.weapons.shootCooldown).toBeCloseTo(cooldownBefore, 5);
     });
 
     it('manual mode: behavioral flags paused; restored on switchback to auto', () => {
@@ -587,7 +596,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
         const before = combat.bullets.length;
         const player = combat.getCachedPlayer();
-        combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+        combat.handleShooting(
+          combat.weapons.shootCooldown + 0.001,
+          player.getStats()
+        );
         const fired = combat.bullets.slice(before);
 
         expect(fired.length).toBe(2);
@@ -624,7 +636,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
         const before = combat.bullets.length;
         const player = combat.getCachedPlayer();
-        combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+        combat.handleShooting(
+          combat.weapons.shootCooldown + 0.001,
+          player.getStats()
+        );
         const fired = combat.bullets.slice(before);
         expect(fired.length).toBeGreaterThanOrEqual(n);
 

@@ -349,15 +349,15 @@ describe('R5.4 cards on the weapon (CombatSystem)', () => {
 
   it('Gyro Servos 2: fire rate +80% for 1.5 s after a dash', () => {
     const { combat, eventBus } = makeCombat();
-    const cooldown = combat.shootCooldown;
+    const cooldown = combat.weapons.shootCooldown;
     takeCard(eventBus, 'gyro_servos');
-    expect(combat.shootCooldown).toBeCloseTo(cooldown, 9);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(cooldown, 9);
     eventBus.emit('player-dashed', {});
-    expect(combat.shootCooldown).toBeCloseTo(cooldown / 1.8, 9);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(cooldown / 1.8, 9);
     combat.updateWeaponEffects(1.4);
-    expect(combat.shootCooldown).toBeCloseTo(cooldown / 1.8, 9);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(cooldown / 1.8, 9);
     combat.updateWeaponEffects(0.2);
-    expect(combat.shootCooldown).toBeCloseTo(cooldown, 9);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(cooldown, 9);
   });
 });
 
@@ -488,9 +488,9 @@ describe('R5.4 cards in a running game', () => {
     const game = startGame();
     const { player, progression, combat } = game.services;
     player.setInvulnerableTimer(1e9);
-    const cooldown = combat.shootCooldown;
+    const cooldown = combat.weapons.shootCooldown;
     progression.applyUpgrade('overclocked_core');
-    expect(combat.shootCooldown).toBeCloseTo(cooldown * 0.74, 6);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(cooldown * 0.74, 6);
 
     const start = player.health;
     stepFor(game, 8.5);

@@ -72,7 +72,7 @@ describe('content scene on a live run', () => {
         x,
         displayName,
       })),
-      weaponId: combat.weaponId,
+      weaponId: combat.weapons.weaponId,
       hullId: player.currentHull?.id,
       cardRank: progression.getUpgradeCount(item.id),
     };

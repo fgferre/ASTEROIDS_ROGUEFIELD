@@ -187,7 +187,9 @@ function pushStatic(ribbons, enemy, rgb, white, strength) {
 export function shotColor(combat, bullet) {
   if (bullet.kind === 'arc' || bullet.kind === 'chain') return null;
   const colors =
-    bullet.colors || getContent('weapons', combat.weaponId)?.colors || {};
+    bullet.colors ||
+    getContent('weapons', combat.weapons.weaponId)?.colors ||
+    {};
   const own = {
     flak: colors.tracer,
     seeker: colors.burst,
@@ -195,7 +197,7 @@ export function shotColor(combat, bullet) {
     heat: colors.heat,
     blade: colors.edge,
   }[bullet.kind];
-  return own || combat.lanceLook?.trail || PALETTE.shot;
+  return own || combat.weapons.lanceLook?.trail || PALETTE.shot;
 }
 
 // The bolt's strike lights the hull round it, once.
@@ -472,10 +474,10 @@ export function pushSeeker(THREE, batches, bullet, pushTrail) {
 // The Shard Halo: each blade a matte shard under its glowing edge, with a
 // wake behind it along its ring; each ring's track, faint.
 function mirrorBlades(THREE, combat, batches) {
-  const { blades } = combat;
+  const { blades } = combat.weapons;
   if (!blades.length) return;
   const { ribbons, glow, lances, bodies } = batches;
-  const { colors } = combat.weaponForm;
+  const { colors } = combat.weapons.weapon;
   const edge = rgbOf(THREE, colors.edge);
   const core = rgbOf(THREE, colors.core);
   blades.forEach((blade) => {
@@ -513,7 +515,7 @@ function mirrorBlades(THREE, combat, batches) {
 // The Furnace Corona: its ring heating up between pulses (a thin core over
 // a wide haze), and each pulse opening to the ring with a heat flash.
 function mirrorAura(THREE, combat, batches, flashes) {
-  const { aura, pulses } = combat;
+  const { aura, pulses } = combat.weapons;
   const { ribbons, glow } = batches;
   if (aura) {
     const heat = rgbOf(THREE, aura.colors.heat);
@@ -680,7 +682,7 @@ function mirrorShards(THREE, combat, batches) {
   const { ribbons, glow } = batches;
   const tail = rgbOf(THREE, SHARD_COLORS.tail);
   const head = rgbOf(THREE, SHARD_COLORS.head);
-  combat.shards.forEach((burst) => {
+  combat.weapons.shards.forEach((burst) => {
     const k = burst.life / burst.maxLife;
     const gain = Math.min(1, k * 2);
     const t = Math.sqrt(1 - k);
@@ -715,7 +717,7 @@ function mirrorShards(THREE, combat, batches) {
       glow.push(x, ARC_H + 0.4, y, tail, 6, 0.8 * gain, 1.6);
     }
   });
-  combat.flung.forEach((flung) => {
+  combat.weapons.flung.forEach((flung) => {
     const { enemy } = flung;
     if (enemy.destroyed || enemy.id !== flung.id) return;
     const speed = Math.hypot(enemy.vx || 0, enemy.vy || 0);
@@ -850,24 +852,30 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   const white = rgbOf(THREE, PALETTE.text);
   mirrorBlades(THREE, combat, batches);
   mirrorAura(THREE, combat, batches, flashes);
-  if (combat.scars.length) mirrorScars(THREE, combat.scars, batches);
-  if (combat.shards.length || combat.flung.length) {
+  if (combat.weapons.scars.length)
+    mirrorScars(THREE, combat.weapons.scars, batches);
+  if (combat.weapons.shards.length || combat.weapons.flung.length) {
     mirrorShards(THREE, combat, batches);
   }
-  if (combat.trench) mirrorTrench(THREE, combat.trench, batches, white);
-  if (combat.glances.length) mirrorGlances(THREE, combat.glances, ribbons);
-  if (combat.kindled.length) {
-    mirrorKindled(THREE, combat.kindled, batches, staticFrame / 60);
+  if (combat.weapons.trench)
+    mirrorTrench(THREE, combat.weapons.trench, batches, white);
+  if (combat.weapons.glances.length)
+    mirrorGlances(THREE, combat.weapons.glances, ribbons);
+  if (combat.weapons.kindled.length) {
+    mirrorKindled(THREE, combat.weapons.kindled, batches, staticFrame / 60);
   }
-  if (combat.scraps.length) mirrorScraps(THREE, combat.scraps, batches);
-  if (combat.implosions.length) {
-    mirrorImplosions(THREE, combat.implosions, ribbons, white);
+  if (combat.weapons.scraps.length)
+    mirrorScraps(THREE, combat.weapons.scraps, batches);
+  if (combat.weapons.implosions.length) {
+    mirrorImplosions(THREE, combat.weapons.implosions, ribbons, white);
   }
-  if (combat.gravityWells.length) {
-    mirrorImplosions(THREE, combat.gravityWells, ribbons, white);
+  if (combat.weapons.gravityWells.length) {
+    mirrorImplosions(THREE, combat.weapons.gravityWells, ribbons, white);
   }
-  if (combat.lodged.length) mirrorLodged(THREE, combat.lodged, batches);
-  if (combat.thermite.length) mirrorThermite(THREE, combat.thermite, batches);
+  if (combat.weapons.lodged.length)
+    mirrorLodged(THREE, combat.weapons.lodged, batches);
+  if (combat.weapons.thermite.length)
+    mirrorThermite(THREE, combat.weapons.thermite, batches);
 
   // Thruster trails: Cinder Trail embers, Ion Trail as a cyan ribbon.
   const cinderRgb = rgbOf(THREE, WEAPON_EVOLUTIONS.thermal.look.trail);
@@ -992,7 +1000,7 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
       : null;
   const rail = combat.weapons.hasEvolution('kinetic');
   const railRgb = rgbOf(THREE, RAIL_RGB);
-  const lanceArc = combat.lanceLook.arc || PALETTE.player;
+  const lanceArc = combat.weapons.lanceLook.arc || PALETTE.player;
   combat.arcs.forEach((arc) => {
     const k = arc.life / arc.maxLife;
     const { points } = arc;
@@ -1032,11 +1040,11 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
 
   // Flak and missile bursts are Renderer3D's blasts (fire, soot, sparks);
   // here only the first of a volley lights the hulls round it.
-  combat.flakBursts.forEach((burst) => {
+  combat.weapons.flakBursts.forEach((burst) => {
     if (burst.lit) flashes.observe(burst, rgbOf(THREE, burst.colors.burst));
   });
 
-  combat.beams.forEach((beam) => {
+  combat.weapons.beams.forEach((beam) => {
     const { colors } = beam;
     const k = beam.life / beam.maxLife;
     BEAM_LAYERS.forEach(([key, width, gain, length]) => {

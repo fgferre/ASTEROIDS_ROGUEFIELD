@@ -109,7 +109,7 @@ describe('a weapon defined only as a content file', () => {
     combat.bullets.forEach((bolt) => {
       expect(bolt.kind).toBe('lance');
       expect(Math.hypot(bolt.vx, bolt.vy)).toBeCloseTo(
-        combat.bulletSpeed * needle.projectile.speedMultiplier,
+        combat.weapons.bulletSpeed * needle.projectile.speedMultiplier,
         6
       );
       expect(bolt.damage).toBeCloseTo(
@@ -120,11 +120,11 @@ describe('a weapon defined only as a content file', () => {
 
     combat.handleShooting(5, stats);
     // On the cooldown exactly: the clock carries nothing past it.
-    combat.lastShotTime = combat.shootCooldown;
+    combat.weapons.lastShotTime = combat.weapons.shootCooldown;
     combat.handleShooting(0, stats);
     expect(combat.bullets).toHaveLength(2 * fan.bolts);
-    expect(combat.beams).toHaveLength(1);
-    expect(combat.beams[0].colors).toEqual(needle.colors);
-    expect(combat.lastShotTime).toBe(-beam.cooldownPenalty);
+    expect(combat.weapons.beams).toHaveLength(1);
+    expect(combat.weapons.beams[0].colors).toEqual(needle.colors);
+    expect(combat.weapons.lastShotTime).toBe(-beam.cooldownPenalty);
   });
 });

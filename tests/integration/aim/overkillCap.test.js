@@ -63,7 +63,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.length - before;
       expect(fired).toBe(1);
     });
@@ -95,7 +98,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.length - before;
       expect(fired).toBe(4);
     });
@@ -123,7 +129,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.length - before;
       expect(fired).toBe(4);
     });
@@ -245,7 +254,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.length - before;
 
       // The lone target HP=50 only needs 1 shot at damage=100. The 3 extra
@@ -285,7 +297,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.length - before;
 
       // Each enemy needs 1 bullet (dmg=100 vs HP=50). With 4 distinct enemies
@@ -336,7 +351,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
 
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
 
       off?.();
 
@@ -372,7 +390,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
     it('bullets do NOT have targetX/targetY fields (asserts assumptions for Finding 3)', () => {
       const { combat } = setupCombatHarness({ multishot: 1, damage: 100 });
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       expect(combat.bullets.length).toBeGreaterThan(0);
       const b = combat.bullets[combat.bullets.length - 1];
       // If either of these flips, the fix-pass-3 Finding 3 test must be
@@ -439,7 +460,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const created = [];
       const off = eventBus.on('bullet-created', (p) => created.push(p));
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       off?.();
 
       const assignmentCount = combat.targeting.currentLockAssignments.length;
@@ -471,7 +495,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const created = [];
       const off = eventBus.on('bullet-created', (p) => created.push(p));
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       off?.();
 
       // The 4 enemies each absorb 1 bullet. Assignment count matches.
@@ -541,7 +568,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const off = eventBus.on('bullet-created', (p) => created.push(p));
       const player = combat.getCachedPlayer();
       const playerPos = player.getPosition();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       off?.();
 
       // For 2 lanes (duplicateCount=2), the perpendicular offsets are at
@@ -644,7 +674,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const created = [];
       const off = eventBus.on('bullet-created', (p) => created.push(p));
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       off?.();
 
       // === Smoke-check observable report ===

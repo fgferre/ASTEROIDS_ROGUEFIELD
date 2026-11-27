@@ -45,7 +45,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.updateTargeting(0);
 
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
 
       expect(captured.length).toBe(1);
       expect(captured[0].centerlineTarget).toBeDefined();
@@ -69,7 +72,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.targeting.currentLockAssignments = [];
 
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
 
       expect(captured.length).toBe(1);
       expect(captured[0].centerlineTarget).toBeDefined();
@@ -167,7 +173,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(2);
@@ -197,7 +206,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(2);
@@ -223,7 +235,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(4);
@@ -252,7 +267,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.slice(before);
 
       expect(fired.length).toBeGreaterThanOrEqual(3);
@@ -535,7 +553,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
 
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       if (typeof off === 'function') off();
 
       expect(captured).not.toBeNull();
@@ -606,7 +627,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
         combat.updateTargeting(0);
         const before = combat.bullets.length;
         const player = combat.getCachedPlayer();
-        combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+        combat.handleShooting(
+          combat.weapons.shootCooldown + 0.001,
+          player.getStats()
+        );
         return combat.bullets.slice(before);
       }
 
@@ -656,7 +680,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // different enemies → velocity angles would diverge.
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.slice(before);
       expect(fired.length).toBeGreaterThanOrEqual(2);
 
@@ -685,7 +712,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // harness mock). Bullet velocity should point +x.
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
-      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      combat.handleShooting(
+        combat.weapons.shootCooldown + 0.001,
+        player.getStats()
+      );
       const fired = combat.bullets.slice(before);
       expect(fired.length).toBe(1);
       expect(fired[0].vx).toBeGreaterThan(0);
@@ -697,9 +727,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const savedGetAngle = broken.getTurretAngle;
       broken.getTurretAngle = undefined;
       // Force the cooldown to clear immediately so this fire goes through.
-      combat.lastShotTime = combat.shootCooldown;
+      combat.weapons.lastShotTime = combat.weapons.shootCooldown;
       expect(() =>
-        combat.handleShooting(combat.shootCooldown + 0.001, {
+        combat.handleShooting(combat.weapons.shootCooldown + 0.001, {
           multishot: 1,
           damage: 10,
         })

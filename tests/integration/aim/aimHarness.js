@@ -159,12 +159,12 @@ export function setupCombatHarness({
 
 /**
  * Capture the projectile vector set produced by `fireCount` sequential fires.
- * Each fire is preceded by a delta-time of `combat.shootCooldown + 0.001` so
+ * Each fire is preceded by a delta-time of `combat.weapons.shootCooldown + 0.001` so
  * the cooldown gate at `canShoot()` clears.
  */
 export function captureVectorSet(combat, fireCount = 8) {
   const before = combat.bullets.length;
-  const dt = combat.shootCooldown + 0.001;
+  const dt = combat.weapons.shootCooldown + 0.001;
   for (let i = 0; i < fireCount; i++) {
     // Re-establish target acquisition each tick (no-op if already locked).
     combat.updateTargeting(dt);

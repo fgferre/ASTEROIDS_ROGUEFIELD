@@ -49,8 +49,8 @@ export function mirrorProjectiles(t, combat) {
   const { lances } = t;
 
   const bullets = combat.bullets || [];
-  const look = combat.lanceLook;
-  const evolved = combat.evolutions.length > 0;
+  const look = combat.weapons.lanceLook;
+  const evolved = combat.weapons.evolutions.length > 0;
   const trail = pushTrail.bind(null, t);
   for (let i = 0; i < bullets.length; i += 1) {
     const b = bullets[i];
