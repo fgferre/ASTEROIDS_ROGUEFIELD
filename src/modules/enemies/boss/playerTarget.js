@@ -43,6 +43,13 @@ export function resolvePlayerTarget(boss) {
     position = { x: player.position.x, y: player.position.y };
   }
 
+  // Built only while the development log listens: this runs every frame.
+  if (GameDebugLogger.isEnabled) logTargetLookup(boss, player, position);
+
+  return { player, position: position || null };
+}
+
+function logTargetLookup(boss, player, position) {
   const logPayload = {
     hasSystem: !!boss.system,
     hasGetCachedPlayer: typeof boss.system?.getCachedPlayer === 'function',
@@ -81,6 +88,4 @@ export function resolvePlayerTarget(boss) {
     });
     boss._missingTargetLogged = true;
   }
-
-  return { player, position: position || null };
 }
