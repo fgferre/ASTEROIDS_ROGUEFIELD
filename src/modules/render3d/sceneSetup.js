@@ -183,7 +183,7 @@ function displayTarget(THREE, composer, encoders, smaaPass) {
   composer.renderTarget2 = display;
   composer.readBuffer = scene;
   composer.writeBuffer = display;
-  encoders.forEach((pass) => {
+  [...encoders, smaaPass].forEach((pass) => {
     pass.needsSwap = false;
   });
   smaaPass.render = (renderer, writeBuffer) =>

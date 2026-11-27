@@ -12,7 +12,7 @@ import { EffectComposer as Composer } from 'three/examples/jsm/postprocessing/Ef
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { UnrealBloomPass as BloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { SMAAPass as EdgePass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 
 // Colours as r128 read them: a hex or a Color is used as given, never
 // converted from sRGB (r152 turned that conversion on). Before any Color.
@@ -187,16 +187,6 @@ class EffectComposer extends Composer {
     super.reset(target);
     asOutput(this.renderTarget1);
     asOutput(this.renderTarget2);
-  }
-}
-
-// r128's SMAA left the composer's buffers where they were; since then it
-// swaps them, and the game's chains (sceneSetup.js displayTarget, the
-// opening's) were built on it staying put.
-class SMAAPass extends EdgePass {
-  constructor(...args) {
-    super(...args);
-    this.needsSwap = false;
   }
 }
 
