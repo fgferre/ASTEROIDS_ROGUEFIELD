@@ -21,6 +21,14 @@ import { EnemySnapshots } from './enemies/systems/EnemySnapshots.js';
 import { EnemyField } from './enemies/systems/EnemyField.js';
 import { EnemyCombatRelay } from './enemies/systems/EnemyCombatRelay.js';
 import {
+  rewardsKit,
+  bossesKit,
+  fieldKit,
+  combatRelayKit,
+  snapshotsKit,
+  updateContext,
+} from './enemies/systems/enemySystemKits.js';
+import {
   getPlayerPositionSnapshot,
   getPlayerHullRadius,
 } from './enemies/base/playerGeometry.js';
@@ -50,80 +58,11 @@ class EnemySystem extends BaseSystem {
     });
 
     this.asteroids = [];
-    this.rewards = new EnemyRewards({
-      getEventBus: () => this.eventBus,
-      getRewardManager: () => this.rewardManager,
-      getWaveState: () => this.waveState,
-      getXPOrbs: () => this.xpOrbs,
-      getPlayer: () => this.player,
-    });
-    this.bosses = new EnemyBossSystem({
-      rewards: this.rewards,
-      getFactory: () => this.factory,
-      getWaveState: () => this.waveState,
-      getAsteroids: () => this.asteroids,
-      getPhysics: () => this.physics,
-      getSessionStats: () => this.sessionStats,
-      getCachedUI: () => this.getCachedUI(),
-      getCachedEffects: () => this.getCachedEffects(),
-      getCachedAudio: () => this.getCachedAudio(),
-      registerActiveEnemy: (...args) => this.registerActiveEnemy(...args),
-      warnIfWaveManagerRegistrationFailed: (...args) =>
-        this.warnIfWaveManagerRegistrationFailed(...args),
-      registerEnemyWithPhysics: (enemy) => this.registerEnemyWithPhysics(enemy),
-      unregisterEnemyFromPhysics: (enemy) =>
-        this.unregisterEnemyFromPhysics(enemy),
-      removeActiveEnemy: (enemy) => this.removeActiveEnemy(enemy),
-      releaseAsteroid: (asteroid) => this.releaseAsteroid(asteroid),
-    });
-    this.field = new EnemyField({
-      bosses: this.bosses,
-      getAsteroids: () => this.asteroids,
-      getFactory: () => this.factory,
-      getUseFactory: () => this.useFactory,
-      unregisterEnemyFromPhysics: (enemy) =>
-        this.unregisterEnemyFromPhysics(enemy),
-      clearAsteroidPoolId: (asteroid) => this.clearAsteroidPoolId(asteroid),
-    });
-    this.combatRelay = new EnemyCombatRelay({
-      bosses: this.bosses,
-      enemyRandom: this.enemyRandom,
-      getAsteroids: () => this.asteroids,
-      getPhysics: () => this.physics,
-      getCachedCombat: () => this.getCachedCombat(),
-      applyDirectDamageToPlayer: (...args) =>
-        this.applyDirectDamageToPlayer(...args),
-    });
-    this.snapshots = new EnemySnapshots({
-      bosses: this.bosses,
-      enemyRandom: this.enemyRandom,
-      field: this.field,
-      getAsteroids: () => this.asteroids,
-      setAsteroids: (asteroids) => (this.asteroids = asteroids),
-      getSessionStats: () => this.sessionStats,
-      setSessionStats: (sessionStats) => (this.sessionStats = sessionStats),
-      getSessionActive: () => this.sessionActive,
-      setSessionActive: (sessionActive) => (this.sessionActive = sessionActive),
-      setLastWaveManagerCompletionHandled: (wave) =>
-        (this._lastWaveManagerCompletionHandled = wave),
-      setSnapshotFallbackWarningIssued: (issued) =>
-        (this._snapshotFallbackWarningIssued = issued),
-      getWaveState: () => this.waveState,
-      getWaveManager: () => this.waveManager,
-      getFactory: () => this.factory,
-      getUseFactory: () => this.useFactory,
-      createInitialSessionStats: () => this.createInitialSessionStats(),
-      assignAsteroidPoolId: (...args) => this.assignAsteroidPoolId(...args),
-      acquireAsteroid: (config) => this.acquireAsteroid(config),
-      acquireEnemyViaFactory: (type, config) =>
-        this.acquireEnemyViaFactory(type, config),
-      registerActiveEnemy: (...args) => this.registerActiveEnemy(...args),
-      warnIfWaveManagerRegistrationFailed: (...args) =>
-        this.warnIfWaveManagerRegistrationFailed(...args),
-      syncPhysicsIntegration: (force) => this.syncPhysicsIntegration(force),
-      handleSnapshotFallback: (reason) => this._handleSnapshotFallback(reason),
-      createEnemy: (EnemyClass, config) => new EnemyClass(this, config),
-    });
+    this.rewards = new EnemyRewards(rewardsKit(this));
+    this.bosses = new EnemyBossSystem(bossesKit(this));
+    this.field = new EnemyField(fieldKit(this));
+    this.combatRelay = new EnemyCombatRelay(combatRelayKit(this));
+    this.snapshots = new EnemySnapshots(snapshotsKit(this));
 
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = false;
@@ -418,45 +357,7 @@ class EnemySystem extends BaseSystem {
 
   setupSpawnSystem() {
     try {
-      const facade = this;
-      const context = {
-        facade,
-        get asteroids() {
-          return facade.asteroids;
-        },
-        get waveState() {
-          return facade.waveState;
-        },
-        get factory() {
-          return facade.factory;
-        },
-        get waveManager() {
-          return facade.waveManager;
-        },
-        get useFactory() {
-          return facade.useFactory;
-        },
-        get sessionActive() {
-          return facade.sessionActive;
-        },
-        createScopedRandom: (...args) => facade.createScopedRandom(...args),
-        getRandomScope: (...args) => facade.getRandomScope(...args),
-        getRandomService: (...args) => facade.getRandomService(...args),
-        isBossEnemy: (...args) => facade.isBossEnemy(...args),
-        trackBossEnemy: (...args) => facade.trackBossEnemy(...args),
-        getAvailableBossMinionTypes: (...args) =>
-          facade.getAvailableBossMinionTypes(...args),
-        invalidateActiveEnemyCache: (...args) =>
-          facade.invalidateActiveEnemyCache(...args),
-        registerEnemyWithPhysics: (...args) =>
-          facade.registerEnemyWithPhysics(...args),
-        emitEvent: (...args) => facade.emitEvent?.(...args),
-        handleBossSpawned: (...args) => facade.handleBossSpawned(...args),
-        mergeBossRewards: (...args) => facade.mergeBossRewards(...args),
-        getActiveEnemyCount: (...args) => facade.getActiveEnemyCount(...args),
-      };
-
-      this.spawnSystem = new EnemySpawnSystem(context);
+      this.spawnSystem = new EnemySpawnSystem({ facade: this });
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize spawn system', error);
       this.spawnSystem = null;
@@ -465,37 +366,10 @@ class EnemySystem extends BaseSystem {
 
   setupDamageSystem() {
     try {
-      const facade = this;
-      const context = {
-        facade,
-        get spawnSystem() {
-          return facade.spawnSystem;
-        },
-        get asteroids() {
-          return facade.asteroids;
-        },
-        get waveState() {
-          return facade.waveState;
-        },
-        get sessionStats() {
-          return facade.sessionStats;
-        },
-        createScopedRandom: (...args) => facade.createScopedRandom?.(...args),
-        getRandomScope: (...args) => facade.getRandomScope?.(...args),
-        getRandomService: (...args) => facade.getRandomService?.(...args),
-        getCachedPlayer: (...args) => facade.getCachedPlayer?.(...args),
-        getCachedWorld: (...args) => facade.getCachedWorld?.(...args),
-        getCachedPhysics: (...args) => facade.getCachedPhysics?.(...args),
-        getPlayerPositionSnapshot: (...args) =>
-          facade.getPlayerPositionSnapshot?.(...args),
-        getPlayerHullRadius: (...args) => facade.getPlayerHullRadius?.(...args),
-        invalidateActiveEnemyCache: (...args) =>
-          facade.invalidateActiveEnemyCache?.(...args),
-        emitEvent: (...args) => facade.emitEvent?.(...args),
-        getActiveEnemyCount: (...args) => facade.getActiveEnemyCount?.(...args),
-      };
-
-      this.damageSystem = new EnemyDamageSystem(context);
+      this.damageSystem = new EnemyDamageSystem({
+        facade: this,
+        spawnSystem: this.spawnSystem,
+      });
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize damage system', error);
       this.damageSystem = null;
@@ -504,49 +378,7 @@ class EnemySystem extends BaseSystem {
 
   setupUpdateSystem() {
     try {
-      const facade = this;
-      const context = {
-        facade,
-        get spawnSystem() {
-          return facade.spawnSystem;
-        },
-        get damageSystem() {
-          return facade.damageSystem;
-        },
-        get asteroids() {
-          return facade.asteroids;
-        },
-        get sessionStats() {
-          return facade.sessionStats;
-        },
-        get useComponents() {
-          return facade.useComponents;
-        },
-        get movementComponent() {
-          return facade.movementComponent;
-        },
-        get collisionComponent() {
-          return facade.collisionComponent;
-        },
-        get genericMovement() {
-          return facade.genericMovement;
-        },
-        get waveManager() {
-          return facade.waveManager;
-        },
-        refreshServiceState: (...args) => facade.refreshServiceState?.(...args),
-        getCachedPlayer: (...args) => facade.getCachedPlayer?.(...args),
-        getCachedWorld: (...args) => facade.getCachedWorld?.(...args),
-        getCachedPhysics: (...args) => facade.getCachedPhysics?.(...args),
-        getRandomScope: (...args) => facade.getRandomScope?.(...args),
-        getRandomService: (...args) => facade.getRandomService?.(...args),
-        getActiveEnemyCount: (...args) => facade.getActiveEnemyCount?.(...args),
-        invalidateActiveEnemyCache: (...args) =>
-          facade.invalidateActiveEnemyCache?.(...args),
-        releaseAsteroid: (...args) => facade.releaseAsteroid?.(...args),
-      };
-
-      this.updateSystem = new EnemyUpdateSystem(context);
+      this.updateSystem = new EnemyUpdateSystem(updateContext(this));
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize update system', error);
       this.updateSystem = null;
@@ -1106,58 +938,7 @@ class EnemySystem extends BaseSystem {
   }
 
   handleBossAttackPayload(data = {}) {
-    if (!data || data.processedBy === 'physics') {
-      return;
-    }
-
-    const physics = this.physics;
-    const attackType =
-      data.type ||
-      data.attackType ||
-      data.event ||
-      data.kind ||
-      data.mode ||
-      null;
-
-    const boss = this.bosses.resolveBossReference(data) || data.boss || null;
-    const player = data.player || this.getCachedPlayer();
-
-    const payload = {
-      ...data,
-      boss,
-      player,
-      enemiesSystem: this,
-    };
-
-    if (!attackType && !payload.radius && !payload.knockback) {
-      return;
-    }
-
-    switch (attackType) {
-      case 'charge':
-      case 'charge-impact':
-      case 'charge-collision':
-      case 'boss-charge':
-        physics.handleBossChargeCollision(payload);
-        break;
-      case 'area':
-      case 'area-damage':
-      case 'nova':
-      case 'shockwave':
-      case 'boss-area':
-        physics.applyBossAreaDamage(payload);
-        break;
-      default:
-        if (payload.collisionType === 'boss-charge') {
-          physics.handleBossChargeCollision(payload);
-          break;
-        }
-
-        if (payload.radius) {
-          physics.applyBossAreaDamage(payload);
-        }
-        break;
-    }
+    return this.combatRelay.handleBossAttackPayload(data);
   }
 
   handleEnemyProjectile(data = null) {
