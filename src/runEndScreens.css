@@ -19,8 +19,10 @@
   backdrop-filter: blur(calc(3 * var(--u))) saturate(0.75) brightness(0.7);
 }
 
-/* The play stops under an end screen, so its countdown is over. */
-body:has(.end-screen:not(.hidden)) .next-wave-box {
+/* The play stops under an end screen, so its countdown is over, and a flying
+   tip does not show through the screen across its title (the tip, its time
+   stopped too, is back with the play: a Retry, a run that goes on). */
+body:has(.end-screen:not(.hidden)) :is(.next-wave-box, .onboarding-tip) {
   display: none;
 }
 
