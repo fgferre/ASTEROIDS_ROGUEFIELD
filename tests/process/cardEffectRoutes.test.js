@@ -101,7 +101,6 @@ const owners = new Map(
     return [call.name, { ...call, functions: new Set(keys) }];
   })
 );
-const excusedOwners = new Set(EXCUSED.map(({ owner }) => owner));
 
 // An effect's event subscribed by hand: registerEventListener('x', ...),
 // bus.on('x', ...), bus.once('x', ...), or a listener table's { on: 'x' }.
@@ -151,7 +150,7 @@ describe('card effects routed from the card', () => {
   it('`to` names a service that routes its effects', () => {
     const offenders = effects.flatMap(({ source, effect }) =>
       ownersOf(effect)
-        .filter((owner) => !owners.has(owner) && !excusedOwners.has(owner))
+        .filter((owner) => !owners.has(owner))
         .map(
           (owner) =>
             `${source}: '${effect.event}' goes to '${owner}', which does not call routeCardEffects`
