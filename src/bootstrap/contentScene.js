@@ -398,6 +398,11 @@ export function composeContentScene({ scene, services }) {
       console.warn(`[contentScene] Unknown card "${id}" in cards=.`);
       return;
     }
+    // A fallback card is spent on the pick and never held: its count stays 0.
+    if (findCard(id).fallback) {
+      applyCard(progression, id);
+      return;
+    }
     while (
       progression.getUpgradeCount(id) < level &&
       applyCard(progression, id)
