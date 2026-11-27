@@ -263,6 +263,25 @@ select {
   padding: 6px 10px;
 }
 
+/* Narrower, the gap cannot hold it: under the Hangar, Codex and Settings,
+   over the status line, clear of every button down to 568 px. Its top
+   follows the menu's top padding (.menu-screen__overlay), fixed at 700 px. */
+@media (max-width: 1319px) {
+  .pad-hints[data-screen='menu'] {
+    top: calc(68px + clamp(var(--space-3), 2.4vh, var(--space-5)));
+    right: 32px;
+    left: auto;
+    padding: 2px 10px;
+    transform: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .pad-hints[data-screen='menu'] {
+    top: 80px;
+  }
+}
+
 .pad-hints__item {
   display: inline-flex;
   align-items: center;
@@ -4061,6 +4080,12 @@ body.touch-play .menu-version {
   font-size: var(--text-sm);
   line-height: 1.4;
   text-align: center;
+  text-wrap: balance;
+}
+
+/* Too long for one line, it breaks between the parts, never inside one. */
+.hangar-hull-info > span {
+  white-space: nowrap;
 }
 
 /* The menu's 3D hull, copied in from the menu canvas (MenuBackgroundSystem) */

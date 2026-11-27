@@ -3,11 +3,12 @@
 // First-run tips taught in play (NORTE §7 pillar 5): one small prompt at a
 // time, each dismissed by doing the thing. Finished steps persist, so a tip
 // never shows again until the Settings toggle replays them. The menu has its
-// own first-visit lines (MENU_TIPS), kept in the same record. A dash or shield
-// tip that runs out unused is only set aside for the run: it comes back on
+// own first-visit lines (MENU_TIPS), kept in the same record. A dash, strafe or
+// shield tip that runs out unused is only set aside for the run: it comes back on
 // the next one, until it has run out TIP_EXPIRIES_TO_DONE times.
 
 import { loadJSON, saveProgress } from '../../core/storage.js';
+import { splitStrafe } from '../player/movementInput.js';
 import { joinKeyLabels } from './bindingHints.js';
 
 export const ONBOARDING_STORAGE_KEY = 'roguefield:onboarding:v1';
@@ -56,9 +57,31 @@ export const MENU_TIPS = {
  * In-play tips in order; `cards` lives on the level-up screen instead, and
  * `cardsHeadStart` is its head-start variant (a superset of its text).
  */
-const PLAY_STEPS = ['move', 'dash', 'shield'];
+const PLAY_STEPS = ['move', 'dash', 'strafe', 'shield'];
 export const ONBOARDING_STEP_IDS = [...PLAY_STEPS, 'cards', 'cardsHeadStart'];
-const TIP_SECONDS = { dash: DASH_TIP_SECONDS, shield: SHIELD_TIP_SECONDS };
+const TIP_SECONDS = {
+  dash: DASH_TIP_SECONDS,
+  strafe: DASH_TIP_SECONDS,
+  shield: SHIELD_TIP_SECONDS,
+};
+/** The bound controls the in-play tips name (onboardingPrompts `keys`). */
+export const TIP_ACTIONS = [
+  'moveUp',
+  'moveDown',
+  'moveLeft',
+  'moveRight',
+  'dash',
+  'strafeLeft',
+  'strafeRight',
+  'strafeHold',
+  'activateShield',
+  'toggleAimMode',
+  'toggleSpreadMode',
+];
+
+/** The step's input frame slides the ship sideways (splitStrafe). */
+export const isStrafing = (frame, scheme = 'modern') =>
+  Boolean(frame) && splitStrafe(frame, scheme === 'modern').strafe !== 0;
 
 /**
  * The notice when T or G changed a mode in play: `toggled` is CombatSystem's
@@ -94,8 +117,7 @@ export function modeNotice(
 
 /**
  * Prompt content per step. `keys` are the labels of the bound keys or pad
- * buttons ({ moveUp, moveDown, moveLeft, moveRight, dash, activateShield,
- * toggleAimMode, toggleSpreadMode }); `device` is the last one used
+ * buttons (one per TIP_ACTIONS); `device` is the last one used
  * ('keyboard' | 'gamepad' | 'touch'); `toggled` adds the `mode` notice (modeNotice).
  */
 export function onboardingPrompts(
@@ -134,12 +156,31 @@ export function onboardingPrompts(
         : 'Put your left thumb down and drag to move. The cannon fires on its own.',
   };
   const touch = device === 'touch';
+  // The strafe as the controls legend names it: LB + the stick on a pad
+  // (classic: the stick alone), Z and C or the hold + A and D on the keys.
+  const strafe = touch
+    ? {
+        keys: ['STRAFE'],
+        text: 'Hold STRAFE and move your thumb sideways to slide.',
+      }
+    : device === 'gamepad'
+      ? scheme === 'classic'
+        ? { keys: ['L-Stick'], text: 'Push the left stick sideways to slide.' }
+        : {
+            keys: [keys.strafeHold, 'L-Stick'],
+            text: `Hold ${keys.strafeHold} and push the left stick sideways to slide.`,
+          }
+      : {
+          keys: [keys.strafeLeft, keys.strafeRight],
+          text: `Slide sideways with ${keys.strafeLeft} and ${keys.strafeRight}, or hold ${keys.strafeHold} with ${keys.moveLeft} and ${keys.moveRight}.`,
+        };
   return {
     move: touch ? touchMove : device === 'gamepad' ? padMove : keyboardMove,
     dash: {
       keys: [touch ? 'DASH' : keys.dash === 'Shift' ? '⇧ Shift' : keys.dash],
       text: "Dash through danger. You can't be hit mid-dash.",
     },
+    strafe,
     shield: {
       keys: [touch ? 'SHIELD' : keys.activateShield],
       text: 'Raise your shield before a hit lands.',
@@ -242,7 +283,8 @@ export class Onboarding {
   }
 
   /**
-   * One simulation step. `moving`: any thrust/strafe held; `shieldReady`:
+   * One simulation step. `moving`: any thrust/strafe held; `strafing`: the
+   * ship slides sideways this step (isStrafing); `shieldReady`:
    * the ship has a shield to raise; `bannerBusy`: a HUD banner owns the
    * screen, so a new tip waits; `tipCovered`: a timed notice covers the tip
    * on screen, so its time waits.
@@ -251,11 +293,15 @@ export class Onboarding {
     dt,
     {
       moving = false,
+      strafing = false,
       shieldReady = false,
       bannerBusy = false,
       tipCovered = false,
     } = {}
   ) {
+    if (strafing) {
+      this.acted('strafe');
+    }
     const id = this.current;
     if (!id) {
       return;

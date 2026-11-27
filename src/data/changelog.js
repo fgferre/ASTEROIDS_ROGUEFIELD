@@ -28,6 +28,7 @@ export const NEXT = {
     'Sovereign, beaten, no longer breaks into pieces: it stays whole for the ending (with reduced motion it burns away where it fell).', // not confirmed
     "With the Scatter Coil, the Targeting Matrix's second rank now gives +20% damage to elites, heralds and bosses, as it does for the weapons that never aim; its lead added nothing to a fan that bursts so close.", // not confirmed
     "Heat Sink and Overclocked Core now tell, on the Harmonic and the Shard Halo, what they really add: the beam's own wait does not shrink and a Halo blade cuts only while it touches, so their damage grows less than the fire rate.", // not confirmed
+    'A first-time tip now teaches the strafe after the dash: Z and C, or Space held with A and D, on a pad LB with the left stick (in Classic flight the stick alone), by touch STRAFE; it leaves once you slide sideways.', // not confirmed
   ],
   fixed: [
     "On a phone held sideways, the ending's choice now fits the screen: both options show every line, with no scrolling.", // not confirmed
@@ -56,6 +57,7 @@ export const NEXT = {
     'Reactor Bleed and Grav Anchor now say what they do: their bonus holds while you are not thrusting, so turning and strafing keep it; the cards said any movement key ended it.', // not confirmed
     "The emergency brake's shove now throws enemies at its full strength for half a second before their own top speed holds them again: a slow enemy was held at once, so against a Husk the Reactive Brake's stronger shove made no difference.", // not confirmed
     'Starting a sector with a head start (the Crucible gives 26 level-ups) now plays one level-up flash, shake, slow motion and sound instead of one for every level at once.', // not confirmed
+    "In a narrow window with a pad, the strip of pad buttons on Mission Control no longer covers the Hangar, Codex and Settings buttons, and in the Hangar a hull's line that does not fit (the Bastion's, the Solar Slicer's) breaks between its parts instead of leaving a lone number on the second line.", // not confirmed
   ],
   unseen: [
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",
