@@ -56,6 +56,26 @@ import {
   lockReach,
 } from './cardMeasures.js';
 
+// Fire-rate cards on the weapons whose damage does not follow the shot clock
+// one for one (the cards' weaponText): the beam's own 0.25 s wait does not
+// shrink (Harmonic), and a Halo blade cuts only while it touches. Cumulative
+// damage over rank 0, as measured 26/11 over 30 s.
+const FIRE_RATE_DAMAGE = {
+  heat_sink: {
+    harmonic: [1, 1.08, 1.17, 1.26],
+    'shard-halo': [1, 1.04, 1.08, 1.13],
+  },
+  overclocked_core: { harmonic: [1, 1.25], 'shard-halo': [1, 1.13] },
+};
+const fireRateDamage =
+  (id, cum) =>
+  (rank, below, { weapon }) => {
+    const own = FIRE_RATE_DAMAGE[id][weapon];
+    return own
+      ? (below * own[rank]) / own[rank - 1]
+      : (below * cum[rank]) / cum[rank - 1];
+  };
+
 export const PROBES = {
   plasma: [
     {
@@ -89,18 +109,22 @@ export const PROBES = {
         FOCUS_WEAPONS.includes(weapon) ? below * 1.1 : 'more',
     },
     {
+      // The Scatter bursts too close for the lead: rank 2 gives it the threat
+      // focus instead (+20%; rank 1 gave it none).
       metric: (w) =>
-        FOCUS_WEAPONS.includes(w)
+        FOCUS_WEAPONS.includes(w) || w === 'scatter'
           ? 'damage per hit on one elite drone 60 px away (threat focus)'
-          : 'hits per shot on a rock crossing at 300 px/s, 380 px out, 20 s (lead past the base 0.6 s cap; scatter: 150 px)',
+          : 'hits per shot on a rock crossing at 300 px/s, 380 px out, 20 s (lead past the base 0.6 s cap)',
       axes: 'weapons',
       ranks: [2],
       measure: (s, { weapon }) =>
-        FOCUS_WEAPONS.includes(weapon)
+        FOCUS_WEAPONS.includes(weapon) || weapon === 'scatter'
           ? perHit(s, [[60, 0]], { type: 'drone', elite: true })
-          : crossingHits(s, weapon === 'scatter' ? 150 : 380),
-      expect: (rank, below, { weapon }) =>
-        FOCUS_WEAPONS.includes(weapon) ? (below * 1.2) / 1.1 : 'more',
+          : crossingHits(s, 380),
+      expect: (rank, below, { weapon }) => {
+        if (FOCUS_WEAPONS.includes(weapon)) return (below * 1.2) / 1.1;
+        return weapon === 'scatter' ? below * 1.2 : 'more';
+      },
     },
     {
       metric: 'shots in 30 s (rank 3: fire rate +9%)',
@@ -153,7 +177,7 @@ export const PROBES = {
       metric: 'damage dealt in 30 s',
       axes: 'weapons',
       measure: (s) => dps(s, { seconds: 30 }),
-      expect: mult([1, 1 / 0.9, 1 / 0.81, 1 / 0.729]),
+      expect: fireRateDamage('heat_sink', [1, 1 / 0.9, 1 / 0.81, 1 / 0.729]),
     },
   ],
   afterburn_lance: [
@@ -225,19 +249,18 @@ export const PROBES = {
     },
     {
       metric:
-        'damage in 6 s, D held (classic: turning; modern: moving; no bonus promised)',
-      condition: true,
+        'damage in 6 s, D held (classic: turning, bonus promised; modern: moving, none)',
       axes: 'flights',
       measure: (s) => dps(s, { each: (sc) => (sc.input = { right: true }) }),
-      expect: (r, below) => below,
+      expect: (rank, below, { flight }) =>
+        flight === 'classic' ? mult([1, 1.3, 1.6, 2])(rank, below) : below,
     },
     {
-      metric: 'damage in 6 s, strafe held (no bonus promised)',
-      condition: true,
+      metric: 'damage in 6 s, strafe held (bonus promised)',
       axes: 'flights',
       measure: (s) =>
         dps(s, { each: (sc) => (sc.input = { strafeRight: true }) }),
-      expect: (r, below) => below,
+      expect: mult([1, 1.3, 1.6, 2]),
     },
   ],
   overcharge_coil: [
@@ -345,7 +368,7 @@ export const PROBES = {
       metric: 'damage dealt in 30 s',
       axes: 'weapons',
       measure: (s) => dps(s, { seconds: 30 }),
-      expect: mult([1, 1 / 0.74]),
+      expect: fireRateDamage('overclocked_core', [1, 1 / 0.74]),
     },
     {
       metric: 'hull lost in 8.5 s',
@@ -456,18 +479,17 @@ export const PROBES = {
     },
     {
       metric:
-        'hull lost to a 20-damage hit, D held (classic: turning; modern: moving; no cut promised)',
-      condition: true,
+        'hull lost to a 20-damage hit, D held (classic: turning, cut promised; modern: moving, none)',
       axes: 'flights',
       measure: (s) => hullHit(s, 20, { right: true }),
-      expect: (r, below) => below,
+      expect: (rank, below, { flight }) =>
+        flight === 'classic' ? mult([1, 0.8, 0.65, 0.5])(rank, below) : below,
     },
     {
-      metric: 'hull lost to a 20-damage hit, strafe held (no cut promised)',
-      condition: true,
+      metric: 'hull lost to a 20-damage hit, strafe held (cut promised)',
       axes: 'flights',
       measure: (s) => hullHit(s, 20, { strafeRight: true }),
-      expect: (r, below) => below,
+      expect: mult([1, 0.8, 0.65, 0.5]),
     },
   ],
   static_shell: [

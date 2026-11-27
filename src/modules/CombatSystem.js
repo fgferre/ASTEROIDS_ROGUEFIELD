@@ -230,7 +230,8 @@ class CombatSystem extends BaseSystem {
       if (screen !== 'playing') {
         return;
       }
-      const next = this.spreadMode === 'concentrated' ? 'fan' : 'concentrated';
+      const next =
+        this.weapons.spreadMode === 'concentrated' ? 'fan' : 'concentrated';
       this.setSpreadMode(next);
       this.eventBus?.emit?.('combat-mode-toggled', {
         kind: 'spread',
@@ -326,10 +327,6 @@ class CombatSystem extends BaseSystem {
 
   get aimMode() {
     return this.targeting.aimMode;
-  }
-
-  get stickAim() {
-    return this.targeting.stickAim;
   }
 
   get _aimModeFlagSnapshot() {
@@ -502,10 +499,6 @@ class CombatSystem extends BaseSystem {
     return this.weapons.weaponId;
   }
 
-  get spreadMode() {
-    return this.weapons.spreadMode;
-  }
-
   get evolutions() {
     return this.weapons.evolutions;
   }
@@ -573,10 +566,6 @@ class CombatSystem extends BaseSystem {
   // firePatterns.js: the 3D weapon mirror draws them.
   get blades() {
     return this.weapons.blades;
-  }
-
-  get aura() {
-    return this.weapons.aura;
   }
 
   get pulses() {

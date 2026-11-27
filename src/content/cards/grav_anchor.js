@@ -14,26 +14,25 @@ export default {
   text: {
     name: 'Grav Anchor',
     summary:
-      'Let go of the controls and a field generator pins the ship: hits land softer while it holds.',
+      'Cut the thrust and a field generator pins the ship: hits land softer while it holds.',
     lore: 'Warden docking clamps still answer to a Ring signal. You found the signal.',
     levels: [
       {
         title: 'Soft Clamp',
-        description:
-          'While no movement key is held, hits deal 20% less damage.',
-        highlights: ['Move or dash and the clamp lets go.'],
+        description: 'While you are not thrusting, hits deal 20% less damage.',
+        highlights: [
+          'Thrust or dash and the clamp lets go; turning and strafing keep it.',
+        ],
       },
       {
         title: 'Hard Clamp',
-        description:
-          'While no movement key is held, hits deal 35% less damage.',
+        description: 'While you are not thrusting, hits deal 35% less damage.',
         highlights: ['Hold a spot while the Field moves around you.'],
       },
       {
         title: 'Dead Stop',
-        description:
-          'While no movement key is held, hits deal 50% less damage.',
-        highlights: ['Half of every hit, as long as you stay put.'],
+        description: 'While you are not thrusting, hits deal 50% less damage.',
+        highlights: ['Half of every hit, until you thrust.'],
       },
     ],
   },

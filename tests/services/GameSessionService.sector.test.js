@@ -113,6 +113,18 @@ describe('sector runs', () => {
     expect(enemies.waveManager.currentWave).toBe(6);
   });
 
+  it('plays one level-up package for a head start: every level but the last is quiet', () => {
+    const game = createHeadlessGame();
+    const leveled = [];
+    game.eventBus.on('player-leveled-up', (data) => leveled.push(data));
+    game.session.startNewRun({ source: 'test', sector: 'dense-core' });
+
+    const total = sectorById('dense-core').headStart;
+    expect(leveled).toHaveLength(total);
+    expect(leveled.filter((data) => data.quiet)).toHaveLength(total - 1);
+    expect(leveled.at(-1).quiet).toBeUndefined();
+  });
+
   it('equips the head start picks left at once and opens the first layer', () => {
     const game = createHeadlessGame();
     game.session.startNewRun({ source: 'test', sector: 'dense-core' });

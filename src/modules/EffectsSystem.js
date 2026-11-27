@@ -340,9 +340,9 @@ export default class EffectsSystem extends BaseSystem {
       this.enemyEffects.spawnVolatileTrail(data)
     );
 
-    this.registerEventListener('player-leveled-up', () =>
-      this.playerEffects.onLevelUp()
-    );
+    this.registerEventListener('player-leveled-up', (data) => {
+      if (!data?.quiet) this.playerEffects.onLevelUp();
+    });
 
     this.registerEventListener('xp-collected', (data) => {
       if (data?.position) {

@@ -595,6 +595,38 @@ describe('a Retry continues the fight where it stopped', () => {
     );
   });
 
+  it('a heart, a pickup, a chest and XP orbs on the field keep their streams', () => {
+    // Laid in the corners, far from the ship, by the calls the drops make; a
+    // heart holds a stream of its own, the others draw from their system's.
+    // Each stream has drawn, so one brought back to its seed alone shows.
+    const onTheField = (game) => {
+      const { enemies, healthHearts, pickups } = game.services;
+      const xpOrbs = game.services['xp-orbs'];
+      freezeSpawner(enemies.waveManager);
+      // A second into the run: no death comes before the first steps.
+      for (let i = 0; i < 60; i += 1) game.step();
+      const random = new RandomService('retry:heart');
+      random.range(0, 1);
+      healthHearts.spawnHeart(120, 100, { random, pulsePhase: 1 });
+      pickups.spawnPickup('magnet', 680, 100);
+      pickups.chests.spawn('warden', 120, 500);
+      for (let i = 0; i < 3; i += 1) xpOrbs.createXPOrb(680 + i * 20, 500, 5);
+      const dumped = Object.values(streams(game.services));
+      const drawn = [
+        random,
+        pickups.random,
+        pickups.chestRandom,
+        xpOrbs.randomForks.creation,
+      ];
+      for (const stream of drawn) {
+        expect(stream._state).not.toBe(stream.seed);
+        expect(dumped).toContain(`${stream.seed >>> 0}/${stream._state >>> 0}`);
+      }
+      return null;
+    };
+    expectTheFightGoesOn('field', () => fight('field', onTheField));
+  });
+
   it('a layer played with cards, killed and retried', () => {
     const first = playedLayer();
     expect(first.kills).toBeGreaterThan(0);

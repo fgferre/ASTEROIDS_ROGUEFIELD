@@ -38,7 +38,7 @@ describe('hull, shot and flight cards on the player', () => {
       );
   }
 
-  it('Reactor Bleed 3: double damage while no movement key is held', () => {
+  it('Reactor Bleed 3: double damage while not thrusting (a move key thrusts in this flight)', () => {
     const { player, eventBus, movement } = makePlayer();
     const base = player.getStats().damage;
     takeCard(eventBus, 'reactor_bleed', 3);
@@ -66,7 +66,7 @@ describe('hull, shot and flight cards on the player', () => {
     expect(player.getStats().damage).toBe(base);
   });
 
-  it('Grav Anchor 3: hits deal half while no movement key is held', () => {
+  it('Grav Anchor 3: hits deal half while not thrusting (a move key thrusts in this flight)', () => {
     const { player, eventBus, movement } = makePlayer();
     takeCard(eventBus, 'grav_anchor', 3);
     player.update(DELTA_TIME);

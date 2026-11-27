@@ -94,7 +94,9 @@ describe('fire patterns', () => {
     const aside = enemy('aside', 150, 520);
     const { combat } = armed('arc-caster', [...line, aside]);
 
-    combat.handleShooting(1, STATS);
+    // On the cooldown exactly: the clock carries nothing past it.
+    combat.lastShotTime = combat.shootCooldown;
+    combat.handleShooting(0, STATS);
 
     const damage = (hop) => DAMAGE * cast.falloff ** hop;
     line
@@ -252,7 +254,9 @@ describe('fire patterns', () => {
         level: 1,
         bulletSpeedMultiplier: 1.15,
       });
-      combat.handleShooting(1, STATS);
+      // On the cooldown exactly: the clock carries nothing past it.
+      combat.lastShotTime = combat.shootCooldown;
+      combat.handleShooting(0, STATS);
       expect(combat.lastShotTime).toBeCloseTo(
         -combat.shootCooldown * (cast.cooldownMultiplier / Math.cbrt(1.15) - 1),
         9
@@ -523,7 +527,9 @@ describe('fire patterns', () => {
     const { combat } = armed('furnace-corona', [inside, outside]);
     const pulse = DAMAGE * corona.damageMultiplier;
 
-    combat.handleShooting(1, STATS);
+    // On the cooldown exactly: the clock carries nothing past it.
+    combat.lastShotTime = combat.shootCooldown;
+    combat.handleShooting(0, STATS);
     expect(inside.health).toBeCloseTo(100 - pulse, 6);
     expect(inside.vx).toBeGreaterThan(0);
     expect(outside.health).toBe(100);

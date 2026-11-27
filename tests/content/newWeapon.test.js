@@ -119,7 +119,9 @@ describe('a weapon defined only as a content file', () => {
     });
 
     combat.handleShooting(5, stats);
-    combat.handleShooting(5, stats);
+    // On the cooldown exactly: the clock carries nothing past it.
+    combat.lastShotTime = combat.shootCooldown;
+    combat.handleShooting(0, stats);
     expect(combat.bullets).toHaveLength(2 * fan.bolts);
     expect(combat.beams).toHaveLength(1);
     expect(combat.beams[0].colors).toEqual(needle.colors);

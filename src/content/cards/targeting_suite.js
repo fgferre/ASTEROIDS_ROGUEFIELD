@@ -72,10 +72,11 @@ export default {
       levels: [
         {},
         {
-          description: 'Aims the fan ahead of fast targets, reducing misses.',
+          description:
+            'The fan deals +20% damage to elites, heralds and bosses. It bursts too close for the lead to add anything.',
         },
         {
-          description: `Locks one threat per shot of the volley, up to four, and splits the fan's bolts among them. Fire rate +${FIRE_RATE}%.`,
+          description: `Locks one threat per shot of the volley, up to four, and splits the fan's bolts among them. Fire rate +${FIRE_RATE}%. The fan keeps its +20% on elites, heralds and bosses.`,
         },
       ],
     },

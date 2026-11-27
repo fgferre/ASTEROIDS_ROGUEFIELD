@@ -42,72 +42,9 @@ const FLIGHTS = ['classic', 'modern'];
 
 // === Excuses: the only way a failing cell is allowed to stay ===
 // { card, rank, weapon, reason }. `rank` and `weapon` may be '*'.
-const PENDING = "pending the owner's choice";
 const NOT_A_DEFECT = 'judged "not a defect" in the findings (25/11)';
-const SHOT_CLOCK = `${PENDING}: the shot clock (finding 6, the cadence comes in whole steps)`;
-const TURNING_OR_STRAFING = `${PENDING}: no-movement-key cards while turning or strafing (finding 5)`;
 // `metric` (optional): only the probes whose metric text contains it.
 const EXCUSES = [
-  { card: 'heat_sink', rank: '*', weapon: '*', reason: SHOT_CLOCK },
-  { card: 'overclocked_core', rank: '*', weapon: '*', reason: SHOT_CLOCK },
-  {
-    card: 'targeting_suite',
-    rank: 3,
-    weapon: 'lance',
-    reason: `${SHOT_CLOCK} (its rank 3 fire rate +9%)`,
-  },
-  {
-    card: 'targeting_suite',
-    rank: 3,
-    weapon: 'shard-halo',
-    reason: `${SHOT_CLOCK} (its rank 3 fire rate +9%)`,
-  },
-  {
-    card: 'overcharge_coil',
-    rank: '*',
-    weapon: 'arc-caster',
-    reason: SHOT_CLOCK,
-  },
-  {
-    card: 'overcharge_coil',
-    rank: '*',
-    weapon: 'furnace-corona',
-    reason: SHOT_CLOCK,
-  },
-  {
-    card: 'reactor_bleed',
-    rank: '*',
-    weapon: '*',
-    metric: 'D held',
-    reason: TURNING_OR_STRAFING,
-  },
-  {
-    card: 'reactor_bleed',
-    rank: '*',
-    weapon: '*',
-    metric: 'strafe held',
-    reason: TURNING_OR_STRAFING,
-  },
-  {
-    card: 'grav_anchor',
-    rank: '*',
-    weapon: '*',
-    metric: 'D held',
-    reason: TURNING_OR_STRAFING,
-  },
-  {
-    card: 'grav_anchor',
-    rank: '*',
-    weapon: '*',
-    metric: 'strafe held',
-    reason: TURNING_OR_STRAFING,
-  },
-  {
-    card: 'targeting_suite',
-    rank: 2,
-    weapon: 'scatter',
-    reason: `${PENDING}: Targeting Matrix rank 2 adds nothing to the Scatter Coil's fan (finding 3)`,
-  },
   {
     card: 'targeting_suite',
     rank: 2,

@@ -130,7 +130,6 @@ class PlayerSystem extends BaseSystem {
       'maxSpeed',
       'acceleration',
       'brakingDamping',
-      'linearDamping',
     ]);
 
     // === STATS DO JOGADOR ===
@@ -143,7 +142,9 @@ class PlayerSystem extends BaseSystem {
     this.hullDrainTimer = 0;
     this.resetCardStats();
     // No thrust key held and no dash this step (updateMovement): Reactor
-    // Bleed and Grav Anchor read it.
+    // Bleed and Grav Anchor read it; turning and strafing keep it, as their
+    // text says (card decision 7, not confirmed; dev-only `?bleed=B`: they
+    // cancel it).
     this.enginesIdle = true;
     this.bleedChoice = devChoice('bleed');
     this.currentHull = null;
@@ -163,7 +164,7 @@ class PlayerSystem extends BaseSystem {
       getLocalDirection: (dx, dy) => this.getLocalDirection(dx, dy),
       getAccent: () => this.currentHull.visual.accent,
     });
-    exposeFields(this, this.thrusters, ['lastThrusterState', 'thrusterVisual']);
+    exposeFields(this, this.thrusters, ['lastThrusterState']);
 
     // === WEAPON RECOIL ===
     this.recoilOffset = { x: 0, y: 0 };
@@ -507,7 +508,7 @@ class PlayerSystem extends BaseSystem {
       !thrust.isMainManual &&
       !thrust.isAuxManual &&
       !(this.maneuvers.dashTimer > 0) &&
-      // dev-only `?bleed=B`: turning and strafing also cancel the bonus
+      // dev-only `?bleed=B` (option B): turning and strafing cancel it too
       !(this.bleedChoice === 'B' && thrust.isSideManual);
     this.updateTurret(deltaTime);
     this.thrusters.emitThrusterEffects(thrust);

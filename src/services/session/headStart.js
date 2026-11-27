@@ -72,7 +72,9 @@ export class HeadStart {
       progression.applyLevelUp()
     );
     progression.emitExperienceChanged();
-    levels.forEach((level) => progression.emitLevelUp(level));
+    levels.forEach((level, index) =>
+      progression.emitLevelUp(level, { quiet: index < levels.length - 1 })
+    );
   }
 
   /** The pick on screen, { pick, total } (1-based), or null outside a head start. */

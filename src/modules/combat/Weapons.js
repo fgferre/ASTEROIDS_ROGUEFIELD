@@ -34,9 +34,9 @@ import {
   computeParallelOffset,
 } from './volleyLanes.js';
 
-// Plan 01.07: validate spread mode mutations to prevent T-07-02 tampering.
-// Dev-only `?cadencia=B`: the cooldown today's clock really takes, the steps
-// of 1/60 s that float-add up to `base`, times 1/60.
+// Dev-only `?cadencia=B` (card decision 6): the cooldown the clock that drops
+// its remainder (`?cadencia=hoje`) really takes, the steps of 1/60 s that
+// float-add up to `base`, times 1/60.
 const STEP = 1 / 60;
 function todaysCooldown(base) {
   let clock = 0;
@@ -48,6 +48,7 @@ function todaysCooldown(base) {
   return steps * STEP;
 }
 
+// Plan 01.07: validate spread mode mutations to prevent T-07-02 tampering.
 const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
 // Trail alpha ramp, tail → head (precomputed: one string per step).
 const lanceTrailStyles = (color) =>
@@ -107,8 +108,10 @@ export class Weapons {
       ? Math.max(0, COMBAT_SHOOT_COOLDOWN)
       : 0.3;
     this.baseShootCooldown = this.shootCooldown;
-    // Dev-only `?cadencia=A|B` (card decision, finding 6): carry the clock's
-    // remainder; B also rounds the base cooldown to today's step count.
+    // The shot clock carries its remainder (restartClock; card decision 6, not
+    // confirmed). Dev-only switches: `?cadencia=hoje` brings back the clock
+    // that dropped it, `?cadencia=B` keeps the carry and rounds the base
+    // cooldown to the steps that clock took.
     this.clockMode = devChoice('cadencia');
     if (this.clockMode === 'B') {
       this.baseShootCooldown = todaysCooldown(this.baseShootCooldown);
@@ -451,10 +454,11 @@ export class Weapons {
     }
   }
 
-  // A shot was fired: the clock waits one cooldown plus `extra` s. Today it
-  // resets to -extra; with `?cadencia` it keeps the remainder (at most 0.05 s).
+  // A shot was fired: the clock waits one cooldown plus `extra` s, keeping
+  // what it ran past the cooldown (at most 0.05 s, so a long wait cannot
+  // burst). Dev-only `?cadencia=hoje`: it resets to -extra, dropping it.
   restartClock(extra = 0) {
-    if (!this.clockMode) {
+    if (this.clockMode === 'HOJE') {
       this.lastShotTime = 0 - extra;
       return;
     }
@@ -468,7 +472,7 @@ export class Weapons {
   canShoot() {
     // [SMART AUTO-FIRE] Allow firing if cooldown is ready.
     // We no longer require a forced target lock.
-    const slack = this.clockMode ? 1e-9 : 0;
+    const slack = this.clockMode === 'HOJE' ? 0 : 1e-9;
     return this.lastShotTime >= this.shootCooldown - slack;
   }
 
