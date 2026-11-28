@@ -31,7 +31,7 @@ export function createMenuRenderer(THREE, canvas) {
   debugLog(`[MenuBackgroundSystem] Renderer: ${glVersion}`);
   renderer.setPixelRatio(resolveDevicePixelRatio());
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x263553, 1);
+  renderer.setClearColor(0x050916, 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // Monolith shader outputs in linear and lets renderer handle encoding.
   renderer.toneMapping = THREE.NoToneMapping;
