@@ -105,6 +105,12 @@ function holdLoadingForWarmUp(menu, renderer) {
         performance.measure('renderer-warm-up', { start });
       } finally {
         onComplete();
+        // ?meter (index.html's recorder): the loading's numbers on screen.
+        if (window.__loadMeter) {
+          import('./modules/menu/loadMeter.js').then((meter) =>
+            meter.showLoadMeter(renderer)
+          );
+        }
       }
     }
   );
@@ -590,6 +596,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // A touch device plays by touch, held sideways (waits while in portrait).
     const { touch } = await mobileGuard();
+    // The loading meter counts from here too: a phone may wait upright.
+    performance.mark('boot-guard-passed');
 
     // ?scene=ring (dev): the broken Ring alone, orbited; no game runs.
     if (

@@ -2,6 +2,82 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // ?meter: the loading meter's recorder, first thing on the page so it
+      // sees every stall; modules/menu/loadMeter.js reads it and draws the
+      // numbers once loaded. Without the parameter nothing here runs.
+      (() => {
+        if (!/[?&]meter\b/.test(location.search)) return;
+        const m = (window.__loadMeter = {
+          rafGaps: [],
+          beatGaps: [],
+          tasks: [],
+          loads: [],
+          pos: [],
+          frames: 0,
+          longtask: false,
+          until: Infinity,
+        });
+        const now = () => performance.now();
+        const sample = !/[?&]meter=lite\b/.test(location.search);
+        let track = null;
+        let trail = null;
+        const shift = (el, i) =>
+          new DOMMatrixReadOnly(getComputedStyle(el).transform)[i];
+        // Every frame: its gap, and where the main thread puts the indicator
+        // (the ship's share of the route, the trail's scale).
+        let lastFrame = now();
+        const frame = () => {
+          const t = now();
+          m.frames += 1;
+          if (t - lastFrame > 50) m.rafGaps.push([lastFrame, t - lastFrame]);
+          lastFrame = t;
+          const width = sample && track ? track.offsetWidth : 0;
+          if (width > 0)
+            m.pos.push([t, shift(track, 'e') / width, shift(trail, 'a')]);
+          if (t < m.until) requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+        // A timer beat: its gaps are the main thread's own stalls; a frame
+        // gap with no beat gap is the screen held elsewhere (the GPU).
+        let lastBeat = now();
+        const beat = () => {
+          const t = now();
+          if (t - lastBeat > 70) m.beatGaps.push([lastBeat, t - lastBeat]);
+          lastBeat = t;
+          if (t < m.until) setTimeout(beat, 20);
+        };
+        setTimeout(beat, 20);
+        try {
+          new PerformanceObserver((list) => {
+            for (const e of list.getEntries())
+              m.tasks.push([e.startTime, e.duration]);
+          }).observe({ type: 'longtask', buffered: true });
+          m.longtask = true;
+        } catch {
+          // Safari and older browsers: the frame and beat gaps still count.
+        }
+        // Every value the loading screen writes to --load, and when it asks
+        // for the press (loading-screen--ready).
+        document.addEventListener('DOMContentLoaded', () => {
+          m.dom = now();
+          const screen = document.getElementById('loading-screen');
+          if (!screen) return;
+          track = screen.querySelector('.opening__track');
+          trail = screen.querySelector('.opening__trail');
+          new MutationObserver(() => {
+            const value = Number(screen.style.getPropertyValue('--load'));
+            const last = m.loads[m.loads.length - 1];
+            if (!last || last[1] !== value) m.loads.push([now(), value]);
+            if (!m.ready && screen.classList.contains('loading-screen--ready'))
+              m.ready = now();
+          }).observe(screen, {
+            attributes: true,
+            attributeFilter: ['style', 'class'],
+          });
+        });
+      })();
+    </script>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"

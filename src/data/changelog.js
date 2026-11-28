@@ -39,6 +39,7 @@ export const NEXT = {
     "The Herald of Silence's shards all turn after the ship at the same rate; now and then one turned twice as sharply and was harder to dodge.", // not confirmed
   ],
   unseen: [
+    "A hidden loading meter (`?meter` at the end of the address) shows on the loading screen how long the game took to load, its stalls, its shader programs, the graphics chip the browser reports and the indicator's path, so it can be photographed on a phone or a car; without the parameter nothing of it runs.", // not confirmed
     "The ending's last image is prepared on the loading screen, so nothing stalls when the choice opens or at any cut; it reuses the freighter the opening already builds, so loading takes no longer (about a twentieth of a second).",
     'A `?replay=` link that points at a damaged or hostile recording (wrong shapes, absurd lengths, another site over plain http, a huge file) now ends in the replay notice instead of a frozen page; players cannot make replay links yet, so nobody notices.', // not confirmed
     'The first-visit tips now save through the held-progress path, so demo and profiling runs (?content=, ?profile=) leave the real pilot untouched; players never start those runs.', // not confirmed
