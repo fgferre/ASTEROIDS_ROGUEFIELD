@@ -22,6 +22,11 @@ export const WAKE_COLORS = Object.freeze({
   engine: '#4fb4ff',
   beacon: '#ff4a32',
 });
+// The red beacons glow this much over their gain (wakeParts.js lamp): the
+// bloom lets a light through by its luminance, which weighs red 0.21 in
+// three where the old engine's bloom weighed it 0.30, so at the same gain
+// a red lamp fell under the bloom's threshold and lost its halo.
+export const BEACON_GAIN = 1.3;
 export const STEEL = Object.freeze({ roughness: 0.45, metalness: 0.9 });
 
 const lerp = (a, b, t) => a + (b - a) * t;
