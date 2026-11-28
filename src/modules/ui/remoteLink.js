@@ -86,7 +86,9 @@ export function playRemoteLink({ lines, button, onConnect, eventBus }) {
   let connected = false;
   const timer = setTimeout(() => connect(CLEAR_MS), CONNECT_MS);
   const skip = () => connect(QUICK_CLEAR_MS);
-  const unbindSkip = listenForHold(skip, skip);
+  // No Settings meanwhile: the link is drawn over every screen (style.css
+  // .remote-link), so it would open unseen, and the run starts in 2 s.
+  const unbindSkip = listenForHold(skip, skip, { noSettings: true });
 
   function connect(clearMs) {
     if (connected) return;

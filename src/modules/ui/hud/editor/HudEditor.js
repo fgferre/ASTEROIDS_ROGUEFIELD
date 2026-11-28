@@ -130,10 +130,12 @@ export class HudEditor {
     // Open, on top of the input layer stack: every key is its own (none
     // reaches a screen under it or the game); the pad moves in its dialog
     // or panels, else drives the instruments; the pad's Start still passes
-    // (the run stays paused: UISystem).
+    // (the run stays paused: UISystem). Settings does not open over it: the
+    // editor is Settings' own page, drawn above it (it would sit unseen).
     this.inputLayer = {
       name: 'hud-editor',
       passes: ['pause'],
+      noSettings: true,
       pointer: true,
       onKey: (event) => {
         editorKey(this, event);

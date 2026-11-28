@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { playRemoteLink } from '../../../src/modules/ui/remoteLink.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 
 // Just enough of a page for the link's static and lines.
 const node = () => ({
@@ -33,6 +34,15 @@ describe('remote link', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it('keeps Settings closed while it plays: it is drawn over every screen', () => {
+    const onConnect = vi.fn();
+    playRemoteLink({ lines: [], onConnect });
+    expect(inputLayers.passes('openSettings')).toBe(false);
+    vi.runAllTimers();
+    expect(onConnect).toHaveBeenCalledTimes(1);
+    expect(inputLayers.passes('openSettings')).toBe(true);
   });
 
   it('keeps the menu under it from taking input until the run starts', () => {

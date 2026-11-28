@@ -654,12 +654,17 @@ export class SettingsPanel {
     return true;
   }
 
-  /** The run goes back to play under it (the cards closed, a scene over):
-   * it waits paused, as when Settings opens in flight; closing resumes it. */
+  /** The run goes back to play under it (the cards closed, a scene over, a
+   * Retry's countdown ended): it waits paused, as when Settings opens in
+   * flight; closing resumes it. Only a run in play is paused, so a second
+   * call changes nothing. */
   holdRun() {
     if (!this.settingsState.isOpen) return;
     this.settingsState.source = 'playing';
-    this.emit('toggle-pause');
+    const state = resolveService('game-state', this.dependencies);
+    if (state.getScreen() === 'playing' && !state.isPaused()) {
+      this.emit('toggle-pause');
+    }
   }
 
   closeSettingsPanel({ resumeRun = true } = {}) {
