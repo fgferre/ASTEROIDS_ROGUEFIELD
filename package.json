@@ -28,16 +28,13 @@
     "test:physics": "node scripts/pinned-node.mjs scripts/vitest-group.mjs run tests/physics",
     "playtest": "node scripts/pinned-node.mjs scripts/playtest.mjs",
     "capture": "node scripts/capture.mjs",
-    "cartao": "node scripts/cartao.mjs",
-    "analyze:deps": "node scripts/analyze-dependencies.js && node scripts/generate-mermaid-graph.js",
-    "validate:deps": "node scripts/analyze-dependencies.js --validate-only"
+    "cartao": "node scripts/cartao.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^9.39.1",
     "globals": "^16.5.0",
-    "nodemon": "^3.1.10",
     "prettier": "3.2.5",
     "vite": "^7.3.1",
     "vitest": "^4.1.12"
