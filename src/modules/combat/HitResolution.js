@@ -11,7 +11,6 @@
 // weapon evolves on itself brings none of its lance evolution here (the
 // Harmonic's lances keep it: its own forms are its beam's).
 
-import { devChoice } from '../../core/devChoice.js';
 import { GameDebugLogger } from '../../utils/dev/GameDebugLogger.js';
 import {
   KNOCKBACK_BASE,
@@ -47,8 +46,7 @@ export class HitResolution {
     this.cards = cards;
     this.emit = emit;
     // Targeting Matrix 2 gives the Scatter its threat focus (card decision 9,
-    // not confirmed; dev-only `?matriz9=hoje`: it gives it nothing)
-    this.matrixScatter = devChoice('matriz9') !== 'HOJE';
+    // not confirmed)
 
     this.resetProspectorCarry();
   }
@@ -125,7 +123,6 @@ export class HitResolution {
     // heralds and bosses harder.
     const focus = cards.cardEffects.threatFocus;
     if (
-      this.matrixScatter &&
       weapons.weaponId === 'scatter' &&
       focus?.damageMultiplier >= 1.2 &&
       (enemy.elite || enemy.type === 'herald' || enemy.type === 'boss')
