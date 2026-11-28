@@ -9,7 +9,6 @@
 // payloads into `cardEffects` from the upgrade events and ticks it after the
 // hits land.
 
-import { devChoice } from '../../core/devChoice.js';
 import { SHIP_SIZE } from '../../core/GameConstants.js';
 import {
   COMBAT_TARGETING_RANGE,
@@ -59,8 +58,7 @@ export class CardEffects {
     this.weapons = weapons;
     this.hits = hits;
     // The brake's shove is not cut by the enemy's top speed for 0.5 s (card
-    // decision 8, not confirmed; dev-only `?freio=hoje`: it is cut at once)
-    this.brakeShoveFree = devChoice('freio') !== 'HOJE';
+    // decision 8, not confirmed)
 
     this.resetWeaponTuning();
     this.resetCardState();
@@ -452,7 +450,7 @@ export class CardEffects {
       const reach = radius + (enemy.radius || 0);
       if (dx * dx + dy * dy > reach * reach) return;
       this.hits().pushEnemy(enemy, dx, dy, speed);
-      if (this.brakeShoveFree) enemy.shoveFreeTimer = 0.5;
+      enemy.shoveFreeTimer = 0.5;
     });
   }
 

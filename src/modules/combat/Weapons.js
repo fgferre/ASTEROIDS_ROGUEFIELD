@@ -9,7 +9,6 @@
 // targeting and before the shots fly; the card tuning lives in CardEffects
 // and the hit path in HitResolution.
 
-import { devChoice } from '../../core/devChoice.js';
 import { TRAIL_LENGTH } from '../../core/GameConstants.js';
 import {
   COMBAT_SHOOT_COOLDOWN,
@@ -33,20 +32,6 @@ import {
   applyMultishotSpread,
   computeParallelOffset,
 } from './volleyLanes.js';
-
-// Dev-only `?cadencia=B` (card decision 6): the cooldown the clock that drops
-// its remainder (`?cadencia=hoje`) really takes, the steps of 1/60 s that
-// float-add up to `base`, times 1/60.
-const STEP = 1 / 60;
-function todaysCooldown(base) {
-  let clock = 0;
-  let steps = 0;
-  while (clock < base && steps < 100000) {
-    clock += STEP;
-    steps += 1;
-  }
-  return steps * STEP;
-}
 
 // Plan 01.07: validate spread mode mutations to prevent T-07-02 tampering.
 const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
@@ -109,14 +94,7 @@ export class Weapons {
       : 0.3;
     this.baseShootCooldown = this.shootCooldown;
     // The shot clock carries its remainder (restartClock; card decision 6, not
-    // confirmed). Dev-only switches: `?cadencia=hoje` brings back the clock
-    // that dropped it, `?cadencia=B` keeps the carry and rounds the base
-    // cooldown to the steps that clock took.
-    this.clockMode = devChoice('cadencia');
-    if (this.clockMode === 'B') {
-      this.baseShootCooldown = todaysCooldown(this.baseShootCooldown);
-      this.shootCooldown = this.baseShootCooldown;
-    }
+    // confirmed).
 
     // Plan 01.07 FIX-05 — spread mode state (the aim mode lives in Targeting).
     // Default = concentrated + auto so the centerline fix lands silently for
@@ -456,12 +434,8 @@ export class Weapons {
 
   // A shot was fired: the clock waits one cooldown plus `extra` s, keeping
   // what it ran past the cooldown (at most 0.05 s, so a long wait cannot
-  // burst). Dev-only `?cadencia=hoje`: it resets to -extra, dropping it.
+  // burst).
   restartClock(extra = 0) {
-    if (this.clockMode === 'HOJE') {
-      this.lastShotTime = 0 - extra;
-      return;
-    }
     const carry = Math.min(
       0.05,
       Math.max(0, this.lastShotTime - this.shootCooldown)
@@ -472,8 +446,7 @@ export class Weapons {
   canShoot() {
     // [SMART AUTO-FIRE] Allow firing if cooldown is ready.
     // We no longer require a forced target lock.
-    const slack = this.clockMode === 'HOJE' ? 0 : 1e-9;
-    return this.lastShotTime >= this.shootCooldown - slack;
+    return this.lastShotTime >= this.shootCooldown - 1e-9;
   }
 
   // [SMART AUTO-FIRE] Helper: Fire forward relative to ship rotation
