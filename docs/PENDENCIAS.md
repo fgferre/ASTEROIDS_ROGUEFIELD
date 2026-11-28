@@ -4,9 +4,41 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 50.** (49 é do final do jogo, ramo `historia/final`.)
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 66.**
 
-## O BASTÃO — onde as sessões pararam (24/11) — a `main` está publicada até a versão 0.8.1 (PR do `publicar/0.8.1`, 24/11)
+## O BASTÃO — onde as sessões pararam (28/11) — a `main` está publicada até a versão 0.8.2 (PR do `publicar/0.8.2`, 28/11)
+
+**28/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a versão 0.8.2 vai ao ar por ordem dele — à
+pergunta "Publico a versão 0.8.2 com esta lista, a limpeza e a linha das regras?", _"Sim, publica"_ (27/11, perto da
+meia-noite) — pela PR do `publicar/0.8.2` para a `main`. Em 25/11 ele tinha respondido _"Ainda não"_ e pedido tudo
+antes: _"vamos resolver tudo antes de publicar,,,"_; das duas reformas grandes, _"Não, antes"_; do jeito de conferir,
+_"eu sou vou olhar depois que tudo estiver pronto."_; do visual do motor novo, _"vamos de B"_. Entra:
+
+- o final da campanha (49), com a escolha que cabe no celular e no celular muito pequeno (50, 51), as letras no tablet
+  (52) e o som das conchas (54); a pausa logo depois da escolha (53) segue como estava, medida e não consertada;
+- a peça que falha ao ligar (55) e o clarão dourado preso nas cenas (56);
+- o motor 3D novo (61), no visual B;
+- os consertos das auditorias de fora 7 e 8 (62), entre eles a reforma das teclas, do controle e do toque nas telas
+  (as Settings abrem por cima das cartas, do baú, da tela de morte, da vitória e da escolha do final), e as duas
+  reformas grandes: o Retry que continua a luta com o chefe de onde parou (64) e as cartas por um caminho só (65);
+- as cartas que fazem o que dizem, com o teste que vigia (63), e quatro decisões de carta: a cadência de tiro exata, o
+  Reactor Bleed e o Grav Anchor dizendo o que fazem, o empurrão do freio de emergência valendo por meio segundo, e o
+  segundo nível da Targeting Matrix com a Scatter Coil.
+
+As quatro decisões de carta entram como estavam no jogo de teste, pela recomendação da coordenadora: ele não trocou
+nenhuma, e os endereços de comparação saíram antes de publicar (um lembrete de fora, que ele passou junto com o sim).
+
+Nenhum desses itens fecha com a publicação: cada um fecha quando ele aprovar jogando. Ele não disse se jogou o jogo de
+teste antes do sim. Ninguém conferiu num aparelho de verdade: os menus com um controle, o celular (os botões de toque,
+o SKIP, a pausa com as Settings), a sensação do Retry com cada chefe, o final com o controle e o visual novo num
+iPhone; os números de sensação seguem dele.
+
+Os replays gravados antes desta versão deixam de tocar; progresso, pilotos e Hangar ficam intactos.
+
+**Fica de fora:** as vozes das cinco falas novas do final (37); o equilíbrio completo (27); a segunda parte da abertura
+(o carregamento que trava no Tesla e no celular; o trabalho está guardado no ramo `abertura/sem-travar`); um botão no
+celular para abrir as Settings com as cartas ou a escolha do final na tela (botão novo na tela é escolha dele); quatro
+sobras de desenho em tela pequena (no `BACKLOG.md`).
 
 **24/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a versão 0.8.1 vai ao ar por ordem dele — à
 pergunta "Publico a versão 0.8.1 com esta lista, a limpeza e a linha das regras?", _"Sim, publica"_ — pela PR do

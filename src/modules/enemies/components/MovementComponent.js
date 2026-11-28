@@ -377,9 +377,8 @@ const createDefaultStrategies = () => ({
   },
 });
 
-// The emergency brake's shove sets `shoveFreeTimer` (card decision 8, not
-// confirmed; dev-only `?freio=hoje` brings back the clamp): the enemy's own
-// top speed is not enforced until it runs out.
+// The emergency brake's shove sets `shoveFreeTimer` (card decision 8): the
+// enemy's own top speed is not enforced until it runs out.
 function shovedFree(enemy, deltaTime) {
   if (!(enemy.shoveFreeTimer > 0)) return false;
   enemy.shoveFreeTimer -= deltaTime;
