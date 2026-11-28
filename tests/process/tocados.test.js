@@ -3,11 +3,15 @@
 // the disk. importTargets is the one reader of imports, shared with the
 // dependency analyzer.
 
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   buildGraph,
   importTargets,
   selectTests,
+  walk,
 } from '../../scripts/tocados.mjs';
 
 const graph = buildGraph({
@@ -95,5 +99,48 @@ describe('tocados test selection', () => {
       'src/a/b/y.js',
       'src/a/c.js',
     ]);
+  });
+});
+
+describe('tocados: files that are not src js', () => {
+  const files = buildGraph({
+    'scripts/tool.mjs': 'export const t = 1;',
+    'src/index.html': '<html></html>',
+    'src/style.css': 'body {}',
+    'tests/process/tool.test.js': "import { t } from '../../scripts/tool.mjs';",
+    'tests/process/page.test.js':
+      "const page = new URL('../../src/index.html', import.meta.url);",
+    'tests/process/css.test.js':
+      "readFileSync(new URL('../../src/style.css', import.meta.url));",
+  });
+
+  it('selects the tests that import a touched script', () => {
+    expect(selectTests(files, ['scripts/tool.mjs'])).toEqual([
+      'tests/process/tool.test.js',
+    ]);
+  });
+
+  it('selects the tests that read a touched html or stylesheet by URL', () => {
+    expect(selectTests(files, ['src/index.html'])).toEqual([
+      'tests/process/page.test.js',
+    ]);
+    expect(selectTests(files, ['src/style.css'])).toEqual([
+      'tests/process/css.test.js',
+    ]);
+  });
+});
+
+describe('walk', () => {
+  it('leaves out the gitignored exported-assets folder', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tocados-'));
+    try {
+      mkdirSync(join(dir, 'exported-assets', 'deep'), { recursive: true });
+      writeFileSync(join(dir, 'exported-assets', 'page.html'), '');
+      writeFileSync(join(dir, 'exported-assets', 'deep', 'old.js'), '');
+      writeFileSync(join(dir, 'game.js'), '');
+      expect(walk(dir)).toEqual([join(dir, 'game.js')]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

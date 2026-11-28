@@ -14,6 +14,7 @@ import { STORY_MS, STORY_SHOT_MS, easeInOut } from '../../core/cinematics.js';
 import { STORY_SKY, buildStorySky } from './story/storySky.js';
 import { buildWake, setWakeLight } from './travel/wake.js';
 import { buildFieldRocks } from './story/storyRocks.js';
+import { POINT_DECAY, pointStrength } from './three.js';
 import { lightWake } from './travel/wakeRig.js';
 
 // proposta 18/11: the shots, in order: `ms` long, the camera from `from` to
@@ -112,16 +113,16 @@ const RIG = {
 // scale, where its centre stands, its tilt (radians about x, z).
 const RING_POSE = { scale: 20, at: [62000, -30000, 22000], tilt: [0, 1.3] };
 // The lens's far plane while it plays (the field's is 20000).
-const FAR = 160000;
+export const STORY_FAR = 160000;
 // The signal: a point in the Field ahead that pulses every `period` s.
 const SIGNAL = {
   at: [15000, 150, -1500],
-  color: '#4fd2ff',
+  color: '#97eaff',
   size: 900,
   period: 1.4,
 };
 // The interceptor: where it drops to under the hangar, how far it flies.
-const LAUNCH = {
+export const LAUNCH = {
   inside: [-160, 0, 0],
   out: [2600, 80],
   dive: -420,
@@ -171,8 +172,8 @@ export class StoryScene {
     this.wake.group.updateMatrixWorld(true);
     this.rig = lightWake(THREE, this.wake, -1);
     Object.entries(RIG).forEach(([name, [color, intensity]]) => {
-      this.rig[name].color.set(color).convertSRGBToLinear();
-      this.rig[name].intensity = intensity;
+      this.rig[name].color.set(color);
+      this.rig[name].intensity = intensity * Math.PI;
     });
     this.rig.rim.position
       .set(...STORY_SKY.sun)
@@ -182,7 +183,7 @@ export class StoryScene {
       new THREE.Vector3()
     );
     // The hangar's own light: its mouth lies in the bow's shadow.
-    this.bay = new THREE.PointLight(0xbfd8ff, 0, 900, 2);
+    this.bay = new THREE.PointLight(0xe0edff, 0, 900, POINT_DECAY);
     this.bay.position.copy(this.hangar).add(new THREE.Vector3(120, -60, 0));
     scene.add(this.bay);
     this.signal = new THREE.Sprite(
@@ -254,7 +255,8 @@ export class StoryScene {
     this.startedAt = performance.now() - ms;
   }
 
-  // The Ring and the player's ship stand in the story's scene meanwhile.
+  // The Ring and the player's ship stand in the story's scene meanwhile
+  // (the ending's beats at home borrow them too: endingHome.js).
   borrow() {
     const { t } = this;
     const ring = t.backdrop.ring;
@@ -273,17 +275,22 @@ export class StoryScene {
     this.active = false;
     if (this.cued) this.emit('story-moment', { id: 'end' });
     const { t } = this;
-    const ring = t.backdrop.ring;
-    ring.follow = this.ringWas.follow;
-    ring.offset.set(0, 0, 0);
-    ring.object.scale.setScalar(1);
-    this.ringWas.parent.add(ring.object);
-    this.shipWas.add(t.player.group);
+    this.giveBack();
     if (this.baseFov !== null) {
       t.camera.fov = this.baseFov;
       t.camera.far = this.baseFar;
       t.camera.updateProjectionMatrix();
     }
+  }
+
+  /** The Ring and the player's ship back where borrow() found them. */
+  giveBack() {
+    const ring = this.t.backdrop.ring;
+    ring.follow = this.ringWas.follow;
+    ring.offset.set(0, 0, 0);
+    ring.object.scale.setScalar(1);
+    this.ringWas.parent.add(ring.object);
+    this.shipWas.add(this.t.player.group);
   }
 
   get progress() {
@@ -325,7 +332,7 @@ export class StoryScene {
       this.baseFov = camera.fov;
       this.baseFar = camera.far;
       // The Ring stands far out: the lens sees past the field's far plane.
-      camera.far = FAR;
+      camera.far = STORY_FAR;
       camera.updateProjectionMatrix();
     }
     if (camera.fov !== shot.fov) {
@@ -341,7 +348,8 @@ export class StoryScene {
     const pulse = 0.5 + 0.5 * Math.cos((time * 2 * Math.PI) / SIGNAL.period);
     this.signal.scale.setScalar(SIGNAL.size * (0.6 + 0.6 * pulse));
     this.signal.material.opacity = 0.35 + 0.65 * pulse;
-    this.bay.intensity = shot.id === 'hangar' ? 1.4 : 0;
+    this.bay.intensity =
+      shot.id === 'hangar' ? pointStrength(this.bay, 1.4) : 0;
     // The reactors falter from the second shot on: the port engine dies.
     const failing = shot.id !== 'wake';
     const flicker = 0.55 + 0.45 * Math.sin(time * 23) * Math.sin(time * 7.3);

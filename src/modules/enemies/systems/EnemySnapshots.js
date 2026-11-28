@@ -2,16 +2,10 @@
 // EnemySystem's save and restore: each rock, support enemy and Warden on the
 // field, and the whole system around them (exportState / importState).
 import RandomService from '../../../core/RandomService.js';
-import { ASTEROID_SIZES } from '../../../core/GameConstants.js';
 import { WARDEN_CLASSES, wardenFactoryKey } from '../types/wardens.js';
 import { getContent } from '../../../content/registry.js';
 import { recipeEnemyClass } from '../types/RecipeEnemy.js';
-import {
-  safeNumber,
-  deepClone,
-  shallowClone,
-  validateSnapshot,
-} from '../../../utils/StateManager.js';
+import { safeNumber, validateSnapshot } from '../../../utils/StateManager.js';
 
 export class EnemySnapshots {
   /**
@@ -146,59 +140,33 @@ export class EnemySnapshots {
     };
   }
 
+  // What rebuilds an enemy the way it was born (its kind, where it is, its
+  // place in the pools) and its state at the death, set back once the whole
+  // field is rebuilt (enemyState.js; importState).
+  captureEnemySnapshot(enemy) {
+    return {
+      poolId: this.assignAsteroidPoolId(enemy),
+      id: enemy.id || null,
+      type: enemy.type,
+      wave: safeNumber(enemy.wave, this.waveState?.current || 1),
+      x: safeNumber(enemy.x),
+      y: safeNumber(enemy.y),
+      state: enemy.getSnapshotState(),
+    };
+  }
+
   captureAsteroidSnapshot(asteroid) {
     if (!asteroid || asteroid.destroyed) {
       return null;
     }
 
-    const type = asteroid.type || 'asteroid';
-    if (type !== 'asteroid') {
-      return null;
-    }
-
-    const poolId = this.assignAsteroidPoolId(asteroid);
-    const snapshot = {
-      poolId,
-      id: asteroid.id || null,
-      type,
+    return {
+      ...this.captureEnemySnapshot(asteroid),
       size: asteroid.size || 'small',
       variant: asteroid.variant || 'common',
-      wave: safeNumber(asteroid.wave, this.waveState?.current || 1),
       generation: safeNumber(asteroid.generation, 0),
       spawnedBy: asteroid.spawnedBy ?? null,
-      x: safeNumber(asteroid.x),
-      y: safeNumber(asteroid.y),
-      vx: safeNumber(asteroid.vx),
-      vy: safeNumber(asteroid.vy),
-      radius: safeNumber(asteroid.radius, ASTEROID_SIZES?.[asteroid.size] || 0),
-      rotation: safeNumber(asteroid.rotation),
-      rotationSpeed: safeNumber(asteroid.rotationSpeed),
-      health: safeNumber(asteroid.health),
-      maxHealth: safeNumber(asteroid.maxHealth),
-      destroyed: Boolean(asteroid.destroyed),
-      spawnTime: safeNumber(asteroid.spawnTime),
-      crackSeed: Number.isFinite(asteroid.crackSeed)
-        ? asteroid.crackSeed
-        : null,
-      crackStage: Number.isFinite(asteroid.crackStage)
-        ? asteroid.crackStage
-        : 0,
-      randomSeed:
-        asteroid.random && typeof asteroid.random.seed === 'number'
-          ? asteroid.random.seed >>> 0
-          : null,
-      randomScopes: asteroid.randomScopeSeeds
-        ? shallowClone(asteroid.randomScopeSeeds)
-        : null,
-      variantState: asteroid.variantState
-        ? deepClone(asteroid.variantState)
-        : null,
-      visualState: asteroid.visualState
-        ? deepClone(asteroid.visualState)
-        : null,
     };
-
-    return snapshot;
   }
 
   captureBossSnapshot(boss) {
@@ -206,26 +174,9 @@ export class EnemySnapshots {
       return null;
     }
 
-    const poolId = this.assignAsteroidPoolId(boss);
     return {
-      poolId,
-      id: boss.id || null,
-      type: boss.type || 'boss',
+      ...this.captureEnemySnapshot(boss),
       bossKind: boss.bossKind || 'prime',
-      wave: safeNumber(boss.wave, this.waveState?.current || 1),
-      x: safeNumber(boss.x),
-      y: safeNumber(boss.y),
-      vx: safeNumber(boss.vx),
-      vy: safeNumber(boss.vy),
-      rotation: safeNumber(boss.rotation),
-      rotationSpeed: safeNumber(boss.rotationSpeed),
-      radius: safeNumber(boss.radius),
-      health: safeNumber(boss.health),
-      maxHealth: safeNumber(boss.maxHealth),
-      currentPhase: safeNumber(boss.currentPhase, 0),
-      phaseCount: safeNumber(boss.phaseCount, null),
-      invulnerable: Boolean(boss.invulnerable),
-      invulnerabilityTimer: safeNumber(boss.invulnerabilityTimer, null),
     };
   }
 
@@ -234,120 +185,47 @@ export class EnemySnapshots {
       return null;
     }
 
-    const poolId = this.assignAsteroidPoolId(enemy);
     return {
-      poolId,
-      id: enemy.id || null,
-      type: enemy.type || null,
-      wave: safeNumber(enemy.wave, this.waveState?.current || 1),
+      ...this.captureEnemySnapshot(enemy),
       // A Twain's splits so far (behaviors/split.js).
       generation: safeNumber(enemy.generation, 0),
-      x: safeNumber(enemy.x),
-      y: safeNumber(enemy.y),
-      vx: safeNumber(enemy.vx),
-      vy: safeNumber(enemy.vy),
-      rotation: safeNumber(enemy.rotation),
-      rotationSpeed: safeNumber(enemy.rotationSpeed),
-      radius: safeNumber(enemy.radius),
-      health: safeNumber(enemy.health),
-      maxHealth: safeNumber(enemy.maxHealth),
       spawnedBy: enemy.spawnedBy ?? null,
       spawnedByBossId: enemy.spawnedByBossId ?? null,
       // An Elite's affixes (EnemyFactory.applyElite), a Herald's kind.
       elite: Boolean(enemy.elite),
       affixes: [...(enemy.affixes ?? [])],
       heraldKind: enemy.heraldKind ?? null,
-      // A frontal shield's points left (a broken plate stays broken).
-      shieldHealth: Number.isFinite(enemy.shieldHealth)
-        ? enemy.shieldHealth
-        : null,
-      shieldBroken: Boolean(enemy.shieldBroken),
+    };
+  }
+
+  // The config every rebuild starts from: its streams are set back where
+  // they stood with its state, so no scope of the layer is drawn from or
+  // opened to rebuild it.
+  rebuildConfig(snapshot) {
+    return {
+      id: snapshot.id || undefined,
+      wave: safeNumber(snapshot.wave, this.waveState?.current || 1),
+      x: safeNumber(snapshot.x, 0),
+      y: safeNumber(snapshot.y, 0),
+      random: new RandomService(0),
+      poolId: snapshot.poolId,
     };
   }
 
   applyAsteroidSnapshot(snapshot) {
-    if (!snapshot || snapshot.destroyed) {
+    if (!snapshot || (snapshot.type || 'asteroid') !== 'asteroid') {
       return null;
     }
 
-    const snapshotType = snapshot.type || 'asteroid';
-    if (snapshotType !== 'asteroid') {
-      return null;
-    }
-
-    const randomSeed = Number.isFinite(snapshot.randomSeed)
-      ? snapshot.randomSeed
-      : null;
-    const randomInstance =
-      randomSeed !== null ? new RandomService(randomSeed) : null;
-
-    const config = {
-      id: snapshot.id || undefined,
+    const asteroid = this.acquireAsteroid({
+      ...this.rebuildConfig(snapshot),
       size: snapshot.size || 'small',
       variant: snapshot.variant || 'common',
-      wave: safeNumber(snapshot.wave, this.waveState?.current || 1),
       generation: safeNumber(snapshot.generation, 0),
       spawnedBy: snapshot.spawnedBy ?? null,
-      x: safeNumber(snapshot.x, 0),
-      y: safeNumber(snapshot.y, 0),
-      vx: safeNumber(snapshot.vx, 0),
-      vy: safeNumber(snapshot.vy, 0),
-      rotation: safeNumber(snapshot.rotation, 0),
-      rotationSpeed: safeNumber(snapshot.rotationSpeed, 0),
-      random: randomInstance,
-      randomScope: 'snapshot',
-      poolId: snapshot.poolId,
-    };
-
-    const asteroid = this.acquireAsteroid(config);
+    });
     if (!asteroid) {
       return null;
-    }
-
-    const radius = safeNumber(snapshot.radius, null);
-    if (radius !== null) {
-      asteroid.radius = radius;
-    }
-    const maxHealth = safeNumber(snapshot.maxHealth, null);
-    if (maxHealth !== null) {
-      asteroid.maxHealth = maxHealth;
-    }
-    const health = safeNumber(snapshot.health, null);
-    if (health !== null) {
-      asteroid.health = health;
-    }
-    asteroid.destroyed = Boolean(snapshot.destroyed);
-
-    const spawnTime = safeNumber(snapshot.spawnTime, null);
-    if (spawnTime !== null) {
-      asteroid.spawnTime = spawnTime;
-    }
-
-    if (Number.isFinite(snapshot.crackSeed)) {
-      asteroid.crackSeed = snapshot.crackSeed;
-    }
-
-    asteroid.crackStage = safeNumber(snapshot.crackStage, 0);
-
-    if (snapshot.variantState && typeof snapshot.variantState === 'object') {
-      asteroid.variantState = deepClone(snapshot.variantState);
-    }
-
-    if (snapshot.visualState && typeof snapshot.visualState === 'object') {
-      asteroid.visualState = deepClone(snapshot.visualState);
-    }
-
-    if (snapshot.randomScopes && typeof snapshot.randomScopes === 'object') {
-      const randomScopesClone = shallowClone(snapshot.randomScopes);
-      if (randomScopesClone) {
-        asteroid.randomScopeSeeds = randomScopesClone;
-        if (typeof asteroid.ensureRandomScopes === 'function') {
-          asteroid.ensureRandomScopes();
-        }
-        if (typeof asteroid.reseedRandomScopes === 'function') {
-          asteroid.reseedRandomScopes();
-        }
-      }
     }
 
     this.assignAsteroidPoolId(asteroid, snapshot.poolId);
@@ -355,28 +233,12 @@ export class EnemySnapshots {
   }
 
   applyBossSnapshot(snapshot) {
-    if (!snapshot || snapshot.destroyed) {
-      return null;
-    }
-
-    const snapshotType = snapshot.type || 'boss';
-    if (snapshotType !== 'boss') {
+    if (!snapshot || (snapshot.type || 'boss') !== 'boss') {
       return null;
     }
 
     const config = {
-      id: snapshot.id || undefined,
-      wave: safeNumber(snapshot.wave, this.waveState?.current || 1),
-      x: safeNumber(snapshot.x, 0),
-      y: safeNumber(snapshot.y, 0),
-      vx: safeNumber(snapshot.vx, 0),
-      vy: safeNumber(snapshot.vy, 0),
-      rotation: safeNumber(snapshot.rotation, 0),
-      rotationSpeed: safeNumber(snapshot.rotationSpeed, 0),
-      currentHealth: safeNumber(snapshot.health, null),
-      radius: safeNumber(snapshot.radius, null),
-      randomScope: 'snapshot',
-      poolId: snapshot.poolId,
+      ...this.rebuildConfig(snapshot),
       bossKind: snapshot.bossKind || 'prime',
     };
 
@@ -421,85 +283,12 @@ export class EnemySnapshots {
       );
     }
 
-    if (Number.isFinite(snapshot.radius)) {
-      boss.radius = snapshot.radius;
-    }
-    if (Number.isFinite(snapshot.maxHealth)) {
-      boss.maxHealth = snapshot.maxHealth;
-    }
-    if (Number.isFinite(snapshot.health)) {
-      boss.health = snapshot.health;
-    }
-    if (Number.isFinite(snapshot.phaseCount)) {
-      boss.phaseCount = Math.max(1, Math.floor(snapshot.phaseCount));
-    }
-
-    boss.syncPhaseThresholds(true);
-
-    const phaseCount =
-      Number.isFinite(boss.phaseCount) && boss.phaseCount > 0
-        ? boss.phaseCount
-        : 1;
-    let restoredPhase = null;
-
-    if (Number.isFinite(snapshot.currentPhase)) {
-      restoredPhase = Math.min(
-        Math.max(0, Math.floor(snapshot.currentPhase)),
-        phaseCount - 1
-      );
-    } else if (
-      Array.isArray(boss.phaseHealthThresholds) &&
-      boss.phaseHealthThresholds.length &&
-      Number.isFinite(boss.health)
-    ) {
-      let computed = 0;
-      for (let i = 0; i < boss.phaseHealthThresholds.length; i += 1) {
-        if (boss.health <= boss.phaseHealthThresholds[i]) {
-          computed += 1;
-        }
-      }
-      restoredPhase = Math.min(computed, phaseCount - 1);
-    }
-
-    if (restoredPhase !== null) {
-      boss.currentPhase = 0;
-      boss.nextPhaseIndex = Math.min(
-        restoredPhase,
-        boss.phaseHealthThresholds.length
-      );
-    }
-
-    if (typeof snapshot.invulnerable === 'boolean') {
-      boss.invulnerable = snapshot.invulnerable;
-    }
-    if (Number.isFinite(snapshot.invulnerabilityTimer)) {
-      boss.invulnerabilityTimer = Math.max(
-        0,
-        Number(snapshot.invulnerabilityTimer)
-      );
-    } else if (snapshot.invulnerable === false) {
-      boss.invulnerabilityTimer = 0;
-    }
-
-    boss.applyPhaseMovement(true);
-    // Each phase it had reached is entered again as advancePhase enters it
-    // (a Sovereign's split, the Null's shed shell), without the flash.
-    for (let phase = 1; phase <= (restoredPhase ?? 0); phase += 1) {
-      boss.currentPhase = phase;
-      boss.applyPhaseMovement(true);
-      boss.enterPhase(phase - 1);
-    }
-
     return boss;
   }
 
   applySupportEnemySnapshot(snapshot) {
-    if (!snapshot || snapshot.destroyed) {
-      return null;
-    }
-
     const snapshotType =
-      typeof snapshot.type === 'string' ? snapshot.type.toLowerCase() : null;
+      typeof snapshot?.type === 'string' ? snapshot.type.toLowerCase() : null;
     if (
       !snapshotType ||
       snapshotType === 'asteroid' ||
@@ -509,25 +298,13 @@ export class EnemySnapshots {
     }
 
     const config = {
-      id: snapshot.id || undefined,
-      wave: safeNumber(snapshot.wave, this.waveState?.current || 1),
+      ...this.rebuildConfig(snapshot),
       generation: safeNumber(snapshot.generation, 0),
-      x: safeNumber(snapshot.x, 0),
-      y: safeNumber(snapshot.y, 0),
-      vx: safeNumber(snapshot.vx, 0),
-      vy: safeNumber(snapshot.vy, 0),
-      rotation: safeNumber(snapshot.rotation, 0),
-      rotationSpeed: safeNumber(snapshot.rotationSpeed, 0),
-      health: safeNumber(snapshot.health, null),
-      maxHealth: safeNumber(snapshot.maxHealth, null),
-      radius: safeNumber(snapshot.radius, null),
       spawnedBy: snapshot.spawnedBy ?? null,
       spawnedByBossId: snapshot.spawnedByBossId ?? null,
       elite: snapshot.elite,
       affixes: snapshot.affixes,
       heraldKind: snapshot.heraldKind ?? undefined,
-      randomScope: 'snapshot',
-      poolId: snapshot.poolId,
     };
 
     let enemy = null;
@@ -569,26 +346,6 @@ export class EnemySnapshots {
         'snapshot-restore-support',
         enemy
       );
-    }
-
-    if (Number.isFinite(snapshot.radius)) {
-      enemy.radius = snapshot.radius;
-    }
-    if (Number.isFinite(snapshot.maxHealth)) {
-      enemy.maxHealth = snapshot.maxHealth;
-    }
-    if (Number.isFinite(snapshot.health)) {
-      enemy.health = snapshot.health;
-    }
-    if (Number.isFinite(snapshot.shieldHealth)) {
-      enemy.shieldHealth = snapshot.shieldHealth;
-      enemy.shieldBroken = Boolean(snapshot.shieldBroken);
-    }
-    if (snapshot.spawnedBy !== undefined) {
-      enemy.spawnedBy = snapshot.spawnedBy;
-    }
-    if (snapshot.spawnedByBossId !== undefined) {
-      enemy.spawnedByBossId = snapshot.spawnedByBossId;
     }
 
     return enemy;
@@ -683,15 +440,19 @@ export class EnemySnapshots {
         this.reseedRandomScopes({ resetSequences: true });
       }
 
+      // Each enemy rebuilt, with the state it had at the death.
+      const rebuilt = [];
       for (let i = 0; i < asteroidSnapshots.length; i += 1) {
         const restored = this.applyAsteroidSnapshot(asteroidSnapshots[i]);
         if (restored) {
           this.registerActiveEnemy(restored, { skipDuplicateCheck: true });
+          rebuilt.push([restored, asteroidSnapshots[i].state]);
         }
       }
 
       for (let i = 0; i < supportSnapshots.length; i += 1) {
-        this.applySupportEnemySnapshot(supportSnapshots[i]);
+        const restored = this.applySupportEnemySnapshot(supportSnapshots[i]);
+        if (restored) rebuilt.push([restored, supportSnapshots[i].state]);
       }
 
       const restoredBosses = [];
@@ -699,7 +460,14 @@ export class EnemySnapshots {
         const restoredBoss = this.applyBossSnapshot(bossSnapshots[i]);
         if (restoredBoss) {
           restoredBosses.push(restoredBoss);
+          rebuilt.push([restoredBoss, bossSnapshots[i].state]);
         }
+      }
+
+      // Once the whole field is back, so an escort finds its mother.
+      const byId = new Map(rebuilt.map(([enemy]) => [enemy.id, enemy]));
+      for (const [enemy, state] of rebuilt) {
+        if (state) enemy.restoreSnapshotState(state, (id) => byId.get(id));
       }
 
       // After the field: registering its rocks counted them again.

@@ -14,6 +14,7 @@ export default {
   icon: '🧭',
   themeColor: '#5DADE2',
   unlockLevel: 1,
+  unlock: { by: 'pilot', at: 5 },
   tags: ['control', 'maneuvers'],
   prerequisites: [
     {
@@ -54,7 +55,9 @@ export default {
   levels: [
     {
       rank: 1,
-      effects: [{ type: 'event', event: 'upgrade-modern-flight', payload: {} }],
+      effects: [
+        { type: 'event', event: 'upgrade-modern-flight', to: [], payload: {} },
+      ],
     },
   ],
 };

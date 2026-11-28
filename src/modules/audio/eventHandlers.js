@@ -179,7 +179,26 @@ export const AUDIO_EVENT_HANDLERS = {
   runWon(audio, payload) {
     if (payload?.sector !== ENDING_SECTOR) return;
     audio.sectorScore.stop({ seconds: MIX.victoryFadeSeconds });
+    // The ending's act 1 has the music of this win (endingScore): the
+    // screens hear 'run-won' before the audio does, so it has started.
+    if (audio.endingScoreOn) return;
     audio.playFileTrack(FILE_TRACK_IDS.VICTORY_FINAL);
+  },
+
+  // The ending's act 1 starts: the choice's music plays from it, in the
+  // victory's place, on through the choice and act 2 until the credits'.
+  // Both are asked for by the same win, and a track only replaces one
+  // already playing: whichever handler runs first, the victory's must not
+  // sound (runWon skips it; asked first, it is stopped here).
+  endingScore(audio) {
+    audio.endingScoreOn = true;
+    audio.stopFileTrack(FILE_TRACK_IDS.VICTORY_FINAL, { immediate: true });
+    audio.playFileTrack(FILE_TRACK_IDS.ENDING_CHOICE);
+  },
+
+  // Act 1 is over (the choice opens, or a reset): the next win is its own.
+  endingScoreOver(audio) {
+    audio.endingScoreOn = false;
   },
 
   // The journey's score (./journeyCue.js), the recording of the destination

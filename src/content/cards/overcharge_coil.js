@@ -9,6 +9,7 @@ export default {
   icon: '🌀',
   themeColor: PALETTE.status,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 9 },
   tags: ['projectile-speed', 'weaponry'],
   text: {
     name: 'Overcharge Coil',
@@ -111,6 +112,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { bulletSpeedMultiplier: 1.15 },
         },
       ],
@@ -121,6 +123,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { bulletSpeedMultiplier: 1.15 },
         },
       ],
@@ -131,6 +134,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { bulletSpeedMultiplier: 1.15 },
         },
       ],

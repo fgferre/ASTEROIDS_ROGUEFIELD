@@ -9,6 +9,7 @@ export default {
   icon: '🗜️',
   themeColor: PALETTE.xp,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 24 },
   tags: ['repair', 'level-up'],
   text: {
     name: 'Scrap Compactor',
@@ -40,6 +41,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-level-up-repair',
+          to: 'player',
+          lands: { levelUpRepair: 'repair' },
           payload: { repair: 8 }, // proposta 20/10
         },
       ],
@@ -50,6 +53,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-level-up-repair',
+          to: 'player',
+          lands: { levelUpRepair: 'repair' },
           payload: { repair: 14 }, // proposta 20/10
         },
       ],
@@ -60,6 +65,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-level-up-repair',
+          to: 'player',
+          lands: { levelUpRepair: 'repair' },
           payload: { repair: 20 }, // proposta 20/10
         },
       ],

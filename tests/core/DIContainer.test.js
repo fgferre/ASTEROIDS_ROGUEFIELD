@@ -372,7 +372,7 @@ describe('DIContainer', () => {
   });
 
   describe.concurrent('Eager Initialization', () => {
-    it('should initialize non-lazy services immediately', () => {
+    it('creates non-lazy services in createEagerServices, not on registration', () => {
       const container = createContainer();
       let initialized = false;
 
@@ -387,7 +387,38 @@ describe('DIContainer', () => {
         }
       );
 
+      expect(initialized).toBe(false);
+      const services = container.createEagerServices();
       expect(initialized).toBe(true);
+      expect(services.test).toBe(container.resolve('test'));
+    });
+
+    it('creates an eager service registered before its dependency', () => {
+      const container = createContainer();
+      container.register('consumer', (dep) => ({ dep }), {
+        dependencies: ['dep'],
+        lazy: false,
+      });
+      container.register('dep', () => ({ name: 'dep' }));
+
+      const { consumer } = container.createEagerServices();
+
+      expect(consumer.dep.name).toBe('dep');
+    });
+
+    it('throws when an eager factory throws', () => {
+      const container = createContainer();
+      container.register(
+        'broken',
+        () => {
+          throw new Error('boom');
+        },
+        { lazy: false }
+      );
+
+      expect(() => container.createEagerServices()).toThrow(
+        /eager service 'broken': boom/
+      );
     });
 
     it('should not initialize lazy services on registration', () => {

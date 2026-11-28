@@ -141,7 +141,7 @@ describe('the pad pointer', () => {
     const played = pad(1, 0);
     vi.stubGlobal('navigator', { getGamepads: () => [idle, played] });
     vi.stubGlobal('performance', { now: () => 0 });
-    ui.getService = (name) => (name === 'input' ? { gamepad: played } : null);
+    ui.dependencies = { input: { gamepad: played } };
     const pointer = new PadPointer(ui);
     pointer.tick();
     expect(pointer.shown).toBe(true);

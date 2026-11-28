@@ -11,6 +11,10 @@ import {
   encodeInputFrame,
   serialize,
 } from '../../src/core/replay.js';
+import { EventBus } from '../../src/core/EventBus.js';
+import { CONTROL_ITEMS, HANGAR_ITEMS } from '../../src/data/hangar.js';
+import HangarService from '../../src/services/HangarService.js';
+import { installDomStubs } from '../__helpers__/domStubs.js';
 
 describe('replay recording', () => {
   it('round-trips every input frame field through the encoded mask', () => {
@@ -182,5 +186,123 @@ describe('replay recording', () => {
     expect(createPlayer(deserialize(serialize(json))).stickAt(50)).toBe(
       'medium'
     );
+  });
+});
+
+describe('deserialize rejects damaged recordings', () => {
+  const made = () => {
+    const recorder = createRecorder({
+      seed: 7,
+      hull: 'interceptor',
+      mode: 'daily',
+      date: '2026-11-24',
+      hangar: {
+        hullMultiplier: 1.05,
+        extraRerolls: 1,
+        extraBanishes: 0,
+        dashCooldownMultiplier: 0.9,
+        pickupRadiusMultiplier: 1,
+        openCards: ['multishot'],
+        sealed: [],
+        holds: 0,
+        startingCard: null,
+      },
+    });
+    recorder.record(0, createInputFrame({ up: true, moveX: 0.5 }));
+    recorder.record(5, createInputFrame());
+    recorder.recordReroll(10);
+    recorder.recordBanish(10, 'multishot');
+    recorder.recordHold(10, 'shield');
+    recorder.recordUpgrade(10, 'shield');
+    recorder.recordStick(20, 'high');
+    return JSON.parse(serialize(recorder.toJSON()));
+  };
+
+  it('accepts what the recorder writes', () => {
+    const json = made();
+    expect(deserialize(JSON.stringify(json))).toEqual(json);
+  });
+
+  it.each([
+    ['stick: []', { stick: [] }],
+    ['stick not starting at 0', { stick: [[5, 'low']] }],
+    ['unknown stick value', { stick: [[0, 'ludicrous']] }],
+    ['upgrade entry null', { upgrades: [[0, null]] }],
+    ['upgrades a string', { upgrades: 'x' }],
+    ['banish without id', { upgrades: [[0, { type: 'banish' }]] }],
+    ['input null', { inputs: [null] }],
+    ['input mask not a number', { inputs: [[0, 'a']] }],
+    ['input with half an analog', { inputs: [[0, 1, 5]] }],
+    [
+      'inputs out of order',
+      {
+        inputs: [
+          [3, 0],
+          [1, 0],
+        ],
+      },
+    ],
+    ['negative steps', { steps: -1 }],
+    ['absurd steps', { steps: Number.MAX_SAFE_INTEGER }],
+    ['daily date a number', { date: 123 }],
+    ['daily date missing', { date: null }],
+    ['unknown mode', { mode: 'chaos' }],
+    ['seed an object', { seed: {} }],
+    ['sector a number', { sector: 3 }],
+    ['openCards a number', { hangar: { openCards: 5 } }],
+    ['openCards a string', { hangar: { openCards: 'abc' } }],
+    ['sealed an object', { hangar: { sealed: {} } }],
+    ['hangar field not a number', { hangar: { holds: 'many' } }],
+    ['hangar an array', { hangar: [] }],
+  ])('rejects %s', (_name, patch) => {
+    expect(() => deserialize({ ...made(), ...patch })).toThrow(/replay/);
+  });
+
+  // A hostile link (outside audit 8, verdict A6) flew a ship with a hull of
+  // 100,000, a dash every 0.0016 s, a 4,400 px magnet and 100 rerolls.
+  it.each([
+    ['a hull of 1000', { hullMultiplier: 1000 }],
+    ['a dash cooldown of 0.001', { dashCooldownMultiplier: 0.001 }],
+    ['a magnet of 40', { pickupRadiusMultiplier: 40 }],
+    ['99 rerolls', { extraRerolls: 99 }],
+    ['half a banish', { extraBanishes: 1.5 }],
+    ['negative holds', { holds: -1 }],
+    ['a key no run writes', { damageMultiplier: 1e9 }],
+  ])('rejects a Hangar setup with %s', (_name, patch) => {
+    const json = made();
+    expect(() =>
+      deserialize({ ...json, hangar: { ...json.hangar, ...patch } })
+    ).toThrow(/replay/);
+  });
+
+  it('rejects a Hangar setup missing a key a run writes', () => {
+    const json = made();
+    delete json.hangar.hullMultiplier;
+    expect(() => deserialize(json)).toThrow(/replay/);
+  });
+
+  it('accepts the setup of a pilot who owns every item', () => {
+    const restoreDom = installDomStubs();
+    const hangar = new HangarService({
+      eventBus: new EventBus(),
+      difficulty: { setPressure() {}, getModifiers: () => ({ salvage: 1 }) },
+      achievements: { getEntries: () => [] },
+    });
+    [...HANGAR_ITEMS, ...CONTROL_ITEMS].forEach((item) => {
+      hangar.owned[item.id] = true;
+    });
+    const json = made();
+    json.hangar = JSON.parse(JSON.stringify(hangar.getRunSetup()));
+    expect(deserialize(json).hangar).toEqual(json.hangar);
+    restoreDom();
+  });
+
+  it('allows a missing stick and upgrades, and any string date outside the Daily Field', () => {
+    const json = made();
+    delete json.stick;
+    delete json.upgrades;
+    const read = deserialize({ ...json, mode: 'normal', date: 'whenever' });
+    expect(read.stick).toEqual([[0, 'medium']]);
+    expect(read.upgrades).toEqual([]);
   });
 });

@@ -446,11 +446,14 @@ class ProgressionSystem extends UpgradeSystem {
     };
   }
 
-  emitLevelUp(context) {
+  // `quiet` marks a level of a burst that is not the last: its logic runs,
+  // but the shake, slow motion, flash and sound play once, on the last.
+  emitLevelUp(context, { quiet = false } = {}) {
     this.eventBus?.emit?.('player-leveled-up', {
       newLevel: context.level,
       previousRequirement: context.previousRequirement,
       nextRequirement: context.nextRequirement,
+      ...(quiet && { quiet }),
     });
 
     // The pick screen opens after a short delay so the level-up slow-mo plays first.
@@ -660,11 +663,11 @@ class ProgressionSystem extends UpgradeSystem {
     }
   }
 
-  exportState() {
+  getSnapshotState() {
     return this.serialize();
   }
 
-  importState(snapshot) {
+  restoreSnapshotState(snapshot) {
     try {
       this.deserialize(snapshot);
       this._snapshotFallbackWarningIssued = false;
@@ -680,22 +683,6 @@ class ProgressionSystem extends UpgradeSystem {
 
       return false;
     }
-  }
-
-  getSnapshotState() {
-    return this.exportState();
-  }
-
-  captureSnapshot() {
-    return this.exportState();
-  }
-
-  restoreSnapshotState(snapshot) {
-    return this.importState(snapshot);
-  }
-
-  applySnapshot(snapshot) {
-    return this.importState(snapshot);
   }
 
   restoreState(data) {

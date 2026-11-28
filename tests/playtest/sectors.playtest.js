@@ -22,6 +22,7 @@ import {
   STEP_SECONDS,
 } from '../__helpers__/headlessGame.js';
 import { installDomStubs } from '../__helpers__/domStubs.js';
+import { resolveService } from '../../src/core/serviceUtils.js';
 
 const print = (text) => process.stdout.write(`${text}\n`);
 const FPS = Math.round(1 / STEP_SECONDS);
@@ -100,14 +101,16 @@ async function playSector(sector, seed) {
   const { services, eventBus, session } = game;
   const { player, enemies, progression } = services;
   // The run takes its world seed from the difficulty's first beginRun.
-  const difficulty = session.resolveServiceInstance('difficulty');
+  const difficulty = resolveService('difficulty', session.services);
   difficulty.runSeed = seed;
   if (pressureRung(DIFFICULTY)) {
     difficulty.setPressure(pressureRung(DIFFICULTY));
   } else if (DIFFICULTY) {
-    session
-      .resolveServiceInstance('settings')
-      .setSetting('gameplay', 'difficulty', DIFFICULTY);
+    resolveService('settings', session.services).setSetting(
+      'gameplay',
+      'difficulty',
+      DIFFICULTY
+    );
   }
   const driver = createBotDriver({
     services,

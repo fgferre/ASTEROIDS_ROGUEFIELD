@@ -11,6 +11,7 @@ export default {
   icon: '🔺',
   themeColor: PALETTE.boss,
   unlockLevel: 4,
+  unlock: { by: 'license', at: 9, cost: 250 },
   tags: ['damage', 'cursed'],
   text: {
     name: 'Glass Cannon',
@@ -31,11 +32,13 @@ export default {
         {
           type: 'event',
           event: 'upgrade-damage-boost',
+          to: 'player',
           payload: { multiplier: 1.6 },
         },
         {
           type: 'event',
           event: 'upgrade-health-boost',
+          to: 'player',
           payload: { multiplier: 0.7 },
         },
       ],

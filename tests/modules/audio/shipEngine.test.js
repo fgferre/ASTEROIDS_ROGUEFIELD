@@ -244,14 +244,14 @@ describe('ship engine', () => {
   it("the player's every step carries the three cards' levels to the engine", async () => {
     const { engine, eventBus } = await makeAudio();
     const input = {
-      getMovementInput: () => ({
+      takeStepFrame: () => ({
         up: true,
         down: false,
         left: false,
         right: false,
       }),
     };
-    const player = new PlayerSystem({ eventBus, input, 'command-queue': null });
+    const player = new PlayerSystem({ eventBus, input });
     eventBus.emit('upgrade-thruster-visual', { level: 3 });
     eventBus.emit('upgrade-rcs-visual', { level: 1 });
 

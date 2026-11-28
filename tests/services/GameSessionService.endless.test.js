@@ -88,7 +88,7 @@ describe('endless run past the final Warden', () => {
     expect(victories).toHaveLength(1);
     expect(victories[0].data.bestLayer).toBe(15);
 
-    expect(game.session.continueBeyondVictory()).toBe(true);
+    expect(game.session.runEnd.continueBeyondVictory()).toBe(true);
     expect(game.session.getSessionState()).toBe('running');
     expect(game.session.getScreen()).toBe('playing');
     expect(continued).toEqual([{ fromLayer: 15 }]);
@@ -146,7 +146,7 @@ describe('endless run past the final Warden', () => {
     expect(player.isDead).toBe(true);
     expect(game.session.getScreen()).toBe('victory');
 
-    expect(game.session.continueBeyondVictory()).toBe(true);
+    expect(game.session.runEnd.continueBeyondVictory()).toBe(true);
     expect(player.isDead).toBe(false);
     expect(player.health).toBe(player.maxHealth);
     expect(world.playerAlive).toBe(true);
@@ -176,7 +176,7 @@ describe('endless run past the final Warden', () => {
     game.eventBus.emit('boss-defeated', { wave: 15 });
     expect(player.steadyGuard).toBe(true);
 
-    expect(game.session.continueBeyondVictory()).toBe(true);
+    expect(game.session.runEnd.continueBeyondVictory()).toBe(true);
     expect(player.invulnerableTimer).toBe(0);
     expect(player.steadyGuard).toBe(false);
   });
@@ -207,7 +207,7 @@ describe('endless run past the final Warden', () => {
     for (let step = 0; step < AFTER_STEPS; step += 1) game.step();
     expect(offered).toEqual([]);
 
-    game.session.continueBeyondVictory();
+    game.session.runEnd.continueBeyondVictory();
     for (let step = 0; step < AFTER_STEPS; step += 1) {
       game.step();
       const id = game.takeOfferedUpgrade();

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/domStubs.js';
 import {
@@ -7,6 +8,7 @@ import {
 import { SCREEN_INPUT_LOCKOUT_MS } from '../../../src/modules/ui/LevelUpScreen.js';
 import { STORY } from '../../../src/data/story.js';
 import { loadRecords } from '../../../src/services/runRecords.js';
+import { runModeFor } from '../../../src/core/runMode.js';
 
 describe('Run end screens', () => {
   let restoreDom;
@@ -96,6 +98,7 @@ describe('Run end screens', () => {
           quitBtn,
           hints,
         },
+        victory: {},
       },
       showScreen: () => {},
       progression: () => null,
@@ -182,6 +185,7 @@ describe('Run end screens', () => {
           wave: { current: 10 },
           stats: { timeElapsed: 512, timeline: [] },
           sector,
+          mode: runModeFor({ sector: sector?.id ?? null }),
         },
       });
     const show = (data) => screens.showVictoryScreen({ data });
@@ -215,8 +219,13 @@ describe('Run end screens', () => {
       show: true,
     });
 
+    // The same test tells act 1 of the ending before it (UISystem 'run-won').
+    expect(screens.opensChoice('the-crucible')).toBe(true);
+    expect(screens.opensChoice('wardens-reach')).toBe(false);
+
     const replay = victoryScreen();
     replay.screens.noteRunStart({ replay: true });
+    expect(replay.screens.opensChoice('the-crucible')).toBe(false);
     replay.win(CRUCIBLE);
     expect(replay.screens.choice).toBe(null);
     expect(replay.victory.body.innerHTML).toContain('The end');
@@ -256,6 +265,31 @@ describe('Run end screens', () => {
     expect(victory.nextBtn.classList.contains('hidden')).toBe(true);
   });
 
+  it('dims the field for Severance only where the scene draws no pictures of it', () => {
+    const field = () => {
+      const names = new Set();
+      return {
+        classList: {
+          add: (name) => names.add(name),
+          toggle: (name, on) => (on ? names.add(name) : names.delete(name)),
+          contains: (name) => names.has(name),
+        },
+      };
+    };
+    const pick = (ending, drawn) => {
+      const { victory, win, screens, cinematics } = victoryScreen();
+      victory.field = field();
+      cinematics.playEnding.mockReturnValue(drawn);
+      win(CRUCIBLE);
+      screens.chooseEnding(ending);
+      return victory.field.classList;
+    };
+    expect(pick('severance', true).contains('is-severed')).toBe(false);
+    expect(pick('severance', false).contains('is-severed')).toBe(true);
+    expect(pick('stewardship', false).contains('is-severed')).toBe(false);
+    expect(pick('severance', true).contains('is-ending')).toBe(true);
+  });
+
   it('a sector won: the chapter cleared, its badge, Next Chapter and the way back to the map', () => {
     const { victory, win, cinematics } = victoryScreen();
     win({
@@ -285,7 +319,8 @@ describe('Run end screens', () => {
     show({
       wave: { current: 15 },
       stats: { timeElapsed: 126, timeline: [] },
-      bossRush: { stage: 3, bestStage: 3, bestTime: 120, newBest: true },
+      rush: { stage: 3, bestStage: 3, bestTime: 120, newBest: true },
+      mode: runModeFor({ bossRush: true }),
     });
     expect(victory.body.innerHTML).toContain('New best');
   });
@@ -317,5 +352,17 @@ describe('Run end screens', () => {
     expect(victory.body.innerHTML).toContain('DEBRIS WAKE · 8:32');
     expect(victory.nextBtn.dataset.sector).toBe('salvage-lanes');
     expect(victory.nextBtn.label.textContent).toBe('Next Sector');
+  });
+
+  it('no flying tip is drawn behind an end screen, across its title', () => {
+    const css = readFileSync(
+      new URL('../../../src/runEndScreens.css', import.meta.url),
+      'utf8'
+    );
+    const rule = css
+      .split('}')
+      .find((part) => part.includes('body:has(.end-screen:not(.hidden))'));
+    expect(rule).toContain('.onboarding-tip');
+    expect(rule).toMatch(/display:\s*none/);
   });
 });

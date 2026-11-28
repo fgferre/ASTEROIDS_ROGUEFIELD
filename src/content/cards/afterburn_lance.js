@@ -18,6 +18,7 @@ export default {
   icon: '🔥',
   themeColor: PALETTE.shot,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 3 },
   tags: ['range', 'weaponry'],
   text: {
     name: 'Afterburn Lance',
@@ -50,23 +51,26 @@ export default {
   weaponText: {
     // proposta 17/11
     'arc-caster': {
-      levels: BONUS.map((bonus, rank) => ({
-        description: `Jumps deal +${bonus}% damage per 100 px between the ship and the enemy: the far end of the chain strikes harder. Lock-on range +${LOCK_RANGE[rank]}%.`,
+      levels: BONUS.map((bonus) => ({
+        description: `Jumps deal +${bonus}% damage per 100 px between the ship and the enemy: the far end of the chain strikes harder.`,
       })),
     },
+    // The Halo and the Furnace never aim, and the Arc Caster and the Scatter
+    // Coil cannot reach what a longer lock-on finds: no lock-on range to sell
+    // any of them (the lock keeps to what the weapon reaches).
     'shard-halo': {
-      levels: BONUS.map((bonus, rank) => ({
-        description: `Cuts deal +${bonus}% damage per 100 px between the ship and the enemy: the far edge of the halo cuts deeper. Lock-on range +${LOCK_RANGE[rank]}%.`,
+      levels: BONUS.map((bonus) => ({
+        description: `Cuts deal +${bonus}% damage per 100 px between the ship and the enemy: the far edge of the halo cuts deeper.`,
       })),
     },
     'furnace-corona': {
-      levels: BONUS.map((bonus, rank) => ({
-        description: `Pulses deal +${bonus}% damage per 100 px between the ship and the enemy: the ring's edge burns hotter. Lock-on range +${LOCK_RANGE[rank]}%.`,
+      levels: BONUS.map((bonus) => ({
+        description: `Pulses deal +${bonus}% damage per 100 px between the ship and the enemy: the ring's edge burns hotter.`,
       })),
     },
     scatter: {
-      levels: BONUS.map((bonus, rank) => ({
-        description: `Flak bolts deal +${bonus}% damage per 100 px flown: they burst by ${BOLT_RANGE} px, so up to +${Math.round((bonus * BOLT_RANGE) / 100)}%. Lock-on range +${LOCK_RANGE[rank]}%.`,
+      levels: BONUS.map((bonus) => ({
+        description: `Flak bolts deal +${bonus}% damage per 100 px flown: they burst by ${BOLT_RANGE} px, so up to +${Math.round((bonus * BOLT_RANGE) / 100)}%.`,
         highlights: ['Only the bolt’s own hit: its shrapnel gains nothing.'],
       })),
     },
@@ -83,11 +87,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { targetingRangeMultiplier: 1.15 },
         },
         {
           type: 'event',
           event: 'upgrade-long-burn',
+          to: 'combat',
+          lands: 'cards.cardEffects.longBurn',
           payload: { bonusPer100px: 0.1, maxDistance: MAX_DISTANCE }, // proposta 20/10
         },
       ],
@@ -98,11 +105,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { targetingRangeMultiplier: 1.15 },
         },
         {
           type: 'event',
           event: 'upgrade-long-burn',
+          to: 'combat',
+          lands: 'cards.cardEffects.longBurn',
           payload: { bonusPer100px: 0.15, maxDistance: MAX_DISTANCE }, // proposta 20/10
         },
       ],
@@ -113,11 +123,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { targetingRangeMultiplier: 1.15 },
         },
         {
           type: 'event',
           event: 'upgrade-long-burn',
+          to: 'combat',
+          lands: 'cards.cardEffects.longBurn',
           payload: { bonusPer100px: 0.2, maxDistance: MAX_DISTANCE }, // proposta 20/10
         },
       ],

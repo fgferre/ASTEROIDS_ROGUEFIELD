@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
 import { TURRET_BARREL_LENGTH } from '../../../src/data/constants/physics.js';
@@ -19,26 +18,14 @@ import {
   cleanupGlobalState,
   setupGlobalMocks,
 } from '../../__helpers__/setup.js';
-
-// The vendored r128 build is UMD: evaluated with an `exports` object it
-// fills that object instead of a global.
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const ribbons = { px: [], py: [], polyline: vi.fn() };
 
 function mirrorFor(hull) {
   const player = new PlayerSystem({
     eventBus: createEventBusMock(),
-    input: { getMovementInput: () => ({}) },
-    'command-queue': null,
+    input: { takeStepFrame: () => ({}) },
   });
   player.noseAim = false; // the Auto Turret taken: the turret on its pivot
   player.setHull(hull);
@@ -217,7 +204,7 @@ describe('PlayerMirror', () => {
 
   it('lights the turn couple: a nose swinging to starboard shows the starboard wingtip and the port nose jet', () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    player.lastThrusterState.turnR = 1;
+    player.thrusters.lastThrusterState.turnR = 1;
     mirror.update(player, ribbons, 0);
     const shown = mirror.puffs
       .filter(({ puff }) => puff.visible)
@@ -238,7 +225,7 @@ describe('PlayerMirror', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const turnLeft = (level) => {
       player.thrusters.rcsVisualLevel = level;
-      player.lastThrusterState.turnL = 1;
+      player.thrusters.lastThrusterState.turnL = 1;
       mirror.update(player, ribbons, 0);
       return mirror.puffs.filter(({ puff }) => puff.visible);
     };
@@ -286,7 +273,7 @@ describe('PlayerMirror', () => {
       player.velocity.vx = speed;
       player.velocity.vy = 0;
       player.enginesIdle = false;
-      player.lastThrusterState.main = 1;
+      player.thrusters.lastThrusterState.main = 1;
       for (let i = 0; i < 30; i += 1) mirror.update(player, ribbons, 0);
       return mirror.flames[0].flame.scale.x;
     };
@@ -336,8 +323,8 @@ describe('PlayerMirror', () => {
   it('burns the turn jets and the retro as hard as the pilot pushes; a full key burns full', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const at = (turn, aux) => {
-      player.lastThrusterState.turnR = turn;
-      player.lastThrusterState.aux = aux;
+      player.thrusters.lastThrusterState.turnR = turn;
+      player.thrusters.lastThrusterState.aux = aux;
       for (let i = 0; i < 30; i += 1) mirror.update(player, ribbons, 0);
       return {
         jet: mirror.rcsJets.turnR.material.opacity,
@@ -355,7 +342,7 @@ describe('PlayerMirror', () => {
 
   it("lights a whole flank's jets, fore and aft, for the auto-brake's push across the hull", () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    player.lastThrusterState.brakeStarboard = 0.5;
+    player.thrusters.lastThrusterState.brakeStarboard = 0.5;
     mirror.update(player, ribbons, 0);
     const shown = mirror.puffs
       .filter(({ puff }) => puff.visible)
@@ -376,7 +363,7 @@ describe('PlayerMirror', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const retrosAt = (level, aux) => {
       player.thrusters.brakingVisualLevel = level;
-      player.lastThrusterState.aux = aux;
+      player.thrusters.lastThrusterState.aux = aux;
       for (let i = 0; i < 30; i += 1) mirror.update(player, ribbons, 0);
       return mirror.retros;
     };
@@ -409,7 +396,7 @@ describe('PlayerMirror', () => {
 
   it('rolls toward the lit turn couple or flank and pitches with the engine, then settles level', () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    const jets = player.lastThrusterState;
+    const jets = player.thrusters.lastThrusterState;
     const deg = (d) => (d * Math.PI) / 180;
     let time = 0;
     const fly = (state) => {
@@ -429,6 +416,35 @@ describe('PlayerMirror', () => {
     expect(dip).toBeCloseTo(deg(-8), 3);
     const level = fly({ brakeStarboard: 0, aux: 0 });
     expect(level.map(Math.abs).every((a) => a < 1e-3)).toBe(true);
+  });
+
+  it('holds a ship posed by a cinematic level and dark, whatever the pilot holds', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const lit = [
+      ...mirror.flames.flatMap(({ flame, core }) => [flame, core]),
+      ...mirror.puffs.map(({ puff }) => puff),
+      ...mirror.retros.map(({ mesh }) => mesh),
+      mirror.flareFan,
+    ];
+    player.enginesIdle = false;
+    Object.assign(player.thrusters.lastThrusterState, {
+      main: 1,
+      turnR: 1,
+      aux: 1,
+    });
+    for (let i = 0; i < 60; i += 1) {
+      const time = i / 60;
+      mirror.update(player, ribbons, time);
+      mirror.flashMuzzle();
+      mirror.still(time);
+      expect(lit.filter((mesh) => mesh.visible)).toEqual([]);
+      expect(mirror.light.intensity).toBe(0);
+      expect(mirror.group.rotation.x).toBe(0);
+      expect(mirror.group.rotation.z).toBe(0);
+    }
+    // the pilot's own flame was lit under it
+    mirror.update(player, ribbons, 1);
+    expect(mirror.flames[0].flame.visible).toBe(true);
   });
 
   it('springs the barrels back from a shot while the hull gives against it and returns, never jumping', () => {
@@ -469,7 +485,7 @@ describe('PlayerMirror', () => {
   it('keeps the hull still and level under reduced motion and takes no kick from a shard fired away from the ship', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const rest = mirror.barrels.position.x;
-    player.lastThrusterState.turnR = 1;
+    player.thrusters.lastThrusterState.turnR = 1;
     let time = 0;
     for (let i = 0; i < 30; i += 1) {
       if (i === 10) mirror.recoilToward(player, 0, 1, player.position);
@@ -495,13 +511,13 @@ describe('PlayerMirror', () => {
   it('shows the dash ring and a brighter rim only through dash i-frames', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const rim = mirror.rim.r + mirror.rim.g + mirror.rim.b;
-    player.dashTimer = 0.1;
+    player.maneuvers.dashTimer = 0.1;
     player.invulnerableTimer = 0.2;
     mirror.update(player, ribbons, 0.1);
     expect(mirror.dashRing.visible).toBe(true);
     expect(mirror.rim.r + mirror.rim.g + mirror.rim.b).toBeGreaterThan(rim);
 
-    player.dashTimer = 0;
+    player.maneuvers.dashTimer = 0;
     player.invulnerableTimer = 0;
     mirror.update(player, ribbons, 0.2);
     expect(mirror.dashRing.visible).toBe(false);
@@ -522,12 +538,15 @@ describe('PlayerMirror', () => {
   it('draws no afterimage dropped while Blink hides the ship', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     const hidden = { x: 100, y: 300, angle: 0, age: 0 };
-    player.dashGhosts = [hidden];
+    player.maneuvers.dashGhosts = [hidden];
     player._quitExplosionHidden = true;
     mirror.update(player, ribbons, 0.05);
 
     player._quitExplosionHidden = false;
-    player.dashGhosts = [hidden, { x: 140, y: 300, angle: 0, age: 0 }];
+    player.maneuvers.dashGhosts = [
+      hidden,
+      { x: 140, y: 300, angle: 0, age: 0 },
+    ];
     mirror.update(player, ribbons, 0.15);
     expect(mirror.ghosts[0].visible).toBe(false);
     expect(mirror.ghosts[1].visible).toBe(true);
@@ -667,8 +686,8 @@ describe('PlayerMirror', () => {
 
   it('hides the dash ring under a raised shield dome', () => {
     const { player, mirror } = mirrorFor(defaultHull);
-    player.isShieldActive = true;
-    player.dashTimer = 0.1;
+    player.shield.isShieldActive = true;
+    player.maneuvers.dashTimer = 0.1;
     player.invulnerableTimer = 0.2;
     mirror.update(player, ribbons, 0.1);
     expect(mirror.dashRing.visible).toBe(false);

@@ -35,13 +35,14 @@ function retryDeadShip(game) {
   vi.advanceTimersByTime(3000);
   expect(game.session.getScreen()).toBe('gameover');
 
-  game.session.retryCountElement = { textContent: '1', isConnected: true };
-  game.session.retryCountdownElement = {
+  // A run has one Retry; this test grants each of its two.
+  game.session.retry.setRetryCount(1);
+  game.session.retry.retryCountdownElement = {
     textContent: '',
     isConnected: true,
     classList: { add() {}, remove() {} },
   };
-  expect(game.session.requestRetry({ source: 'test' })).toBe(true);
+  expect(game.session.retry.requestRetry({ source: 'test' })).toBe(true);
   vi.advanceTimersByTime(3000);
   expect(game.session.getScreen()).toBe('playing');
 }
@@ -50,7 +51,7 @@ function readBuild({ player, combat, 'xp-orbs': xpOrbs }) {
   return {
     maxHealth: player.maxHealth,
     damage: player.damage,
-    maxSpeed: player.maxSpeed,
+    maxSpeed: player.flight.maxSpeed,
     magnetismRadius: player.magnetismRadius,
     orbPull: xpOrbs.getMagnetismForce(),
     orbReach: xpOrbs.getMagnetismRadius(),
@@ -207,5 +208,33 @@ describe('retry after death', () => {
     dieAndRetry(game);
     expect(readBuild(game.services)).toEqual(build);
     expect(player.health).toBe(build.maxHealth);
+  });
+});
+
+// The Retries left were read back from the game over screen's text, so a run
+// without that screen (or with its text rewritten) had none, or more
+// (outside audit 8, verdict A7): the session keeps the number.
+describe('the Retries left', () => {
+  beforeEach(() => {
+    const restoreDom = installDomStubs();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    return restoreDom;
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    GamePools.releaseAll();
+    vi.restoreAllMocks();
+  });
+
+  it('are the session number, whatever the screen shows', () => {
+    const game = createHeadlessGame();
+    game.session.startNewRun({ source: 'test' });
+    expect(game.session.retry.getRetryCount()).toBe(1);
+    game.session.retry.retryCountElement = {
+      textContent: '7',
+      isConnected: true,
+    };
+    expect(game.session.retry.getRetryCount()).toBe(1);
   });
 });

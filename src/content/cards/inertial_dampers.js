@@ -9,6 +9,7 @@ export default {
   icon: '🧭',
   themeColor: PALETTE.boss,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 19 },
   tags: ['dash', 'distance'],
   text: {
     name: 'Inertial Dampers',
@@ -35,6 +36,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-distance',
+          to: 'player',
           payload: { multiplier: 1.25 }, // proposta 20/10
         },
       ],
@@ -45,6 +47,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-distance',
+          to: 'player',
           payload: { multiplier: 1.2 }, // proposta 20/10; total 1.50
         },
       ],

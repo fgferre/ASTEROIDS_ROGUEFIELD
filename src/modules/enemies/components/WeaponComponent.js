@@ -359,12 +359,16 @@ export class WeaponComponent {
     this.patterns.set(name, handler);
   }
 
+  // A pooled enemy's weapon starts as a new one's: a fresh state drops every
+  // field the patterns added in its last life (a mine's arming clock too).
   reset(enemy) {
     if (enemy?.weaponState) {
-      enemy.weaponState.cooldown = 0;
-      enemy.weaponState.burstTimer = 0;
-      enemy.weaponState.burstRemaining = 0;
-      enemy.weaponState.detonated = false;
+      enemy.weaponState = {
+        cooldown: 0,
+        burstTimer: 0,
+        burstRemaining: 0,
+        detonated: false,
+      };
     }
   }
 

@@ -11,6 +11,9 @@
   --status: #bcff00;
   --boss: #8a2be2;
   --xp: #ffd700;
+  /* The game's warning amber: PALETTE.shot, as cardScreens.css and the touch
+     buttons' refused state use it */
+  --amber: #ffb347;
   /* Layer-modifier banner frame: indigo, apart from the cyan --accent */
   --modifier: #7b86ff;
 
@@ -260,6 +263,25 @@ select {
   padding: 6px 10px;
 }
 
+/* Narrower, the gap cannot hold it: under the Hangar, Codex and Settings,
+   over the status line, clear of every button down to 568 px. Its top
+   follows the menu's top padding (.menu-screen__overlay), fixed at 700 px. */
+@media (max-width: 1319px) {
+  .pad-hints[data-screen='menu'] {
+    top: calc(68px + clamp(var(--space-3), 2.4vh, var(--space-5)));
+    right: 32px;
+    left: auto;
+    padding: 2px 10px;
+    transform: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .pad-hints[data-screen='menu'] {
+    top: 80px;
+  }
+}
+
 .pad-hints__item {
   display: inline-flex;
   align-items: center;
@@ -362,6 +384,12 @@ select {
 
 .screen--overlay {
   z-index: 130;
+}
+
+/* Settings opens over any other overlay (the input layer stack keeps it on
+   top), so it is drawn over them too, the pilots (140) included. */
+#settings-screen {
+  z-index: 141;
 }
 
 /* Shared panel surface: pause, settings, credits */
@@ -1594,6 +1622,16 @@ select {
   transition: opacity 0.5s ease-out;
 }
 
+/* A service failed to start (loadingScreen.js): the jet goes out, the line
+   says so in red. */
+.loading-screen--failed .opening__jet {
+  opacity: 0;
+}
+
+.loading-screen--failed .opening__line {
+  color: var(--danger);
+}
+
 /* Loaded (loadingScreen.js): the ship has arrived, the line asks to go on. */
 .loading-screen--ready .opening__end {
   border-color: var(--accent);
@@ -1872,6 +1910,13 @@ html[data-motion='reduced'] .opening__brand * {
   opacity: 1;
   visibility: visible;
   transition: opacity 0.15s;
+}
+
+/* A screen over the scene (Settings): the hint goes at once, so a touch in
+   its corner reaches the screen on top. */
+.skip-hold.is-covered {
+  visibility: hidden;
+  transition: none;
 }
 
 body.motion-reduced .skip-hold {
@@ -2704,6 +2749,11 @@ kbd {
   text-align: center;
 }
 
+/* A key hint whose binding was cleared (ui/bindingHints.js). */
+kbd[data-binding][hidden] {
+  display: none;
+}
+
 /* ============================================
    SETTINGS
    ============================================ */
@@ -3093,6 +3143,13 @@ kbd {
   border-color: var(--accent);
   color: var(--accent);
   box-shadow: var(--glow-accent);
+}
+
+/* First slot of an action with no key on this device: amber, dashed (shape
+   cue besides colour), until it listens (is-listening has its own look). */
+.settings-binding-btn.is-unbound:not(.is-listening) {
+  border: 1px dashed var(--amber);
+  color: var(--amber);
 }
 
 .settings-footer {
@@ -4036,6 +4093,12 @@ body.touch-play .menu-version {
   font-size: var(--text-sm);
   line-height: 1.4;
   text-align: center;
+  text-wrap: balance;
+}
+
+/* Too long for one line, it breaks between the parts, never inside one. */
+.hangar-hull-info > span {
+  white-space: nowrap;
 }
 
 /* The menu's 3D hull, copied in from the menu canvas (MenuBackgroundSystem) */
@@ -4552,12 +4615,23 @@ button.campaign-node {
   display: none;
 }
 
+/* On a short window the mode's panel gives way (it scrolls in its own box)
+   so Launch under it always shows whole. */
 .prep-main {
   grid-area: main;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-4) 0;
+}
+
+.prep-main > .prep-panel {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--neutral) transparent;
 }
 
 .prep-panel__objective {
@@ -4873,6 +4947,43 @@ button.campaign-node {
   }
 }
 
+/* A short window (a small laptop): tighter spacing and each chapter's dot and
+   numeral on one line, so the mode's panel keeps room (the phone layout below
+   has its own Ring). */
+@media (min-height: 501px) and (max-height: 780px) {
+  .prep-main {
+    padding: var(--space-2) 0;
+  }
+
+  .prep-launch {
+    margin-top: var(--space-3);
+  }
+
+  .campaign-node {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-content: start;
+    align-items: center;
+    column-gap: var(--space-2);
+  }
+
+  .campaign-node__dot {
+    margin: 0;
+  }
+
+  :is(.campaign-node__name, .campaign-node__state) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Shorter still: the Campaign's objective leaves the sectors the room; the
+   footer's line under the Ring says the same words. */
+@media (min-height: 501px) and (max-height: 680px) {
+  .prep-panel[data-prep-for='campaign'] .prep-panel__objective {
+    display: none;
+  }
+}
+
 /* The Wake log's own open and close buttons: only the phone layout below. */
 .prep-links .campaign-log__open,
 .campaign-log .campaign-log__close {
@@ -4975,6 +5086,9 @@ body.touch-play .menu-ship-selector__name {
       'flinks hints  diff   launch';
     gap: 6px 12px;
     width: 100%;
+    /* the window's height, whatever its width: the panel and the hint line
+       give way (each scrolls in its own box), never Launch */
+    height: 100%;
   }
 
   body.touch-play :is(.prep-main, .prep-side, .prep-footer, .prep-launch) {
@@ -5056,19 +5170,19 @@ body.touch-play .menu-ship-selector__name {
     padding: 0 14px;
   }
 
-  /* Launch holds the bottom-right corner here: the version waits at the foot
-     of the mode rail, above Credits. */
+  /* Launch holds the bottom-right corner here and the mode rail has no room
+     left: the version waits in the top row, beside the title. */
   body.touch-play .menu-version {
     position: static;
-    grid-area: tabs;
-    align-self: end;
+    grid-area: links;
+    align-self: center;
     justify-self: start;
   }
 
   body.touch-play .prep-panel {
     grid-area: panel;
     min-height: 0;
-    overflow: hidden;
+    overflow: hidden auto;
   }
 
   body.touch-play #prep-before-launch {
@@ -5337,6 +5451,8 @@ body.touch-play .menu-ship-selector__name {
   body.touch-play .prep-footer__hints {
     grid-area: hints;
     align-self: center;
+    max-height: 100%;
+    overflow: hidden auto;
   }
 
   body.touch-play .menu-hint {
@@ -5373,6 +5489,8 @@ body.touch-play .menu-ship-selector__name {
     bottom: 100%;
     left: 0;
     margin-bottom: var(--space-1);
+    /* it sits over the Ring: a touch goes through to the chapter */
+    pointer-events: none;
   }
 
   body.touch-play .prep-launch__btn {
@@ -5396,12 +5514,13 @@ body.touch-play .menu-ship-selector__name {
   }
 }
 
-/* Phone in Safari, its bars showing (not installed): too short for four
-   tabs over Credits and Support, so those two join the top row. */
+/* Phone in Safari, its bars showing (not installed): the top row has no room
+   for Credits and Support, so they share the whole rail under the four tabs,
+   every button a little shorter. */
 @media (max-height: 340px) {
   body.touch-play .menu-screen__content {
     grid-template-areas:
-      'brand  flinks links  links'
+      'brand  links  links  links'
       'tabs   status status status'
       'tabs   panel  panel  side'
       'tabs   ring   ring   ring'
@@ -5409,9 +5528,12 @@ body.touch-play .menu-ship-selector__name {
   }
 
   body.touch-play .prep-footer__links {
-    flex-direction: row;
-    align-self: start;
-    padding-right: 0;
+    grid-area: tabs;
+    gap: var(--space-1);
+  }
+
+  body.touch-play :is(.prep-tab, .prep-footer__links .menu-screen__button) {
+    min-height: 40px;
   }
 }
 
@@ -5507,6 +5629,8 @@ body.touch-play .credits-support__link {
     padding-right: 10px;
     border-bottom: 0;
     border-right: 1px solid var(--line);
+    /* on the shortest phones the tabs scroll above Back, never under it */
+    overflow: hidden auto;
   }
 
   body.touch-play :is(.hangar-dialog, .codex-dialog) .codex-tab {
@@ -5911,6 +6035,37 @@ body.touch-play .hud-frame [data-touch-action]::after {
   color: var(--danger);
   border-color: var(--danger);
   box-shadow: 0 0 12px rgba(255, 49, 49, 0.35);
+}
+
+/* === HUD editor that did not load (ui/hudEditorDoor.js): the editor's own
+   toast (.hed-toast, editorStyles.js), over Settings or the pause screen === */
+.hud-editor-notice {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  z-index: 150;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 48px);
+  margin: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-align: center;
+  color: var(--text);
+  pointer-events: none;
+}
+
+/* A phone held sideways: two lines between the panel's title and its close button. */
+@media (max-width: 900px) {
+  .hud-editor-notice {
+    max-width: min(calc(100vw - 48px), 460px);
+  }
 }
 
 /* === Door notice (mobileGuard): turn sideways; on a phone in the browser,

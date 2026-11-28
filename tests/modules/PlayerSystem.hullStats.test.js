@@ -16,8 +16,7 @@ import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 const makePlayer = (dependencies = {}) =>
   new PlayerSystem({
     eventBus: createEventBusMock(),
-    input: { getMovementInput: vi.fn(() => ({})) },
-    'command-queue': null,
+    input: { takeStepFrame: vi.fn(() => ({})) },
     ...dependencies,
   });
 
@@ -29,33 +28,33 @@ describe('PlayerSystem hull stats', () => {
     const player = makePlayer();
     player.setHull(defaultHull);
     player.resetStats();
-    expect(player.acceleration).toBe(SHIP_ACCELERATION);
-    expect(player.maxSpeed).toBe(SHIP_MAX_SPEED);
+    expect(player.flight.acceleration).toBe(SHIP_ACCELERATION);
+    expect(player.flight.maxSpeed).toBe(SHIP_MAX_SPEED);
     expect(player.maxHealth).toBe(100);
-    expect(player.dashCooldown).toBe(DASH_COOLDOWN);
+    expect(player.maneuvers.dashCooldown).toBe(DASH_COOLDOWN);
   });
 
   it('makes the Solar Slicer lighter as soon as it is chosen', () => {
     const player = makePlayer();
     player.setHull(solarSlicer);
-    expect(player.acceleration).toBeCloseTo(SHIP_ACCELERATION * 1.15, 6);
-    expect(player.maxSpeed).toBeCloseTo(SHIP_MAX_SPEED * 1.15, 6);
+    expect(player.flight.acceleration).toBeCloseTo(SHIP_ACCELERATION * 1.15, 6);
+    expect(player.flight.maxSpeed).toBeCloseTo(SHIP_MAX_SPEED * 1.15, 6);
     expect(player.maxHealth).toBe(80);
     expect(player.health).toBe(80);
-    expect(player.dashCooldown).toBeCloseTo(DASH_COOLDOWN * 0.85, 6);
+    expect(player.maneuvers.dashCooldown).toBeCloseTo(DASH_COOLDOWN * 0.85, 6);
 
     player.setHull(defaultHull);
-    expect(player.maxSpeed).toBe(SHIP_MAX_SPEED);
+    expect(player.flight.maxSpeed).toBe(SHIP_MAX_SPEED);
     expect(player.maxHealth).toBe(100);
   });
 
   it('makes the Bastion heavier: slower, tougher', () => {
     const player = makePlayer();
     player.setHull(bastion);
-    expect(player.acceleration).toBeCloseTo(SHIP_ACCELERATION * 0.85, 6);
-    expect(player.maxSpeed).toBeCloseTo(SHIP_MAX_SPEED * 0.9, 6);
+    expect(player.flight.acceleration).toBeCloseTo(SHIP_ACCELERATION * 0.85, 6);
+    expect(player.flight.maxSpeed).toBeCloseTo(SHIP_MAX_SPEED * 0.9, 6);
     expect(player.maxHealth).toBe(135);
-    expect(player.dashCooldown).toBeCloseTo(DASH_COOLDOWN * 1.2, 6);
+    expect(player.maneuvers.dashCooldown).toBeCloseTo(DASH_COOLDOWN * 1.2, 6);
   });
 
   it('applies the Hangar modifiers on top of the hull stats', () => {
@@ -72,7 +71,10 @@ describe('PlayerSystem hull stats', () => {
     player.setHull(solarSlicer);
     player.resetStats();
     expect(player.maxHealth).toBe(84);
-    expect(player.dashCooldown).toBeCloseTo(DASH_COOLDOWN * 0.85 * 0.9, 6);
+    expect(player.maneuvers.dashCooldown).toBeCloseTo(
+      DASH_COOLDOWN * 0.85 * 0.9,
+      6
+    );
   });
 
   it('draws both hull chips, the Slicer with wide twin thrusters and blades', () => {

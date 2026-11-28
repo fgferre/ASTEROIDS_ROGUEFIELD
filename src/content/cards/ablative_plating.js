@@ -11,6 +11,7 @@ export default {
   icon: '🧱',
   themeColor: PALETTE.text,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 14 },
   tags: ['armor', 'hull'],
   text: {
     name: 'Ablative Plating',
@@ -43,6 +44,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-hull-armor',
+          to: 'player',
+          lands: { hullArmor: 'armor' },
           payload: { armor: 3 }, // proposta 20/10
         },
       ],
@@ -53,6 +56,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-hull-armor',
+          to: 'player',
+          lands: { hullArmor: 'armor' },
           payload: { armor: 6 }, // proposta 20/10
         },
       ],
@@ -63,6 +68,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-hull-armor',
+          to: 'player',
+          lands: { hullArmor: 'armor' },
           payload: { armor: 9 }, // proposta 20/10
         },
       ],

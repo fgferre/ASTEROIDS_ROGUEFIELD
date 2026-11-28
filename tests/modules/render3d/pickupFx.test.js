@@ -1,18 +1,8 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PICKUP_KINDS } from '../../../src/data/pickups.js';
 import { rgbOf } from '../../../src/modules/render3d/batches.js';
 import { PickupFx } from '../../../src/modules/render3d/pickupFx.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 // The default hull's outline (hull units), the ship at (400, 300) facing +x.
 const HULL = { minX: -11.1, maxX: 15, maxY: 9.6, extent: 15 };

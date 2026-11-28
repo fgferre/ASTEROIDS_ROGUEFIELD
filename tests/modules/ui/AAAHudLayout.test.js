@@ -12,6 +12,7 @@ import { PICKUP_KINDS } from '../../../src/data/pickups.js';
 import { bossRushStageTitle } from '../../../src/data/layers.js';
 import { WEAPONS } from '../../../src/data/weapons.js';
 import { getInstrument } from '../../../src/modules/ui/hud/instruments/registry.js';
+import { getHudCss } from '../../../src/modules/ui/hud/hudStyles.js';
 import {
   fakeDocument,
   fakeElement as fakeHudElement,
@@ -308,7 +309,7 @@ describe('AAAHudLayout layer modifier', () => {
     };
     hud.showLayerBanner(5, {
       boss: true,
-      bossRush: true,
+      title: 'BOSS RUSH',
       chapter: bossRushStageTitle(1),
     });
     vi.advanceTimersByTime(0);
@@ -582,5 +583,13 @@ describe('AAAHudLayout timed notice', () => {
     expect(shown().text).toBe('AIM AUTO');
     vi.advanceTimersByTime(1);
     expect(shown()).toBeNull();
+  });
+
+  it('is out of sight, like the instruments, while a journey has them off the screen', () => {
+    const rule = getHudCss()
+      .split('}')
+      .find((part) => part.includes('#hud-layer.is-journey .onboarding-tip'));
+    // not by opacity: the slot's entry animation would show through it
+    expect(rule).toMatch(/visibility:\s*hidden/);
   });
 });

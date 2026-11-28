@@ -152,7 +152,7 @@ export function directorFor(layer, runSeed = 0) {
 
 // Boss Rush: the three Wardens back to back, each on its own layer (biome,
 // music, Warden kind and HP scaling follow the layer) with only its escort
-// and BOSS_RUSH_ROCKS rocks; GameSessionService.bossRush turns it on.
+// and BOSS_RUSH_ROCKS rocks; the run's mode (src/core/runMode.js) turns it on.
 export const BOSS_RUSH_LAYERS = deepFreeze([5, 10, 15]);
 const BOSS_RUSH_ROCKS = 3; // proposta 18/10
 // The calm after each Warden but the last (one card pick, the next title).

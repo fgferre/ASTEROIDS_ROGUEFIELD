@@ -456,6 +456,7 @@ export class PlayerFlight {
       pilotForce,
       isMainManual,
       isAuxManual,
+      isSideManual: Boolean(strafe) || (!modern && (asks.left || asks.right)),
       jets: {
         ...jets,
         turn: Math.max(-1, Math.min(1, spin / spinShown)),

@@ -1,16 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FieldBackdrop } from '../../../src/modules/render3d/fieldBackdrop.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const look = (overrides = {}) => ({
   structures: 0,
@@ -90,11 +80,11 @@ describe('FieldBackdrop', () => {
     backdrop.setLook(look({ structures: 0.4, debris: 0.25 }));
     expect(backdrop.structures.dark.opacity).toBeCloseTo(0.4);
     const matrix = new THREE.Matrix4();
-    const scale = new THREE.Vector3();
+    const column = new THREE.Vector3();
+    // read off the matrix: decompose() calls a zero scale 1 since r187
     const scaleOf = (i) => {
       backdrop.debris.getMatrixAt(i, matrix);
-      matrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
-      return scale.x;
+      return column.setFromMatrixColumn(matrix, 0).length();
     };
     expect(scaleOf(0)).toBeGreaterThan(0);
     expect(scaleOf(47)).toBe(0);

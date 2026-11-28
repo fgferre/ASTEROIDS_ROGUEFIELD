@@ -12,8 +12,7 @@ describe('PlayerSystem shot recoil', () => {
     const eventBus = createEventBusMock();
     const player = new PlayerSystem({
       eventBus,
-      input: { getMovementInput: () => ({}) },
-      'command-queue': null,
+      input: { takeStepFrame: () => ({}) },
     });
     const shot = (cooldownMultiplier) => ({
       cooldownMultiplier,

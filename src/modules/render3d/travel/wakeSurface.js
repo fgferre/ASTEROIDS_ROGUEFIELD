@@ -242,7 +242,7 @@ function finish(THREE, s, { strength, tile }) {
     t.minFilter = THREE.LinearMipmapLinearFilter;
     t.generateMipmaps = true;
     t.anisotropy = 8;
-    if (srgb) t.encoding = THREE.sRGBEncoding;
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
     t.needsUpdate = true;
     return t;
   };
@@ -630,11 +630,11 @@ function patchPaint(shader) {
   shader.fragmentShader = shader.fragmentShader
     .replace(
       '#include <map_fragment>',
-      'vec4 wakeTexel = mapTexelToLinear(texture2D(map, vUv));'
+      'vec4 wakeTexel = texture2D(map, vMapUv); // sRGB decoded on read'
     )
     .replace(
       '#include <color_fragment>',
-      'diffuseColor.rgb *= wakeTexel.rgb * mix(vec3(1.0), vColor, wakeTexel.a);'
+      'diffuseColor.rgb *= wakeTexel.rgb * mix(vec3(1.0), vColor.rgb, wakeTexel.a);'
     );
 }
 

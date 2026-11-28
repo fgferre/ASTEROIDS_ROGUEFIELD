@@ -27,8 +27,8 @@ const SHADOW = { half: 1900, tall: 1200, near: 500, far: 11000, map: 4096 };
 export function lightWake(THREE, wake, side = -1) {
   const lamp = ({ color, intensity, from }) => {
     const light = new THREE.DirectionalLight(
-      new THREE.Color(color).convertSRGBToLinear(),
-      intensity
+      new THREE.Color(color),
+      intensity * Math.PI
     );
     // Authoring units: far enough to stand outside the hull.
     light.position

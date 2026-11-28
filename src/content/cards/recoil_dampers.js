@@ -10,6 +10,7 @@ export default {
   icon: '🔩',
   themeColor: PALETTE.player,
   unlockLevel: 3,
+  unlock: { by: 'start', at: 7 },
   tags: ['pierce', 'weaponry'],
   text: {
     name: 'Recoil Dampers',
@@ -62,6 +63,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { pierceBonus: 1 },
         },
       ],

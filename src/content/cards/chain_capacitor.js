@@ -10,6 +10,7 @@ export default {
   icon: '🔗',
   themeColor: PALETTE.status,
   unlockLevel: 3,
+  unlock: { by: 'license', at: 5, cost: 250 },
   tags: ['chain', 'weaponry'],
   text: {
     name: 'Chain Capacitor',
@@ -87,6 +88,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-chain-capacitor',
+          to: 'combat',
+          lands: 'cards.cardEffects.chainCapacitor',
           payload: { extraJumps: 1, doubleHitChance: 0.1 },
         },
       ],

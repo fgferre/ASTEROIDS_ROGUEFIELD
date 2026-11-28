@@ -55,7 +55,7 @@ const MENU_SKY = 0.35;
 const STUDIO_GLSL = 'vec3(-0.45, 0.7, 0.55)';
 const STUDIO_STRENGTH = '1.1';
 // A locked hull's silhouette: dark slate, a shade above the starfield.
-const SILHOUETTE_COLOR = 0x1c2533;
+const SILHOUETTE_COLOR = 0x5d6a7c;
 
 // Plume: white-hot at the nozzle, fading into the accent toward the tip
 // (cone uv.y runs 0 at the base to 1 at the tip).
@@ -170,9 +170,10 @@ export class MenuHullPreview {
 
   /**
    * The hull's own reflection sky (hullModel.js), as in the game, from the
-   * menu's `renderer` (its own generator), and again after a lost context.
+   * menu's `renderer` (its own generator), and again after a lost context,
+   * inside `seeded` (three names what it builds with Math.random).
    */
-  useSky(renderer) {
+  useSky(renderer, seeded) {
     const { hull, canopy } = this.materials;
     // not the turret: its dome mirrored the softboxes vivid blue (22/11)
     const materials = [...hull, canopy];
@@ -186,7 +187,9 @@ export class MenuHullPreview {
       pmrem.dispose();
     };
     dress();
-    renderer.domElement.addEventListener('webglcontextrestored', dress);
+    renderer.domElement.addEventListener('webglcontextrestored', () =>
+      seeded(dress)
+    );
   }
 
   build(definition) {

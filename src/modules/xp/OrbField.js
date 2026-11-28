@@ -84,6 +84,10 @@ export class OrbField {
       source: 'drop',
       pendingRemoval: false,
       active: false,
+      home: null,
+      driftHeading: null,
+      fusionId: null,
+      _gridIndex: 0,
     };
   }
 
@@ -110,7 +114,10 @@ export class OrbField {
     orb.source = 'drop';
     orb.pendingRemoval = false;
     orb.active = false;
+    orb.home = null;
     orb.driftHeading = null;
+    orb.fusionId = null;
+    orb._gridIndex = 0;
   }
 
   acquireOrb() {

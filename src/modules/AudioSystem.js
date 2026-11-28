@@ -67,7 +67,6 @@ class AudioSystem extends BaseSystem {
     this.settings = resolveService('settings', this.dependencies);
     this.random =
       resolveService('random', this.dependencies) ||
-      (this.dependencies && this.dependencies.random) ||
       new RandomService('audio-system:fallback');
     this.randomScopes = {
       ...createRandomScopes(this.random),
@@ -135,6 +134,9 @@ class AudioSystem extends BaseSystem {
     // The recorded music (data/audio/sectorScores.js). Joins the music chain at the duck
     // node, like the file tracks (init below).
     this.sectorScore = new SectorScore({ mixer: this.musicMixer });
+    // The ending's act 1 has the music of the win in progress
+    // (audio/eventHandlers.js endingScore).
+    this.endingScoreOn = false;
 
     // FileTrackManager (INFRA-02) — owns the MP3 streaming catalog + media graph
     // + rejection-safe, resume-race-hardened, ordered playback starts. Composed
@@ -642,11 +644,19 @@ class AudioSystem extends BaseSystem {
     const isOpen = Boolean(payload?.isOpen);
     const source = typeof payload?.source === 'string' ? payload.source : null;
 
-    // The endings' own music: the choice plays until one is picked, the credits
-    // from their roll until the menu takes over (_handleScreenChanged).
+    // The endings' own music: the choice's plays on through the ending picked
+    // until the credits' starts in its place (FileTrackManager stops the track
+    // it replaces), which plays until the menu takes over
+    // (_handleScreenChanged).
     if (overlay === 'ending') {
-      if (isOpen) this.playFileTrack(FILE_TRACK_MANAGER_IDS.ENDING_CHOICE);
-      else this.stopFileTrack(FILE_TRACK_MANAGER_IDS.ENDING_CHOICE);
+      // Already playing since act 1 started: it goes on, not restarted.
+      if (
+        isOpen &&
+        this.fileTrackManager?.activeTrackId !==
+          FILE_TRACK_MANAGER_IDS.ENDING_CHOICE
+      ) {
+        this.playFileTrack(FILE_TRACK_MANAGER_IDS.ENDING_CHOICE);
+      }
       return;
     }
     if (overlay === 'end-credits') {

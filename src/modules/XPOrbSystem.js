@@ -13,6 +13,7 @@ import { OrbFusion } from './xp/OrbFusion.js';
 import { OrbSpacing } from './xp/OrbSpacing.js';
 import { OrbMagnet } from './xp/OrbMagnet.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
+import { routeCardEffects } from './cardEffectRoutes.js';
 
 const SERVICE_CACHE_MAP = Object.freeze({
   cachedPlayer: 'player',
@@ -279,10 +280,18 @@ class XPOrbSystem extends BaseSystem {
       this.towPulse = null;
     });
 
-    // A new rank keeps the time already counted toward the next haul.
-    this.registerEventListener('upgrade-tow-pulse', ({ interval }) => {
-      this.towPulse = { interval, timer: this.towPulse?.timer ?? 0 };
-    });
+    // The card effects routed to the orbs (src/modules/cardEffectRoutes.js).
+    routeCardEffects(
+      this,
+      'xp-orbs',
+      (event, fn) => this.registerEventListener(event, fn),
+      {
+        // A new rank keeps the time already counted toward the next haul.
+        'upgrade-tow-pulse': ({ interval }) => {
+          this.towPulse = { interval, timer: this.towPulse?.timer ?? 0 };
+        },
+      }
+    );
 
     this.registerEventListener('player-reset', () => {
       super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
@@ -662,6 +671,67 @@ class XPOrbSystem extends BaseSystem {
     if (!this.isOrbEligibleForFusion(orb)) return 0;
     orb.collected = true;
     return orb.value;
+  }
+
+  // The orbs on the field as plain data (a fusion holds its orbs by index),
+  // what moves them and the system's draws: the death snapshot
+  // (session/deathSnapshot.js) puts them back on a retry.
+  getSnapshotState() {
+    const orbs = this.xpOrbs;
+    return {
+      orbs: orbs.map((orb) => ({ ...orb, home: orb.home && { ...orb.home } })),
+      fusions: this.fusion.activeFusionAnimations.map((animation) => ({
+        ...animation,
+        center: { ...animation.center },
+        orbs: animation.orbs.map((entry) => ({
+          ...entry,
+          orb: orbs.indexOf(entry.orb),
+        })),
+      })),
+      fusionCheckTimer: this.fusion.fusionCheckTimer,
+      globalPull: this.globalPull && { ...this.globalPull },
+      towPulse: this.towPulse && { ...this.towPulse },
+      drift: this.drift && {
+        ...this.drift,
+        random: this.drift.random.serialize(),
+      },
+      random: Object.fromEntries(
+        Object.entries(this.randomForks).map(([name, fork]) => [
+          name,
+          fork.serialize(),
+        ])
+      ),
+    };
+  }
+
+  restoreSnapshotState(snapshot) {
+    this.field.reset();
+    const orbs = snapshot.orbs.map((data) => {
+      const orb = Object.assign(this.field.acquireOrb(), data, {
+        home: data.home && { ...data.home },
+      });
+      this.field.addOrbToPools(orb);
+      return orb;
+    });
+    this.fusion.activeFusionAnimations = snapshot.fusions.map((animation) => ({
+      ...animation,
+      center: { ...animation.center },
+      orbs: animation.orbs.map((entry) => ({ ...entry, orb: orbs[entry.orb] })),
+    }));
+    this.fusion.fusionCheckTimer = snapshot.fusionCheckTimer;
+    this.homing = new Set(orbs.filter((orb) => orb.home));
+    this.globalPull = snapshot.globalPull && { ...snapshot.globalPull };
+    this.towPulse = snapshot.towPulse && { ...snapshot.towPulse };
+    this.drift = null;
+    if (snapshot.drift) {
+      const random = new RandomService(snapshot.drift.random.seed);
+      random.restore(snapshot.drift.random);
+      this.drift = { ...snapshot.drift, random };
+    }
+    Object.entries(snapshot.random).forEach(([name, state]) =>
+      this.randomForks[name].restore(state)
+    );
+    return true;
   }
 
   reset() {

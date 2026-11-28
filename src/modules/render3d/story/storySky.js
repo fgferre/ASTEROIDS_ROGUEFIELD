@@ -122,7 +122,7 @@ void main() {
 
 /** The sky dome: { mesh, uniforms }; `place(camera)` each frame. */
 export function buildStorySky(THREE) {
-  const tint = (hex) => new THREE.Color(hex).convertSRGBToLinear();
+  const tint = (hex) => new THREE.Color(hex);
   const uniforms = {
     uZenith: { value: tint(STORY_SKY.zenith) },
     uHigh: { value: tint(STORY_SKY.high) },

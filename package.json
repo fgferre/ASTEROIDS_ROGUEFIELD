@@ -1,6 +1,6 @@
 {
   "name": "asteroids_roguefield",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Roguelike game inspired by Asteroids mechanics",
   "type": "module",
   "main": "app.js",
@@ -28,25 +28,19 @@
     "test:physics": "node scripts/pinned-node.mjs scripts/vitest-group.mjs run tests/physics",
     "playtest": "node scripts/pinned-node.mjs scripts/playtest.mjs",
     "capture": "node scripts/capture.mjs",
-    "cartao": "node scripts/cartao.mjs",
-    "stress": "node scripts/run-stress-checks.mjs",
-    "analyze:deps": "node scripts/analyze-dependencies.js && node scripts/generate-mermaid-graph.js",
-    "analyze:deps:watch": "nodemon --watch src --exec npm run analyze:deps",
-    "validate:deps": "node scripts/analyze-dependencies.js --validate-only",
-    "test:benchmark": "node scripts/benchmark-tests.js",
-    "test:validate-optimizations": "node scripts/validate-test-optimizations.js"
+    "cartao": "node scripts/cartao.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^9.39.1",
     "globals": "^16.5.0",
-    "nodemon": "^3.1.10",
     "prettier": "3.2.5",
     "vite": "^7.3.1",
     "vitest": "^4.1.12"
   },
   "dependencies": {
-    "nipplejs": "^1.0.4"
+    "nipplejs": "^1.0.4",
+    "three": "0.187.0"
   }
 }

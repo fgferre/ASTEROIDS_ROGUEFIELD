@@ -24,7 +24,12 @@ const WEAPON_CARDS = armed.map(({ id, card }) => ({
     {
       rank: 1,
       effects: [
-        { type: 'event', event: 'upgrade-weapon', payload: { weaponId: id } },
+        {
+          type: 'event',
+          event: 'upgrade-weapon',
+          to: 'combat',
+          payload: { weaponId: id },
+        },
       ],
     },
   ],
@@ -72,11 +77,36 @@ export function textForWeapon(card, weaponId) {
   };
 }
 
+// A card's `unlock` (how it enters the draw) is the Hangar's to read, through
+// `cardsUnlockedBy`; the catalog leaves it out.
 const UPGRADE_LIBRARY = deepFreeze(
-  [...cardsForFlight(listContent('cards')), ...WEAPON_CARDS].sort(
-    (a, b) => a.order - b.order
-  )
+  [...cardsForFlight(listContent('cards')), ...WEAPON_CARDS]
+    .map(({ unlock: _unlock, ...card }) => card)
+    .sort((a, b) => a.order - b.order)
 );
+
+/**
+ * The cards and weapon cards whose `unlock.by` is `by` (`start`, `license`,
+ * `pilot`, `medal`), as `{ id, kind, unlock }` with `kind` 'card' or
+ * 'weapon', in `unlock.at` order. data/hangar.js and data/achievements.js
+ * build their lists from it.
+ */
+export function cardsUnlockedBy(by) {
+  return [
+    ...listContent('cards').map(({ id, unlock }) => ({
+      id,
+      kind: 'card',
+      unlock,
+    })),
+    ...armed.map(({ card: { id, unlock } }) => ({
+      id,
+      kind: 'weapon',
+      unlock,
+    })),
+  ]
+    .filter(({ unlock }) => unlock?.by === by)
+    .sort((a, b) => (a.unlock.at ?? 0) - (b.unlock.at ?? 0));
+}
 /**
  * The new flight's piloting cards: the Flight Computer and every card on its
  * way (its prerequisites, followed down); none when it is not in `cards`.

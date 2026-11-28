@@ -23,7 +23,8 @@ import { createServiceManifest } from '../bootstrap/serviceManifest.js';
 
 export class ServiceRegistry {
   /**
-   * Registers all game services in the DI container.
+   * Registers all game services in the DI container, creating none; the
+   * eager ones are created afterwards by container.createEagerServices().
    *
    * @param {DIContainer} container - The DI container to populate
    */

@@ -12,6 +12,7 @@ export default {
   icon: '🪨',
   themeColor: PALETTE.player,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 6 },
   tags: ['damage', 'finisher'],
   text: {
     name: 'Ballast Rounds',
@@ -43,6 +44,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-execute-damage',
+          to: 'combat',
+          lands: 'cards.cardEffects.executeDamage',
           payload: { threshold: THRESHOLD, damageMultiplier: 1.3 }, // proposta 20/10
         },
       ],
@@ -53,6 +56,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-execute-damage',
+          to: 'combat',
+          lands: 'cards.cardEffects.executeDamage',
           payload: { threshold: THRESHOLD, damageMultiplier: 1.6 }, // proposta 20/10
         },
       ],
@@ -63,6 +68,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-execute-damage',
+          to: 'combat',
+          lands: 'cards.cardEffects.executeDamage',
           payload: { threshold: THRESHOLD, damageMultiplier: 2 }, // proposta 20/10
         },
       ],

@@ -93,6 +93,8 @@ export class Weapons {
       ? Math.max(0, COMBAT_SHOOT_COOLDOWN)
       : 0.3;
     this.baseShootCooldown = this.shootCooldown;
+    // The shot clock carries its remainder (restartClock; card decision 6, not
+    // confirmed).
 
     // Plan 01.07 FIX-05 — spread mode state (the aim mode lives in Targeting).
     // Default = concentrated + auto so the centerline fix lands silently for
@@ -384,7 +386,7 @@ export class Weapons {
     }
     this._concentratedLanes = null;
 
-    this.lastShotTime = 0;
+    this.restartClock();
 
     if (firedTargets.length) {
       const firstTarget = firedTargets[0]?.position || null;
@@ -430,10 +432,21 @@ export class Weapons {
     }
   }
 
+  // A shot was fired: the clock waits one cooldown plus `extra` s, keeping
+  // what it ran past the cooldown (at most 0.05 s, so a long wait cannot
+  // burst).
+  restartClock(extra = 0) {
+    const carry = Math.min(
+      0.05,
+      Math.max(0, this.lastShotTime - this.shootCooldown)
+    );
+    this.lastShotTime = carry - extra;
+  }
+
   canShoot() {
     // [SMART AUTO-FIRE] Allow firing if cooldown is ready.
     // We no longer require a forced target lock.
-    return this.lastShotTime >= this.shootCooldown;
+    return this.lastShotTime >= this.shootCooldown - 1e-9;
   }
 
   // [SMART AUTO-FIRE] Helper: Fire forward relative to ship rotation
@@ -500,7 +513,7 @@ export class Weapons {
       });
     }
 
-    this.lastShotTime = 0;
+    this.restartClock();
 
     if (firedTargets.length) {
       // Plan 01.07 Task 2: centerline = the on-axis aim point at fixed range
@@ -578,6 +591,19 @@ export class Weapons {
     this.broods = [];
     this.echo = null; // a Chain Capacitor volley or beam due again
     this.refreshLanceLook();
+  }
+
+  /**
+   * How far the weapon in hand strikes, px from the muzzle: its fire's range,
+   * or where its bolts burst plus the burst; Infinity when its shots fly on.
+   */
+  get reach() {
+    const { fire, projectile } = this.weapon;
+    const reaches = [
+      ...fire.map(({ range }) => range),
+      projectile?.range + (projectile?.burst?.radius ?? 0),
+    ].filter(Number.isFinite);
+    return reaches.length > 0 ? Math.max(...reaches) : Infinity;
   }
 
   /** The weapon the ship carries, in its own form once its family evolved. */

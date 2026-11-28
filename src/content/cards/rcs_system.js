@@ -11,6 +11,7 @@ export default {
   icon: '🛰️',
   themeColor: '#5DADE2',
   unlockLevel: 2,
+  unlock: { by: 'pilot', at: 3 },
   tags: ['agility', 'maneuvers'],
   prerequisites: [
     {
@@ -67,11 +68,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-thrust-agility',
+          to: 'player',
+          lands: { 'flight.agility': 'multiplier' },
           payload: { multiplier: 1.3 }, // proposta 20/10
         },
         {
           type: 'event',
           event: 'upgrade-rcs-visual',
+          to: 'player',
           payload: { level: 1 },
         },
       ],
@@ -82,11 +86,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-thrust-agility',
+          to: 'player',
+          lands: { 'flight.agility': 'multiplier' },
           payload: { multiplier: 1.6 }, // proposta 20/10
         },
         {
           type: 'event',
           event: 'upgrade-rcs-visual',
+          to: 'player',
           payload: { level: 2 },
         },
       ],
@@ -97,11 +104,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-thrust-agility',
+          to: 'player',
+          lands: { 'flight.agility': 'multiplier' },
           payload: { multiplier: 1.9 }, // proposta 20/10
         },
         {
           type: 'event',
           event: 'upgrade-rcs-visual',
+          to: 'player',
           payload: { level: 3 },
         },
       ],
@@ -112,11 +122,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-thrust-agility',
+          to: 'player',
+          lands: { 'flight.agility': 'multiplier' },
           payload: { multiplier: 2.2 }, // proposta 20/10
         },
         {
           type: 'event',
           event: 'upgrade-rcs-visual',
+          to: 'player',
           payload: { level: 4 },
         },
       ],
@@ -127,11 +140,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-thrust-agility',
+          to: 'player',
+          lands: { 'flight.agility': 'multiplier' },
           payload: { multiplier: 2.6 }, // proposta 20/10
         },
         {
           type: 'event',
           event: 'upgrade-rcs-visual',
+          to: 'player',
           payload: { level: 5 },
         },
       ],

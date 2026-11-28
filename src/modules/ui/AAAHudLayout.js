@@ -239,17 +239,16 @@ export class AAAHudLayout {
     {
       boss = false,
       sentinel = false,
-      bossRush = false,
+      title = null,
       delayMs = 0,
       chapter = '',
       context = '',
     } = {}
   ) {
-    let title = boss
+    const layerTitle = boss
       ? `LAYER ${layer} — ${sentinel ? 'SENTINEL' : 'WARDEN'}`
       : `LAYER ${layer}`;
-    if (bossRush) title = 'BOSS RUSH';
-    this._showBanner(title, {
+    this._showBanner(title ?? layerTitle, {
       tone: boss ? 'boss' : null,
       subtitle: chapter,
       note: context,

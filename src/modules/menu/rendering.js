@@ -32,22 +32,10 @@ export function createMenuRenderer(THREE, canvas) {
   renderer.setPixelRatio(resolveDevicePixelRatio());
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearColor(0x050916, 1);
-  if (
-    typeof renderer.outputEncoding !== 'undefined' &&
-    THREE &&
-    THREE.sRGBEncoding
-  ) {
-    renderer.outputEncoding = THREE.sRGBEncoding;
-  }
-  if (
-    typeof renderer.toneMapping !== 'undefined' &&
-    THREE &&
-    typeof THREE.NoToneMapping !== 'undefined'
-  ) {
-    // Monolith shader outputs in linear and lets renderer handle encoding.
-    renderer.toneMapping = THREE.NoToneMapping;
-    renderer.toneMappingExposure = 1.0;
-  }
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  // Monolith shader outputs in linear and lets renderer handle encoding.
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.toneMappingExposure = 1.0;
 
   return renderer;
 }
@@ -55,16 +43,17 @@ export function createMenuRenderer(THREE, canvas) {
 /** Adds the menu's lights to `scene`; returns the key light (the sun). */
 export function createLighting(THREE, scene) {
   // Keep scene lights minimal and dramatic (single distant sun + subtle ambient).
-  const ambient = new THREE.AmbientLight(0x101820, 0.015);
+  // The colours are sRGB hexes, read to the linear values they were tuned at.
+  const ambient = new THREE.AmbientLight(0x475663, 0.015 * Math.PI);
   scene.add(ambient);
 
   // Distant sun-like directional light (grazing angle for strong terminator).
-  const keyLight = new THREE.DirectionalLight(0xfff0e6, 3.1);
+  const keyLight = new THREE.DirectionalLight(0xfff8f4, 3.1 * Math.PI);
   keyLight.position.set(560, 130, -240);
   scene.add(keyLight);
 
   // Very subtle cool fill to avoid pure-black crush while keeping contrast.
-  const fill = new THREE.DirectionalLight(0x4466aa, 0.1);
+  const fill = new THREE.DirectionalLight(0x8daad5, 0.1 * Math.PI);
   fill.position.set(-260, -120, 180);
   scene.add(fill);
 

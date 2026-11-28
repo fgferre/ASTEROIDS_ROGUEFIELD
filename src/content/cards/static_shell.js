@@ -10,6 +10,7 @@ export default {
   icon: '⚡',
   themeColor: PALETTE.status,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 10 },
   tags: ['retaliation', 'hull'],
   text: {
     name: 'Static Shell',
@@ -42,6 +43,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-static-shell',
+          to: 'combat',
+          lands: 'cards.cardEffects.staticShell',
           payload: { radius: 90, damage: 20 },
         },
       ],
@@ -52,6 +55,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-static-shell',
+          to: 'combat',
+          lands: 'cards.cardEffects.staticShell',
           payload: { radius: 90, damage: 40 },
         },
       ],
@@ -62,6 +67,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-static-shell',
+          to: 'combat',
+          lands: 'cards.cardEffects.staticShell',
           payload: { radius: 90, damage: 60 },
         },
       ],

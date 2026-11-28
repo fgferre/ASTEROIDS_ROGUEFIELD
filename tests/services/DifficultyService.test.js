@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../__helpers__/domStubs.js';
+import { runModeFor } from '../../src/core/runMode.js';
 import DifficultyService, {
   DAILY_STORAGE_KEY,
   dailyLabel,
@@ -20,6 +21,8 @@ const settingsWith = (difficulty) => ({
 
 const at = (iso) => () => new Date(iso);
 
+const DAILY = runModeFor({ daily: true });
+const DESCENT = runModeFor({ daily: false, bossRush: false });
 describe('DifficultyService', () => {
   let restoreDom;
   beforeEach(() => {
@@ -44,7 +47,7 @@ describe('DifficultyService', () => {
   it('locks the preset when a run begins', () => {
     const settings = settingsWith('pilot');
     const service = new DifficultyService({ settings });
-    service.beginRun({ daily: false });
+    service.beginRun({ mode: DESCENT });
     settings.getSetting = () => 'warden';
     expect(service.getDifficulty()).toBe('pilot');
     service.beginRun();
@@ -60,7 +63,7 @@ describe('DifficultyService', () => {
       settings: settingsWith('pilot'),
       bootSeed: seed,
     });
-    expect(service.beginRun({ daily: false })).toBe(2229850880);
+    expect(service.beginRun({ mode: DESCENT })).toBe(2229850880);
     expect(service.getDifficulty()).toBe('warden');
     expect(service.runLabel()).toBe('SEED 2229850880 · WARDEN');
   });
@@ -74,7 +77,7 @@ describe('DifficultyService', () => {
       bootSeed: 7,
       bootSeedSource: 'crypto',
     });
-    expect(service.beginRun({ daily: false })).toBe(7);
+    expect(service.beginRun({ mode: DESCENT })).toBe(7);
     expect(service.beginRun()).toBe(111);
     expect(service.getRunSeed()).toBe(111);
     expect(service.beginRun()).toBe(222);
@@ -88,7 +91,7 @@ describe('DifficultyService', () => {
         bootSeed: 7,
         bootSeedSource,
       });
-      expect(service.beginRun({ daily: false })).toBe(7);
+      expect(service.beginRun({ mode: DESCENT })).toBe(7);
       expect(service.beginRun()).toBe(7);
       expect(service.beginRun()).toBe(7);
     }
@@ -111,14 +114,14 @@ describe('DifficultyService', () => {
       bootSeed: 1,
       now: at('2026-10-19T02:30:00.000Z'),
     });
-    expect(service.beginRun({ daily: true })).toBe(dailySeed('2026-10-19'));
+    expect(service.beginRun({ mode: DAILY })).toBe(dailySeed('2026-10-19'));
     expect(service.getDifficulty()).toBe('veteran');
     expect(service.runLabel()).toBe(
       `DAILY FIELD · 19 OCT · SEED ${dailySeed('2026-10-19')}`
     );
     // New Mission keeps the mode; Start leaves it.
     expect(service.beginRun()).toBe(dailySeed('2026-10-19'));
-    expect(service.beginRun({ daily: false })).toBe(1);
+    expect(service.beginRun({ mode: DESCENT })).toBe(1);
     expect(service.getDifficulty()).toBe('warden');
   });
 
@@ -128,11 +131,11 @@ describe('DifficultyService', () => {
       settings: settingsWith('veteran'),
       now: () => new Date(now),
     });
-    service.beginRun({ daily: false });
+    service.beginRun({ mode: DESCENT });
     expect(service.recordRun({ layer: 9, time: 300 })).toBeNull();
     expect(localStorage.getItem(DAILY_STORAGE_KEY)).toBeNull();
 
-    service.beginRun({ daily: true });
+    service.beginRun({ mode: DAILY });
     service.recordRun({ layer: 4, time: 120 });
     service.recordRun({ layer: 3, time: 200 });
     expect(service.getDailyRecord()).toEqual({
@@ -148,7 +151,7 @@ describe('DifficultyService', () => {
   it('plays a replay at its recorded difficulty, old ones at Veteran', () => {
     const service = new DifficultyService({ settings: settingsWith('pilot') });
     service.useReplay({ difficulty: 'warden' });
-    service.beginRun({ daily: false });
+    service.beginRun({ mode: DESCENT });
     expect(service.getDifficulty()).toBe('warden');
     service.useReplay({});
     service.beginRun();
@@ -161,7 +164,7 @@ describe('DifficultyService', () => {
       now: at('2026-10-18T12:00:00.000Z'),
     });
     service.useReplay({ difficulty: 'veteran', date: '2026-10-17' });
-    expect(service.beginRun({ daily: true })).toBe(dailySeed('2026-10-17'));
+    expect(service.beginRun({ mode: DAILY })).toBe(dailySeed('2026-10-17'));
     expect(service.recordRun({ layer: 4, time: 120 })).toBeNull();
     expect(service.getDailyRecord().bestLayer).toBe(0);
   });
@@ -172,11 +175,11 @@ describe('DifficultyService', () => {
       now: at('2026-10-18T12:00:00.000Z'),
     });
     service.useReplay({ difficulty: 'warden', date: '2026-10-17' });
-    service.beginRun({ daily: true });
+    service.beginRun({ mode: DAILY });
 
-    expect(service.beginRun({ daily: true })).toBe(dailySeed('2026-10-18'));
+    expect(service.beginRun({ mode: DAILY })).toBe(dailySeed('2026-10-18'));
     expect(service.recordRun({ layer: 4, time: 120 })).not.toBeNull();
-    service.beginRun({ daily: false });
+    service.beginRun({ mode: DESCENT });
     expect(service.getDifficulty()).toBe('pilot');
   });
 
@@ -186,13 +189,13 @@ describe('DifficultyService', () => {
       bootSeed: 1,
     });
     service.setPressure(2);
-    service.beginRun({ daily: false });
+    service.beginRun({ mode: DESCENT });
     expect(service.getDifficulty()).toBe('pressure-2');
     expect(service.getModifiers()).toBe(PRESSURE_RUNGS[1]);
     expect(service.getPressure()).toBe(2);
     expect(service.runLabel()).toContain('PRESSURE II');
 
-    service.beginRun({ daily: true });
+    service.beginRun({ mode: DAILY });
     expect(service.getDifficulty()).toBe('veteran');
     expect(service.getPressure()).toBe(0);
   });

@@ -10,11 +10,13 @@
 // once nothing is pressed for a while. A hold outlives the scene it began
 // in (or the remote link): the next scene's listener goes on filling the
 // same outline; one that skipped counts again only once let go. A Space
-// already down when no hold was running (the strafe held in flight as the
-// scene starts) skips nothing: only a fresh press starts a hold, never a
-// key's repeat.
+// or a Start already down when no hold was running (the strafe held in
+// flight as the scene starts, or as Settings closes over it) skips nothing:
+// only a fresh press starts a hold, never a key's repeat. A screen opened
+// over the scene drops the hold without acting.
 
 import { PAD_BUTTON } from '../../data/constants/gamepad.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 export const HOLD_MS = 1500; // Felipe, 23/11
 // Pressed and let go within this: a tap.
@@ -122,9 +124,9 @@ function drawProgress() {
   hint.classList.toggle('is-holding', holding() && !hold.needsRelease);
 }
 
-// No cinematic listens any more: the hold and the hint are dropped.
-function settle() {
-  if (listening > 0) return;
+// A screen came over the scene: the hold ends without acting, and the hint
+// goes at once.
+function drop() {
   Object.assign(hold, {
     key: false,
     pad: false,
@@ -132,21 +134,30 @@ function settle() {
     progress: 0,
     needsRelease: false,
   });
-  clearTimeout(hideTimer);
   drawProgress();
   hint?.classList.remove('is-showing');
+}
+
+// No cinematic listens any more: the hold and the hint are dropped.
+function settle() {
+  if (listening > 0) return;
+  clearTimeout(hideTimer);
+  drop();
+  hint?.classList.remove('is-covered');
   // The touch buttons step aside while a cinematic plays (style.css).
   document.body.classList.remove('is-cinematic');
 }
 
 /**
  * Listens while a cinematic plays: `onSkip()` when the hold fills, `onNext()`
- * on a tap. Swallows every key, click and touch meanwhile (capture on window:
- * before any other handler); a key still held after the unbind stays
- * swallowed until it is released. Returns the unbind.
+ * on a tap. On the input layer stack meanwhile: it takes every key (no
+ * screen under it and none of the game's actions hear one), and swallows
+ * every click and touch (capture on window: before any other handler); with
+ * a screen over it (Settings opened by the pad) it hears nothing, SKIP and
+ * the pad's Start included. `noSettings`: Settings does not open over it
+ * (input/inputLayers.js). Returns the unbind.
  */
-export function listenForHold(onSkip, onNext) {
-  const keys = new Set();
+export function listenForHold(onSkip, onNext, { noSettings = false } = {}) {
   let live = true;
   let frame = 0;
   let last = performance.now();
@@ -159,7 +170,12 @@ export function listenForHold(onSkip, onNext) {
   };
   // Let go: a quick one is a tap; one held the whole time skips even if no
   // frame came to fill it (a stalled page); the next hold counts from zero.
+  // Covered, the hold was dropped instead: a release does nothing.
   const release = (source) => {
+    if (inputLayers.covered(layer)) {
+      drop();
+      return;
+    }
     hold[source] = false;
     if (holding()) return;
     const held = hold.needsRelease ? null : performance.now() - hold.since;
@@ -167,28 +183,22 @@ export function listenForHold(onSkip, onNext) {
     if (held !== null && held < TAP_MS) onNext();
     if (held >= HOLD_MS) onSkip();
   };
-  const onKeyDown = (event) => {
-    if (!live && !(event.repeat && keys.has(event.code))) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (!live) return;
-    keys.add(event.code);
-    reveal();
-    if (event.code === SKIP_CODE && !event.repeat && !hold.key) press('key');
-  };
-  const detachKeys = () => {
-    window.removeEventListener('keydown', onKeyDown, true);
-    window.removeEventListener('keyup', onKeyUp, true);
-  };
-  const onKeyUp = (event) => {
-    keys.delete(event.code);
-    if (!live) {
-      if (keys.size === 0) detachKeys();
-      return;
-    }
-    if (event.code === SKIP_CODE && hold.key) release('key');
+  const layer = {
+    name: 'skip-hold',
+    passes: ['pause'],
+    noSettings,
+    onKey: (event) => {
+      event.preventDefault();
+      reveal();
+      if (event.code === SKIP_CODE && !event.repeat && !hold.key) press('key');
+      return true;
+    },
+    onKeyUp: (event) => {
+      if (event.code === SKIP_CODE && hold.key) release('key');
+    },
   };
   const onPointerDown = (event) => {
+    if (inputLayers.covered(layer)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     reveal();
@@ -197,16 +207,34 @@ export function listenForHold(onSkip, onNext) {
   const onPointerUp = () => {
     if (hold.pointer) release('pointer');
   };
-  let padHeld = padSource()?.buttons.map((b) => b.pressed) ?? [];
+  const padButtons = () => padSource()?.buttons.map((b) => b.pressed) ?? [];
+  let padHeld = padButtons();
   const tick = () => {
     const now = performance.now();
     const dt = now - last;
     last = now;
-    const pressed = padSource()?.buttons.map((b) => b.pressed) ?? [];
-    if (pressed.some((on, i) => on && !padHeld[i])) reveal();
+    const pressed = padButtons();
+    const covered = inputLayers.covered(layer);
+    hint?.classList.toggle('is-covered', covered);
+    if (covered) {
+      // A screen over the scene (Settings, opened by the pad): the hold is
+      // dropped, not let go (nothing skips, no next line), and the hint
+      // steps aside; uncovered, only a fresh press starts a hold.
+      if (
+        holding() ||
+        hold.progress > 0 ||
+        hint?.classList.contains('is-showing')
+      )
+        drop();
+      padHeld = pressed;
+      if (live) frame = window.requestAnimationFrame(tick);
+      return;
+    }
+    const fresh = pressed.map((on, i) => on && !padHeld[i]);
+    if (fresh.some(Boolean)) reveal();
     padHeld = pressed;
     const start = Boolean(pressed[PAD_BUTTON.START]);
-    if (start && !hold.pad) press('pad');
+    if (fresh[PAD_BUTTON.START] && !hold.pad) press('pad');
     if (!start && hold.pad) release('pad');
 
     if (holding() && !hold.needsRelease) {
@@ -227,8 +255,7 @@ export function listenForHold(onSkip, onNext) {
     if (live) frame = window.requestAnimationFrame(tick);
   };
 
-  window.addEventListener('keydown', onKeyDown, true);
-  window.addEventListener('keyup', onKeyUp, true);
+  inputLayers.push(layer);
   window.addEventListener('pointerdown', onPointerDown, true);
   window.addEventListener('pointerup', onPointerUp, true);
   window.addEventListener('pointercancel', onPointerUp, true);
@@ -238,7 +265,7 @@ export function listenForHold(onSkip, onNext) {
     live = false;
     listening -= 1;
     window.cancelAnimationFrame(frame);
-    if (keys.size === 0) detachKeys();
+    inputLayers.remove(layer);
     window.removeEventListener('pointerdown', onPointerDown, true);
     window.removeEventListener('pointerup', onPointerUp, true);
     window.removeEventListener('pointercancel', onPointerUp, true);

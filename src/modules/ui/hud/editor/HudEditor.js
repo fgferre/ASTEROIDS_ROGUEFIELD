@@ -11,8 +11,8 @@
 // layouts (built-in presets and the player's own, kept by the settings
 // service: layoutStore.js), undo and redo, the grid, the safe area, the
 // window shapes to preview, reset and layout codes. The run stays paused
-// behind; UISystem hides its screens on open and brings them back in
-// `onClose`.
+// behind; its door (ui/hudEditorDoor.js), which loads this file on the
+// first press, hides the screens on open and brings them back in `onClose`.
 
 import { DEFAULT_HUD_PRESET } from '../../../../data/ui/hudPresets.js';
 import { pickFocusTarget } from '../../gamepadNav.js';
@@ -23,6 +23,7 @@ import {
 } from '../instruments/registry.js';
 import { EditorDialogs } from './editorDialogs.js';
 import { editorKey, editorPad } from './editorInput.js';
+import { inputLayers } from '../../../input/inputLayers.js';
 import {
   chromeMarkup,
   esc,
@@ -90,6 +91,8 @@ const FALLBACK_SIZES = {
   build: [230, 45],
 };
 
+// The pad's presses that move the focus in a dialog or panel, as on any screen.
+const PAD_MOVES = ['up', 'down', 'left', 'right', 'confirm'];
 // What tells the inspector's controls apart (their data attributes).
 const FOCUS_KEYS = ['model', 'visible', 'action', 'control', 'select'];
 
@@ -104,16 +107,46 @@ export class HudEditor {
    * `refresh()`: feeds the HUD the services' values again.
    * `wardenLive()`: a Warden or Herald bar is up for real (no sample then).
    * `device()`: 'keyboard' | 'gamepad', for the hints.
+   * `padPress(root, action)`: a d-pad move or A in `root`, as on any screen
+   *   (gamepadNav.js).
    */
-  constructor({ hud, settings, setLayout, refresh, wardenLive, device }) {
+  constructor({
+    hud,
+    settings,
+    setLayout,
+    refresh,
+    wardenLive,
+    device,
+    padPress,
+  }) {
     this.hud = hud;
     this.settings = settings;
     this.setLayout = setLayout;
     this.refresh = refresh;
     this.wardenLive = wardenLive;
     this.device = device;
+    this.padPress = padPress;
     this.state = null;
-    this.onKeyDown = (event) => editorKey(this, event);
+    // Open, on top of the input layer stack: every key is its own (none
+    // reaches a screen under it or the game); the pad moves in its dialog
+    // or panels, else drives the instruments; the pad's Start still passes
+    // (the run stays paused: UISystem). Settings does not open over it: the
+    // editor is Settings' own page, drawn above it (it would sit unseen).
+    this.inputLayer = {
+      name: 'hud-editor',
+      passes: ['pause'],
+      noSettings: true,
+      pointer: true,
+      onKey: (event) => {
+        editorKey(this, event);
+        return true;
+      },
+      onPad: (action) => {
+        const root = this.navRoot;
+        if (root && PAD_MOVES.includes(action)) this.padPress(root, action);
+        else this.handlePadNav(action);
+      },
+    };
     this.onResize = () => {
       this.applyPreview();
       this.render();
@@ -171,7 +204,7 @@ export class HudEditor {
     this.build(hud.layer);
     document.body.classList.add('is-hud-editing');
     hud.layer.classList.add('is-editing');
-    window.addEventListener('keydown', this.onKeyDown, true);
+    inputLayers.push(this.inputLayer);
     window.addEventListener('resize', this.onResize);
     this.setLayout(preset.items);
     // Today's values (and the ship's screen point, for its frames).
@@ -252,7 +285,7 @@ export class HudEditor {
   close() {
     const s = this.state;
     if (!s) return;
-    window.removeEventListener('keydown', this.onKeyDown, true);
+    inputLayers.remove(this.inputLayer);
     window.removeEventListener('resize', this.onResize);
     this.dialogs.dispose();
     window.clearTimeout(s.feedTimer);

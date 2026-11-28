@@ -7,6 +7,7 @@ export default {
   icon: '⚙️',
   themeColor: '#5DADE2',
   unlockLevel: 3,
+  unlock: { by: 'pilot', at: 2 },
   tags: ['control', 'braking', 'precision'],
   prerequisites: [
     {
@@ -54,11 +55,13 @@ export default {
         {
           type: 'event',
           event: 'upgrade-linear-damping',
+          to: 'player',
           payload: { multiplier: 1.3 },
         },
         {
           type: 'event',
           event: 'upgrade-braking-visual',
+          to: 'player',
           payload: { level: 1 },
         },
       ],
@@ -69,11 +72,13 @@ export default {
         {
           type: 'event',
           event: 'upgrade-linear-damping',
+          to: 'player',
           payload: { multiplier: 1.231 }, // Total: 1.60
         },
         {
           type: 'event',
           event: 'upgrade-braking-visual',
+          to: 'player',
           payload: { level: 2 },
         },
       ],
@@ -84,16 +89,20 @@ export default {
         {
           type: 'event',
           event: 'upgrade-linear-damping',
+          to: 'player',
           payload: { multiplier: 1.25 }, // Total: 2.00
         },
         {
           type: 'event',
           event: 'upgrade-braking-visual',
+          to: 'player',
           payload: { level: 3 },
         },
         {
           type: 'event',
           event: 'upgrade-emergency-brake',
+          to: 'player',
+          lands: 'maneuvers.emergencyBrake',
           // proposta 18/10: hold a direction against the motion `hold` s →
           // stop over `stopTime` s with a shove-only shockwave of `radius` px.
           payload: {

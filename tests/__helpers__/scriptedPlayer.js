@@ -23,7 +23,7 @@
  *
  * FIX-04 dependencies (field shapes assumed — refresh if CombatSystem /
  * EnemySystem refactor changes the underlying containers):
- *   - combat.enemyBullets — active enemy projectile array
+ *   - combat.projectiles.enemyBullets — active enemy projectile array
  *   - combat.handleShooting(dt, stats) — fire-this-frame entry point
  *   - player.position.{x, y}, player.velocity.{vx, vy}
  *   - player.getStats() — combat-ready stat snapshot
@@ -83,7 +83,7 @@ export function createScriptedPlayer({ player, combat, enemies } = {}) {
       // 2) Dodge: find nearest incoming enemy projectile.
       let nearest = null;
       let nearestDist = Infinity;
-      const proj = combat.enemyBullets ?? [];
+      const proj = combat.projectiles.enemyBullets ?? [];
       for (const p of proj) {
         if (!p) continue;
         const dx = (p.x ?? 0) - (player.position?.x ?? 0);

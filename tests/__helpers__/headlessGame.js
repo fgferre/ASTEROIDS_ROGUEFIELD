@@ -5,7 +5,6 @@
  * systems (tests/process/simulationLoadsNoPresentation.test.js guards it).
  */
 
-import { afterEach } from 'vitest';
 import { DIContainer } from '../../src/core/DIContainer.js';
 import { EventBus } from '../../src/core/EventBus.js';
 import { GamePools } from '../../src/core/GamePools.js';
@@ -33,10 +32,8 @@ const SIMULATION_SERVICES = [
   'random',
   'game-state',
   'game-pools',
-  'garbage-collector',
   'settings',
   'difficulty',
-  'command-queue',
   ...UPDATE_ORDER,
   'effects',
   'game-session',
@@ -53,15 +50,6 @@ export function createRendererDouble(eventBus) {
  * One game instance: real simulation services, presentation doubles.
  * `seedSource` is the boot's ('profile-harness' boots a demo page).
  */
-// Each game's garbage collector queues its first pool pass on a 150 ms real
-// timer; left running, it logged after the test, sometimes while the worker
-// closed (stray errors under load). Every importing file shuts them at the end
-// of each test.
-const collectors = [];
-afterEach(() => {
-  while (collectors.length) collectors.pop().shutdown();
-});
-
 export function createHeadlessGame({ seedSource = 'test' } = {}) {
   GamePools.releaseAll();
 
@@ -124,7 +112,6 @@ export function createHeadlessGame({ seedSource = 'test' } = {}) {
   for (const name of SIMULATION_SERVICES) {
     services[name] = container.resolve(name);
   }
-  collectors.push(services['garbage-collector']);
   const session = services['game-session'];
   session.initialize({ seedInfo: { seed: SEED, source: 'test' } });
 
@@ -158,8 +145,6 @@ export function createHeadlessGame({ seedSource = 'test' } = {}) {
     },
     /** Mirrors the fixed-step body of app.js gameLoop. */
     step() {
-      services['game-pools'].update(STEP_SECONDS);
-      services['garbage-collector'].update(STEP_SECONDS);
       const adjusted = services.effects.update(STEP_SECONDS);
       for (const name of UPDATE_ORDER) {
         services[name].update(adjusted);

@@ -4,8 +4,15 @@
 export default {
   id: 'heat',
   order: 5,
+  tier: 'herald',
   displayName: 'Herald of Heat',
   subtitle: 'The Core remembers fire',
+  codex: {
+    lore: 'The Core still burns where we told it to. The Heat carries the flame from rock to rock and knows each one by its temperature. A pilot is one more reading, and the reading is rising.',
+    hint: 'Its seam brightens, then the rocks nearest it turn Volatile.',
+    glyph:
+      '<circle r="12"/><path class="eye" fill-rule="evenodd" d="M-10.5 0a10.5 10.5 0 1 0 21 0a10.5 10.5 0 1 0 -21 0Z M-8.5 0a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0Z"/>',
+  },
   health: 700,
   radius: 30,
   contactDamage: 20,

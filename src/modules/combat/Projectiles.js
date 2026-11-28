@@ -120,11 +120,6 @@ export class Projectiles {
     bullet.pierceLeft = projectile.pierce
       ? weapon.lancePierce + weapon.pierceBonus
       : 0;
-    if (!bullet.pierced) {
-      bullet.pierced = [];
-    } else {
-      bullet.pierced.length = 0;
-    }
 
     // Initialize trail array
     if (!bullet.trail) {
@@ -232,6 +227,8 @@ export class Projectiles {
     bullet.enemyId = data.enemyId ?? data.source?.id ?? data.enemy?.id ?? null;
     bullet.enemyType =
       data.enemyType ?? data.source?.type ?? data.enemy?.type ?? null;
+    // Its kind of shot ('herald-shard'...): a Herald finds its shards by it.
+    bullet.pattern = projectile.pattern ?? null;
     bullet.source = data.source
       ? { ...data.source }
       : bullet.enemyId || bullet.enemyType
@@ -578,18 +575,9 @@ export class Projectiles {
           });
           bullet.destroyLogEmitted = true;
         }
-        bullet.source = null;
-        bullet.enemyId = null;
-        bullet.enemyType = null;
-        bullet.isBossProjectile = false;
-        bullet.destroyed = false;
-        bullet.destroyReason = null;
-        bullet.destroyLogEmitted = false;
-        bullet.createdAt = 0;
         if (Array.isArray(bullet.trail)) {
           bullet.trail.length = 0;
         }
-        bullet.trailMax = 0;
         GamePools.bullets.release(bullet);
       }
     }
@@ -609,6 +597,21 @@ export class Projectiles {
     }
   }
 
+  /** The enemy shots in flight, copied at the death for a Retry. */
+  getSnapshotState() {
+    return this.enemyBullets.map((bullet) => structuredClone(bullet));
+  }
+
+  /** The enemy shots in flight back as they were at the death. */
+  restoreSnapshotState(bullets) {
+    this.clearEnemyBullets();
+    for (const saved of bullets) {
+      const bullet = GamePools.bullets.acquire();
+      Object.assign(bullet, structuredClone(saved));
+      this.enemyBullets.push(bullet);
+    }
+  }
+
   clearEnemyBullets() {
     if (!Array.isArray(this.enemyBullets) || !this.enemyBullets.length) {
       this.enemyBullets = [];
@@ -620,14 +623,9 @@ export class Projectiles {
       if (!bullet) {
         continue;
       }
-      bullet.source = null;
-      bullet.enemyId = null;
-      bullet.enemyType = null;
-      bullet.isBossProjectile = false;
       if (Array.isArray(bullet.trail)) {
         bullet.trail.length = 0;
       }
-      bullet.trailMax = 0;
       GamePools.bullets.release(bullet);
     }
 

@@ -312,7 +312,7 @@ function composeBoss({ id }, { enemies }) {
 // The weapon's own card switches to it; the ship's default weapon has none.
 function composeWeapon({ id, item }, { enemies, progression, combat }) {
   if (item.card) applyCard(progression, item.card.id);
-  if (combat.weaponId !== id) {
+  if (combat.weapons.weaponId !== id) {
     console.warn(`[contentScene] No card switches the ship to "${id}".`);
   }
   spawnTargets(enemies);
@@ -363,7 +363,7 @@ function placeShip(player) {
 function holdShip(player) {
   let steered = false;
   const intervalId = setInterval(() => {
-    const input = player.cachedMovementInput;
+    const input = player.movementInput.cachedMovementInput;
     if (
       input?.up ||
       input?.down ||
@@ -396,6 +396,11 @@ export function composeContentScene({ scene, services }) {
   (scene.cards ?? []).forEach(({ id, level }) => {
     if (!findCard(id)) {
       console.warn(`[contentScene] Unknown card "${id}" in cards=.`);
+      return;
+    }
+    // A fallback card is spent on the pick and never held: its count stays 0.
+    if (findCard(id).fallback) {
+      applyCard(progression, id);
       return;
     }
     while (

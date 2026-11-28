@@ -289,16 +289,12 @@ class AudioCache {
       return randomInstance.seed >>> 0;
     }
 
-    try {
-      const snapshot =
-        typeof randomInstance.debugSnapshot === 'function'
-          ? randomInstance.debugSnapshot()
-          : null;
-      if (snapshot && typeof snapshot.seed === 'number') {
-        return snapshot.seed >>> 0;
-      }
-    } catch (error) {
-      // Ignore snapshot failures in production
+    const snapshot =
+      typeof randomInstance.debugSnapshot === 'function'
+        ? randomInstance.debugSnapshot()
+        : null;
+    if (snapshot && typeof snapshot.seed === 'number') {
+      return snapshot.seed >>> 0;
     }
 
     return 'unseeded';

@@ -554,12 +554,10 @@ export function createRecipeViews(kit) {
       }
       geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     });
-    const geometry = mergeStatic(
+    return mergeStatic(
       THREE,
       parts.map((part) => ({ ...part, flat: true }))
     );
-    geometry.setAttribute('uv2', geometry.getAttribute('uv'));
-    return geometry;
   }
 
   function create(kind, recipe) {

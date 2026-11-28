@@ -11,6 +11,7 @@ export default {
   icon: '🔄',
   themeColor: PALETTE.boss,
   unlockLevel: 1,
+  unlock: { by: 'start', at: 18 },
   tags: ['dash', 'fire-rate'],
   text: {
     name: 'Gyro Servos',
@@ -30,6 +31,22 @@ export default {
       },
     ],
   },
+  // The Halo fires nothing: what a dash speeds is how soon a blade may cut
+  // the same enemy again (see heat_sink.js).
+  weaponText: {
+    'shard-halo': {
+      levels: [
+        {
+          description:
+            'After each dash, the blades may cut the same enemy again 40% sooner for 1 s.',
+        },
+        {
+          description:
+            'After each dash, the blades may cut the same enemy again 80% sooner for 1.5 s.',
+        },
+      ],
+    },
+  },
   levels: [
     {
       rank: 1,
@@ -37,6 +54,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-fire',
+          to: 'combat',
+          lands: 'cards.cardEffects.dashFire',
           payload: { cooldownMultiplier: 1 / 1.4, duration: 1 }, // proposta 20/10
         },
       ],
@@ -47,6 +66,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-dash-fire',
+          to: 'combat',
+          lands: 'cards.cardEffects.dashFire',
           payload: { cooldownMultiplier: 1 / 1.8, duration: 1.5 }, // proposta 20/10
         },
       ],

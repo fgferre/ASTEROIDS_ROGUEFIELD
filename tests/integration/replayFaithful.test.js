@@ -5,6 +5,7 @@ import { installDomStubs } from '../__helpers__/domStubs.js';
 import { FlightBriefing } from '../../src/modules/ui/FlightBriefing.js';
 import CodexService from '../../src/services/CodexService.js';
 import { deserialize, serialize } from '../../src/core/replay.js';
+import { resolveService } from '../../src/core/serviceUtils.js';
 
 const STEPS = 300;
 let restoreDom;
@@ -47,7 +48,7 @@ describe('replay fidelity', () => {
     const recording = roundTrip(live);
 
     const game = createHeadlessGame();
-    const hangar = game.session.resolveServiceInstance('hangar');
+    const hangar = resolveService('hangar', game.session.services);
     // Not built by the harness (nothing depends on it): the real class on the bus.
     const codex = new CodexService({ eventBus: game.eventBus });
     game.controller.arm(recording);

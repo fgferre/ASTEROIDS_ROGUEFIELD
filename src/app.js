@@ -16,6 +16,10 @@ import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
 import { watchGameBox } from './core/viewport.js';
 import { TouchControls } from './modules/input/touchControls.js';
+import { followBindingHints } from './modules/ui/bindingHints.js';
+import { playRemoteLink, remoteLinkLines } from './modules/ui/remoteLink.js';
+import { runModeFor } from './core/runMode.js';
+import { showStartFailure } from './modules/menu/loadingScreen.js';
 import {
   activateProfileHarness,
   startRun,
@@ -26,10 +30,7 @@ import {
   getReplayUrl,
   showReplayNotice,
 } from './bootstrap/replaySession.js';
-import {
-  DEFAULT_POOL_CONFIG,
-  DEFAULT_GC_OPTIONS,
-} from './bootstrap/serviceManifest.js';
+import { DEFAULT_POOL_CONFIG } from './bootstrap/serviceManifest.js';
 import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
 import GameSessionService from './services/GameSessionService.js';
 import { GameDebugLogger } from './utils/dev/GameDebugLogger.js';
@@ -51,8 +52,6 @@ const gameState = {
   randomSnapshot: null,
   randomScope: 'uninitialized',
 };
-
-let garbageCollectionManager = null;
 
 // Performance monitoring (Week 1: Balance & Feel)
 const performanceMonitor = new PerformanceMonitor();
@@ -230,10 +229,16 @@ function init(recording = null, touch = false) {
           { ...value },
         ])
       ),
-      garbageCollectorOptions: { ...DEFAULT_GC_OPTIONS },
       seed: initialSeed,
       randomSeed: initialSeed,
       randomSeedSource: seedSource,
+      // The way into a run from the menu, on screen (the session stays free
+      // of presentation code).
+      playLink: ({ options, hullName, ...link }) =>
+        playRemoteLink({
+          lines: remoteLinkLines(runModeFor(options), hullName),
+          ...link,
+        }),
     };
 
     // Initialize DI system first (Phase 2.1)
@@ -244,14 +249,13 @@ function init(recording = null, touch = false) {
       if (DEV_MODE) {
         GameDebugLogger.log('ERROR', 'DI bootstrap failed; aborting init');
       }
-      alert('Service initialization failed. Reload the page.');
+      showStartFailure();
 
       return;
     }
 
     const { services } = bootstrapServices({
       container: diContainer,
-      manifestContext,
     });
 
     // Store services for use in game loop
@@ -271,6 +275,9 @@ function init(recording = null, touch = false) {
         ),
     });
     services.input.touch.start();
+
+    // The key hints in the menu, briefing and pause name the bound keys.
+    followBindingHints(services['event-bus'], services.settings);
 
     holdLoadingForWarmUp(services['menu-background'], services.renderer);
 
@@ -298,9 +305,6 @@ function init(recording = null, touch = false) {
         console.warn('[App] ⚠️ Missing required services:', missingServices);
       }
     }
-
-    garbageCollectionManager =
-      services['garbage-collector'] || garbageCollectionManager;
 
     let resolvedGameSession = null;
     if (diContainer && typeof diContainer.resolve === 'function') {
@@ -436,7 +440,7 @@ function init(recording = null, touch = false) {
     requestAnimationFrame(gameLoop);
   } catch (error) {
     console.error('Erro na inicialização:', error);
-    alert('Game failed to start. Reload the page.');
+    showStartFailure();
   }
 }
 
@@ -468,8 +472,6 @@ function gameLoop(currentTime) {
       // Stop mid-frame when a step pauses the run (level-up, pause): the
       // remaining steps must not depend on how frames were batched.
       for (let i = 0; i < steps && gameSessionService.isRunning(); i += 1) {
-        GamePools.update(stepSeconds);
-        garbageCollectionManager.update(stepSeconds);
         // Effects own freeze frames and time dilation: they return the
         // simulation delta the game systems should actually advance by.
         const adjustedDelta = effects.update(stepSeconds);
@@ -499,7 +501,7 @@ function gameLoop(currentTime) {
 
         metricsCache = {
           enemies: enemies?.getActiveEnemyCount() || 0,
-          bullets: combat?.bullets?.length || 0,
+          bullets: combat?.projectiles.bullets?.length || 0,
           orbs: xpOrbs?.getActiveOrbs().length || 0,
           particles: effects?.particles?.length || 0,
           wave: enemies?.waveManager?.currentWave || 0,
@@ -614,6 +616,12 @@ document.addEventListener('DOMContentLoaded', () => {
       performanceMonitor,
       getServices: () => gameSystemServices,
     });
+
+    // ?final=1 (dev): the last sector started at its boss, one hit from down.
+    if (IS_DEV && new URLSearchParams(window.location.search).has('final')) {
+      const { openFinalDoor } = await import('./bootstrap/finalDoor.js');
+      void openFinalDoor({ getServices: () => gameSystemServices });
+    }
 
     // ?replay=<url>: the recording's seed must be known before init().
     const replayUrl = getReplayUrl();

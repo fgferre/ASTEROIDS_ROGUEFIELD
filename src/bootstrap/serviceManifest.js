@@ -8,10 +8,7 @@ import MenuBackgroundSystem from '../modules/MenuBackgroundSystem.js';
 import { createServiceResolver } from '../core/serviceUtils.js';
 import { createSimulationManifest } from './simulationManifest.js';
 
-export {
-  DEFAULT_POOL_CONFIG,
-  DEFAULT_GC_OPTIONS,
-} from './simulationManifest.js';
+export { DEFAULT_POOL_CONFIG } from './simulationManifest.js';
 
 export function createServiceManifest(context = {}) {
   return createSimulationManifest(context, {
@@ -31,7 +28,8 @@ export function createServiceManifest(context = {}) {
       name: 'ui',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'settings', 'hangar', 'difficulty'],
+      // 'input' first: it installs the input layer stack the screens use.
+      dependencies: ['event-bus', 'settings', 'hangar', 'difficulty', 'input'],
       factory: ({ resolved, container }) => {
         const serviceResolver = createServiceResolver(container);
         return new UISystem({

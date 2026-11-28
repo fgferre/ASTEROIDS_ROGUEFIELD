@@ -20,6 +20,12 @@ export default {
   tier: 'sentinel',
   displayName: 'Foundry Mother',
   subtitle: 'The line was never told to stop',
+  codex: {
+    lore: "The Reach built the Ring's machines and was never told the Ring had ended. The Mother still lays down the same chassis, one after another, for a fleet no one will launch.",
+    hint: 'Hit it hard while it builds and the escort is scrapped. Strike again when its arms hang open.',
+    glyph:
+      '<rect x="-11" y="-5" width="22" height="10"/><rect x="-8" y="-10" width="5" height="5"/><rect x="3" y="-10" width="5" height="5"/><rect x="11" y="-1" width="5" height="2" transform="rotate(-35 11 0)"/><rect x="-16" y="-1" width="5" height="2" transform="rotate(-35 -11 0)"/><rect class="eye" x="-2" y="-2" width="4" height="4"/>',
+  },
   layer: 15, // proposta 12/11: the layer it fights on (health scales by it)
   // 55 % of Warden Null's health on the same layer: Null is Prime's base ×
   // its 1.35 (null.js), so 0.55 × 1.35.

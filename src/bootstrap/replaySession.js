@@ -20,6 +20,8 @@
 
 import { createPlayer, createRecorder, deserialize } from '../core/replay.js';
 import { CHEST_REVEAL_MS } from '../data/pickups.js';
+import { resolveService } from '../core/serviceUtils.js';
+import { replayModeOptions } from '../core/runMode.js';
 
 /** `?replay=<url>` value, or null. */
 export function getReplayUrl() {
@@ -32,15 +34,57 @@ export function getReplayUrl() {
 /** A replay link that never answers must not hold the game at "Loading the game". */
 export const REPLAY_FETCH_TIMEOUT_MS = 10000;
 
+/** A recording is a few hundred KB at most; a body past this is refused. */
+export const REPLAY_MAX_BYTES = 5 * 1024 * 1024;
+
+// Same-origin only: a link may not make the page ask another site (which
+// would learn who opened it), nor read a local, data or file URL.
+function resolveReplayUrl(url) {
+  const target = new URL(url, window.location.href);
+  if (target.origin !== window.location.origin) {
+    throw new Error(`[replay] Links to another site are not allowed`);
+  }
+  return target.href;
+}
+
+async function readCapped(response) {
+  const declared = Number(response.headers?.get('content-length'));
+  if (declared > REPLAY_MAX_BYTES) {
+    throw new Error('[replay] Recording is too large');
+  }
+  if (!response.body) {
+    const text = await response.text();
+    if (text.length > REPLAY_MAX_BYTES) {
+      throw new Error('[replay] Recording is too large');
+    }
+    return text;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let received = 0;
+  let text = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return text + decoder.decode();
+    received += value.byteLength;
+    if (received > REPLAY_MAX_BYTES) {
+      await reader.cancel();
+      throw new Error('[replay] Recording is too large');
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+}
+
 export async function fetchRecording(url) {
+  const href = resolveReplayUrl(url);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REPLAY_FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(href, { signal: controller.signal });
     if (!response.ok) {
-      throw new Error(`[replay] ${url}: HTTP ${response.status}`);
+      throw new Error(`[replay] ${href}: HTTP ${response.status}`);
     }
-    return deserialize(await response.text());
+    return deserialize(await readCapped(response));
   } finally {
     clearTimeout(timer);
   }
@@ -67,9 +111,9 @@ export function createReplayController({
   let chestDoneAt = null;
   // The viewer's own Stick Sensitivity while a replay flies the recorded one.
   let viewerStick = null;
-  const difficulty = session.resolveServiceInstance('difficulty');
-  const playerService = session.resolveServiceInstance('player');
-  const hangar = session.resolveServiceInstance('hangar');
+  const difficulty = resolveService('difficulty', session.services);
+  const playerService = resolveService('player', session.services);
+  const hangar = resolveService('hangar', session.services);
 
   const runStep = () => getStep() - runStartStep;
 
@@ -119,13 +163,9 @@ export function createReplayController({
       seed: difficulty.getRunSeed(),
       hull: session.getConfiguredHullId(),
       difficulty: difficulty.getDifficulty(),
-      mode: session.bossRush
-        ? 'bossRush'
-        : difficulty.isDaily()
-          ? 'daily'
-          : 'normal',
+      mode: session.mode.replayMode,
       date: difficulty.dateKey,
-      sector: session.sector?.id ?? null,
+      sector: session.mode.sector?.id ?? null,
       stick: playerService.stickSensitivity,
       hangar: hangar.getRunSetup(),
     });
@@ -146,6 +186,12 @@ export function createReplayController({
     recorder = null;
     player = null;
     input.setInputSource(null);
+  });
+
+  // A Retry plays on past the death the recording ends at: the recording no
+  // longer tells this run, so it is not offered (the dev F9).
+  eventBus.on('session-retry-countdown', () => {
+    session.replayRecorder = null;
   });
 
   // A pick answers an offer on screen; a chest's cards (collectibles/
@@ -203,8 +249,7 @@ export function createReplayController({
       difficulty.useReplay(recording);
       hangar.useReplaySetup(recording.hangar);
       session.replayStart = {
-        daily: recording.mode === 'daily',
-        bossRush: recording.mode === 'bossRush',
+        ...replayModeOptions(recording.mode),
         sector: recording.sector ?? null,
         hull: recording.hull,
       };

@@ -7,6 +7,7 @@ export default {
   icon: '⚡',
   themeColor: '#F6C945',
   unlockLevel: 1,
+  unlock: { by: 'start', at: 1 },
   tags: ['damage', 'weaponry'],
   text: {
     name: 'Plasma Gun',
@@ -38,6 +39,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-damage-boost',
+          to: 'player',
           payload: { multiplier: 1.25 },
         },
       ],
@@ -48,6 +50,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-damage-boost',
+          to: 'player',
           payload: { multiplier: 1.2 },
         },
       ],
@@ -58,6 +61,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-damage-boost',
+          to: 'player',
           payload: { multiplier: 1.15 },
         },
       ],

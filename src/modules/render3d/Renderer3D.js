@@ -23,18 +23,16 @@ import {
   StepInterpolator,
   interpolationDisabledByUrl,
 } from '../../core/interpolation.js';
-import {
-  AutoQuality,
-  QUALITY_PRESETS,
-  qualityFromUrl,
-} from '../../core/qualityPresets.js';
+import { AutoQuality, qualityFromUrl } from '../../core/qualityPresets.js';
 import { getViewport } from '../../core/viewport.js';
 import { BiomeTransition } from '../../data/biomes.js';
 import { resolveService } from '../../core/serviceUtils.js';
 import { PALETTE } from '../../data/constants/palette.js';
+import { ENDING_SECTOR } from '../../data/story.js';
 import { HALF_H, HALF_W } from './batches.js';
 import { CameraRig } from './cameraRig.js';
-import { VIEW_KINDS, markShadowCasters } from './enemyMirror.js';
+import { EndingScene, isRevelationBeat } from './endingScene.js';
+import { markShadowCasters } from './enemyMirror.js';
 import {
   mirrorEffects,
   mirrorPickups,
@@ -60,10 +58,13 @@ import {
   mirrorOverlays,
   WardLinks,
 } from './overlayMirror.js';
+import { SHIP_MIN_CASTER } from './playerMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, SCENE_FOV, setupThree } from './sceneSetup.js';
 import { StoryScene } from './storyScene.js';
+import { pointStrength } from './three.js';
 import { TravelScene } from './travelScene.js';
+import { warmEnding, warmUp } from './warmUp.js';
 
 // proposta 18/10: Settings > Bloom Intensity scales the preset's strength
 // (Bloom off is the toggle, which drops the pass).
@@ -80,9 +81,6 @@ const DASH_ZOOM_PULSE = 0.94;
 const DASH_ZOOM_PULSE_SECONDS = 0.3;
 const BRAKE_ZOOM_PULSE = 1.04;
 const BRAKE_ZOOM_PULSE_SECONDS = 0.25;
-// The ship's hull panels cast; its turret, nozzles and canopy (radius under
-// this, world units) only receive.
-const SHIP_MIN_CASTER = 5;
 // Point sizes of the star layers are authored for a frame this tall.
 const STAR_FRAME_HEIGHT = 900;
 // The journey's rig holds the intro's first pose under its own camera.
@@ -243,11 +241,12 @@ class Renderer3D extends BaseSystem {
       }
     });
     this.registerEventListener('wave-started', (payload = {}) => {
-      // A sector run shows its sector's look (WaveManager holds the sector).
-      this.biome.enterLayer(
-        payload.wave,
-        this.cachedEnemies?.waveManager?.sector
-      );
+      // A sector run shows its sector's look (the run's mode).
+      const sector = this.cachedEnemies?.waveManager?.mode.sector;
+      this.biome.enterLayer(payload.wave, sector);
+      // The last sector reached with no journey (the dev ?final=1 door):
+      // the ending warms before the fight, as the journey would have.
+      if (sector?.id === ENDING_SECTOR) warmEnding(this);
       this.camera.trigger('waveStart');
     });
     // What opens the camera director's wide view (core/cameraDirector.js).
@@ -423,7 +422,7 @@ class Renderer3D extends BaseSystem {
   // line out to its reach, at the Gravity Brake's strength: in fast, letting
   // go over its last third; `allowed` with the screen pass on.
   aimTrench(allowed) {
-    const trench = this.cachedCombat?.trench;
+    const trench = this.cachedCombat?.weapons.trench;
     if (!allowed || !trench) {
       this.impact.line(0.5, 0.5, 1, 0, 1, 1, 0);
       return;
@@ -479,6 +478,11 @@ class Renderer3D extends BaseSystem {
       this.cachedPlayer,
       freeze?.kind === 'travel' ? freeze.t : null
     );
+    // The way to the Crucible warms its ending (warmUp.js) at the cut into
+    // the journey (one held frame, ~80 ms, once a page). Not at the story's
+    // start: its lights key other programs, and the warm compiled a hundred
+    // more there, holding 0.35 to 2.5 s.
+    if (to === ENDING_SECTOR) warmEnding(this);
     return true;
   }
 
@@ -520,13 +524,27 @@ class Renderer3D extends BaseSystem {
   endTravel() {
     if (!this.travel?.active) return;
     this.travel.stop();
-    const sector = this.cachedEnemies?.waveManager?.sector;
+    const sector = this.cachedEnemies?.waveManager?.mode.sector;
     if (sector) this.biome.enterLayer(sector.layers[0], sector);
   }
 
   /** The victory pull-back; it holds its last shot until endCinematic(). */
   playEpilogue(durationMs) {
     return this.startCinematic(epiloguePath, durationMs, true, 'epilogue');
+  }
+
+  /**
+   * Beat `id` of the campaign's ending (ui/runCinematics.js), `durationMs`
+   * long, `ending` the one picked in act 2: every beat of both acts drawn
+   * by endingScene.js. False when nothing would move, as playIntro.
+   */
+  playEndingBeat(id, durationMs, ending) {
+    const kind = isRevelationBeat(id) ? 'revelation' : 'ending';
+    const drawn = this.startCinematic(holdIntroStart, 1, true, kind);
+    // Warmed on the way to the Crucible; a door that skips it (the dev
+    // ?content= capture) warms it here, or the last image has no slip.
+    if (drawn) warmEnding(this);
+    return drawn && this.ending.start(id, durationMs, ending);
   }
 
   startCinematic(path, durationMs, hold, kind) {
@@ -653,8 +671,8 @@ class Renderer3D extends BaseSystem {
     if (player?.position) visit(player.position, player, 'angle', null);
     const combat = this.cachedCombat;
     const lists = [
-      combat?.bullets,
-      combat?.enemyBullets,
+      combat?.projectiles.bullets,
+      combat?.projectiles.enemyBullets,
       this.cachedPickups?.pickups,
       this.cachedXPOrbs?.xpOrbs,
       this.cachedHealthHearts?.hearts,
@@ -713,6 +731,7 @@ class Renderer3D extends BaseSystem {
     this.three?.backdrop.setWake(0);
     this.travel?.stop();
     this.story?.stop();
+    this.ending?.stop();
     this.three?.enemies.clear();
     this.three?.bursts.clear();
     this.three?.player.reset();
@@ -740,6 +759,7 @@ class Renderer3D extends BaseSystem {
     this.story = new StoryScene(this.three, (event, payload) =>
       this.eventBus?.emit(event, payload)
     );
+    this.ending = new EndingScene(this.three, this.eventBus, this.story);
     this.applyQuality();
   }
 
@@ -759,88 +779,9 @@ class Renderer3D extends BaseSystem {
 
   // --- warm-up ---------------------------------------------------------------
 
-  /**
-   * Loading screen (app.js): builds the scene (maps baked) and compiles every
-   * program a run can draw with — each enemy view kind in all its looks and
-   * burning, both hulls, the bosses' danger looks, then one frame of everything through the composer
-   * (post passes, texture and buffer uploads). One chunk per task, so the
-   * bar repaints; `onProgress(done)` after each, 0..1.
-   */
-  async warmUp(onProgress) {
-    const compile = () => this.compileScene();
-    const steps = [
-      () => this.ready(),
-      () => this.three.player.warm(this.cachedPlayer, compile),
-      ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
-      () => this.three.enemies.kit.warmLooks(compile),
-      () => this.drawEverything(),
-      // The story's freighter (seconds): every campaign launch tells it.
-      () => this.warmStory(),
-    ];
-    for (let i = 0; i < steps.length; i += 1) {
-      if (!this.failed) steps[i]();
-      onProgress((i + 1) / steps.length);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-  }
-
-  // Programs for the scene's materials (pooled views included) as the
-  // frame draws them: into the composer's target, or the screen without it.
-  // Once per program variant the presets use (shadows on/off, surface maps
-  // on/off), the current preset's last: a quality step in a fight then finds
-  // its programs built (compiling them there froze a frame 150 ms, seconds
-  // on a cold shader cache). Programs keep the uniforms of their last build.
-  compileScene() {
-    const q = this.quality.settings;
-    const variants = new Map();
-    Object.values(QUALITY_PRESETS).forEach((p) =>
-      variants.set(`${p.shadows > 0}/${p.surfaceMaps}`, p)
-    );
-    variants.delete(`${q.shadows > 0}/${q.surfaceMaps}`);
-    [...variants.values(), q].forEach((p) => {
-      this.compileVariant(p.shadows > 0, p.surfaceMaps);
-    });
-  }
-
-  compileVariant(shadows, surfaceMaps) {
-    const t = this.three;
-    t.renderer.shadowMap.enabled = shadows;
-    t.key.castShadow = shadows;
-    t.enemies.setSurfaceMaps(surfaceMaps);
-    t.player.setSurfaceMaps(surfaceMaps);
-    markShadowCasters(t.player.group, SHIP_MIN_CASTER);
-    t.renderer.setRenderTarget(
-      this.graphics.postProcessing ? t.composer.readBuffer : null
-    );
-    t.renderer.compile(t.scene, t.camera);
-    t.renderer.setRenderTarget(null);
-    t.renderer.compile(t.overlay, t.camera);
-  }
-
-  // One frame with every object shown and unculled (lights as they are, so
-  // the light count programs are keyed on stays the run's) and every pass on.
-  drawEverything() {
-    const t = this.three;
-    const saved = [];
-    t.scene.traverse((object) => {
-      if (object.isLight) return;
-      saved.push(object, object.visible, object.frustumCulled);
-      object.visible = true;
-      object.frustumCulled = false;
-    });
-    t.bloomPass.enabled = true;
-    t.smaaPass.enabled = true;
-    t.impactPass.enabled = true;
-    // Seeded: the shadow pass names its depth material with a Math.random
-    // UUID the first time it draws.
-    this.seeded(() => t.composer.render(0));
-    t.renderer.render(t.overlay, t.camera);
-    for (let i = 0; i < saved.length; i += 3) {
-      saved[i].visible = saved[i + 1];
-      saved[i].frustumCulled = saved[i + 2];
-    }
-    t.impactPass.enabled = false;
-    this.syncPasses();
+  /** Loading screen (app.js): warmUp.js. */
+  warmUp(onProgress) {
+    return warmUp(this, onProgress);
   }
 
   // --- frame -----------------------------------------------------------------
@@ -886,6 +827,7 @@ class Renderer3D extends BaseSystem {
     const t = this.three;
     travel?.frame(t.camera, t.height);
     story?.frame(t.camera, time);
+    this.ending?.frame(t.camera);
     // The ambient field spawns around the view and muzzle flashes are queued
     // until a draw: both are fed here, once per frame.
     effects?.setAmbientView(this.camera.getView());
@@ -917,7 +859,7 @@ class Renderer3D extends BaseSystem {
     t.blasts.update(dt, t.camera, this.flashScale);
     t.veil.update(dt);
     t.bursts.update(dt);
-    t.wardenLight.intensity = warden ? 2.6 : 0;
+    t.wardenLight.intensity = warden ? pointStrength(t.wardenLight, 2.6) : 0;
     if (warden) {
       t.wardenLight.position.copy(warden.object.position).setY(40);
       // A boss view may name its own light (Sovereign: pale gold).
@@ -937,7 +879,7 @@ class Renderer3D extends BaseSystem {
       travel.poseShip(t.player, player?.getHullVisualLevels().thruster, time);
       this.shipOnScreen = null;
     } else {
-      this.trackShip(player);
+      this.trackShip(this.ending?.active ? null : player);
     }
     this.mirrorShield(player, time);
     // a breaking ship casts none: the depth pass draws it whole
@@ -982,15 +924,15 @@ class Renderer3D extends BaseSystem {
       ? SCENE_FOV
       : travel
         ? SCENE_FOV + (FOV - SCENE_FOV) * travel.risen
-        : FOV;
+        : t.camera.fov;
     const pointScale = t.height / (2 * Math.tan((lens * Math.PI) / 360));
     this.biome.update(dt);
-    t.biomes.update(travel ? travel.look : this.biome, fog);
+    t.biomes.update(travel?.look ?? this.ending?.look ?? this.biome, fog);
     const ship = t.player.group.visible && (travel?.focus || player?.position);
     const view = travel?.focus || this.camera;
     t.space.update(view.x, view.y, dt, {
       ship: ship || null,
-      shipLight: t.player.light.intensity,
+      shipLight: t.player.light.intensity / pointStrength(t.player.light, 1),
       pointScale,
       pixel: t.height / STAR_FRAME_HEIGHT,
     });
@@ -1023,11 +965,14 @@ class Renderer3D extends BaseSystem {
     );
 
     t.renderer.info.reset();
-    // The story draws its own scene in the field's place.
-    const drawn = story ? story.scene : t.scene;
+    // The story draws its own scene in the field's place (the ending's
+    // black, an empty one).
+    const drawn = story ? story.scene : this.ending?.scene ?? t.scene;
     t.composer.passes[0].scene = drawn;
+    this.ending?.pose(time);
     if (this.graphics.postProcessing) t.composer.render(dt);
     else t.renderer.render(drawn, t.camera);
+    this.ending?.showField();
     t.renderer.autoClear = false;
     t.renderer.render(t.overlay, t.camera);
     t.renderer.autoClear = true;
@@ -1143,7 +1088,7 @@ class Renderer3D extends BaseSystem {
         }
       }
     };
-    scan(this.cachedCombat?.enemyBullets || []);
+    scan(this.cachedCombat?.projectiles.enemyBullets || []);
     scan(this.cachedEnemies?.getActiveEnemies() || []);
     return out;
   }

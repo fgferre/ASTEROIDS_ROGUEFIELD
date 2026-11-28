@@ -1,17 +1,7 @@
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MenuHullPreview } from '../../src/modules/MenuHullPreview.js';
 import { createCanvasDocumentStub } from '../__helpers__/stubs.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../src/modules/render3d/three.js';
 
 describe('MenuHullPreview', () => {
   it('shows a locked hull as a dark silhouette without plumes', () => {
@@ -100,6 +90,35 @@ describe('MenuHullPreview', () => {
       expect(maxY - minY).toBeGreaterThan(stage.height * 0.6);
     }
   );
+  // The stage moves without changing size when the menu scrolls.
+  it('follows a stage that moved without changing size', () => {
+    vi.stubGlobal('window', { innerWidth: 1600, innerHeight: 900 });
+    let top = 100;
+    const element = {
+      getBoundingClientRect: () => ({
+        left: 900,
+        top,
+        width: 520,
+        height: 130,
+      }),
+    };
+    const camera = new THREE.PerspectiveCamera(60, 1600 / 900, 0.1, 1000);
+    const preview = new MenuHullPreview(THREE, camera);
+    preview.setHull('default-hull');
+    const centreY = () => {
+      camera.updateMatrixWorld(true);
+      const centre = new THREE.Box3()
+        .setFromObject(preview.hull)
+        .getCenter(new THREE.Vector3())
+        .project(camera);
+      return ((1 - centre.y) / 2) * 900;
+    };
+    preview.update(1 / 60, element, false);
+    const first = centreY();
+    top = 600;
+    preview.update(1 / 60, element, false);
+    expect(centreY() - first).toBeGreaterThan(400);
+  });
 });
 
 // the hull's livery paints in a canvas

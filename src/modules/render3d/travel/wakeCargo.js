@@ -863,7 +863,10 @@ export function buildCargoDeck(kit) {
     [-3.3, -8.2],
     [-3.95, -7.65],
   ];
-  hull(cross(frame, MOUTH, MOUTH + 0.3, [opening]), dark);
+  // Its opening reaches a hair up into the orange block over the mouth, so
+  // the block's underside alone draws the opening's top.
+  const hole = rect(-BAY_Z, BAY_Z, floor, roof + 0.01);
+  hull(cross(frame, MOUTH, MOUTH + 0.3, [hole]), dark);
   const front = MOUTH + 0.3;
   const back3 = V(0, 0, -1);
   hazard(V(front, floor, 3.9), back3, Y, 3.9 - BAY_Z, roof - floor);

@@ -52,7 +52,7 @@ export function createSamplePlayer(sfx) {
   const ready = new Map(); // sampleId → { entry, buffers }
   let fetched = null; // [sampleId, entry, ArrayBuffer[]] waiting for a context
   let voices = []; // live voices, oldest first
-  const lastStart = new Map(); // sampleId → context time of its last start
+  const lastStart = new Map(); // sampleId (or cue:sampleId) → its last start
   const lastPick = new Map(); // sampleId → index of its last variation
   const climbs = new Map(); // sampleId → { at, steps } of its climbing run
 
@@ -144,13 +144,13 @@ export function createSamplePlayer(sfx) {
 
   /**
    * Make room for a voice of `id` at `priority`: false when it is dropped.
-   * Inside the sample's gap → dropped; at its cap → its own oldest voice
-   * stops; all voices busy → the oldest of the lowest priority below it
-   * stops, none lower → dropped.
+   * Inside the sample's gap since its last start on `turn` → dropped; at
+   * its cap → its own oldest voice stops; all voices busy → the oldest of
+   * the lowest priority below it stops, none lower → dropped.
    */
-  function makeRoom(id, entry, priority, now) {
+  function makeRoom(id, turn, entry, priority, now) {
     voices = voices.filter((voice) => voice.endsAt > now);
-    if ((now - (lastStart.get(id) ?? -Infinity)) * 1000 < (entry.gap ?? 0)) {
+    if ((now - (lastStart.get(turn) ?? -Infinity)) * 1000 < (entry.gap ?? 0)) {
       return false;
     }
     const own = voices.filter((voice) => voice.id === id);
@@ -196,7 +196,9 @@ export function createSamplePlayer(sfx) {
     const priority = entry.priority ?? SAMPLE_PRIORITY.interface;
     // A voice that could not connect never stops another to make room.
     if (!busReady(SAMPLE_CUES[cue])) return;
-    if (!makeRoom(id, entry, priority, now)) return;
+    // A cue with its own turn (SAMPLE_CUES ownTurn) counts the gap apart.
+    const turn = SAMPLE_CUES[cue].ownTurn ? `${cue}:${id}` : id;
+    if (!makeRoom(id, turn, entry, priority, now)) return;
 
     // Variation from the audio's seeded scopes (reseeded per run): the
     // impact family, which no synthesis draws from.
@@ -238,7 +240,7 @@ export function createSamplePlayer(sfx) {
       gain.disconnect();
     };
     source.start(now);
-    lastStart.set(id, now);
+    lastStart.set(turn, now);
     voices.push({
       id,
       priority,

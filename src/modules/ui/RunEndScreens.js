@@ -26,7 +26,9 @@ import {
   timelineModel,
 } from './runTimeline.js';
 import { asArray } from '../upgradeCatalog.js';
+import { FIRST_RUN_MODE } from '../../core/runMode.js';
 import { EndCredits } from './EndCredits.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 const ENDINGS = Object.keys(STORY.ending);
 
@@ -80,8 +82,9 @@ function runNumbers(data, outcome) {
 
 export class RunEndScreens {
   /**
-   * `refs`: { gameOver: { body, invite, seed, copySeedBtn, retryBtn, restartBtn, quitBtn, hints }, victory: { body, invite, continueBtn, nextBtn, restartBtn, quitBtn, menuBtn, choiceOptions, field } }.
-   * A sector run's screens (`data.sector`, runEnd.js) speak of its chapter.
+   * `refs`: { gameOver: { screen, body, invite, seed, copySeedBtn, retryBtn, restartBtn, quitBtn, hints }, victory: { body, invite, continueBtn, nextBtn, restartBtn, quitBtn, menuBtn, choiceOptions, field } }.
+   * A sector run's screens (`data.sector`, runEnd.js) speak of its chapter;
+   * what depends on the kind of run asks `data.mode` (src/core/runMode.js).
    * `showScreen(name, options)`: shows the gameover or victory overlay.
    * `progression()`: the progression service (the build), or none.
    * `combat()`: the combat service (the build's weapon).
@@ -89,6 +92,7 @@ export class RunEndScreens {
    * `hangar()`: the hangar service; its lastAward is the salvage line.
    * `lastTransmission()`: the line shown since the death or the win, or null.
    * `cinematics`: the run's cinematics (playEnding).
+   * `cancelQuit()`: disarms the death screen's Quit (PauseScreen asks twice).
    */
   constructor({
     refs,
@@ -99,6 +103,7 @@ export class RunEndScreens {
     hangar,
     lastTransmission,
     cinematics,
+    cancelQuit,
     announceOverlay = () => {},
   }) {
     this.refs = refs;
@@ -122,6 +127,44 @@ export class RunEndScreens {
     this.replay = false;
     // The won run's victory payload while the choice is on screen.
     this.choice = null;
+    // Each screen, up, on the input layer stack; Enter and Space press the
+    // focused button (the browser's), the pad moves and presses in it. The
+    // pause key still goes to the game, which ignores it there. On the death
+    // screen Escape disarms its Quit; on the choice the keys pick and move.
+    this.gameOverLayer = {
+      name: 'gameover',
+      element: refs.gameOver.screen,
+      passes: ['pause'],
+      onKey: (event) => {
+        if (event.key === 'Escape') cancelQuit();
+        return false;
+      },
+    };
+    this.victoryLayer = {
+      name: 'victory',
+      element: refs.victory.screen,
+      passes: ['pause'],
+    };
+    this.choiceLayer = {
+      name: 'ending',
+      element: refs.victory.choiceScreen,
+      passes: ['pause'],
+      onKey: (event) => this.handleChoiceKey(event),
+    };
+  }
+
+  /** A full screen change left the run's end (a new run, a retry's end,
+   * the menu). */
+  markClosed() {
+    [this.gameOverLayer, this.victoryLayer, this.choiceLayer].forEach((layer) =>
+      inputLayers.remove(layer)
+    );
+  }
+
+  // After the lockout the screen's first button takes the focus, unless
+  // another screen is over it.
+  focusAfterLockout(layer, button) {
+    if (!inputLayers.covered(layer)) button?.focus({ preventScroll: true });
   }
 
   /** A run starts ('game-started' payload): the best layer it plays against. */
@@ -138,11 +181,12 @@ export class RunEndScreens {
   bodyMarkup(outcome, data, numbers, final = null) {
     const { layer, time, timeline } = numbers;
     const wardens = timeline.filter(({ kind }) => kind === 'warden').length;
+    const { mode = FIRST_RUN_MODE } = data;
     const sector = sectorById(data.sector?.id);
     const head = runHeadline({
       outcome,
       layer,
-      bossRush: data.bossRush ?? null,
+      rush: data.rush ?? null,
       sector,
       firstClear: Boolean(data.sector?.firstClear),
       wardens,
@@ -150,9 +194,9 @@ export class RunEndScreens {
       // A Boss Rush and a sector run record their clear time (runEnd.js).
       newBest:
         outcome === 'victory' &&
-        (data.bossRush
-          ? Boolean(data.bossRush.newBest)
-          : sector
+        (mode.writesRushRecord
+          ? Boolean(data.rush.newBest)
+          : mode.writesSectorRecord
             ? Boolean(data.sector.newBest)
             : this.bestAtStart < RUN_FINAL_LAYER),
     });
@@ -229,6 +273,7 @@ export class RunEndScreens {
   showGameOverScreen(payload) {
     // Show gameover as overlay so game canvas stays visible with asteroids wandering
     this.showScreen('gameover', { overlay: true, show: true });
+    inputLayers.push(this.gameOverLayer);
 
     const data = payload?.data || {};
     const refs = this.refs.gameOver;
@@ -238,7 +283,7 @@ export class RunEndScreens {
       outcome: 'death',
       layer: numbers.layer,
       bestAtStart: this.bestAtStart,
-      bossRush: data.bossRush ?? null,
+      rush: data.rush ?? null,
       sector: sectorById(data.sector?.id),
     });
     refs.seed.textContent = this.difficulty().runLabel();
@@ -264,7 +309,7 @@ export class RunEndScreens {
       buttons.forEach((button) => {
         button.disabled = false;
       });
-      primary?.focus({ preventScroll: true });
+      this.focusAfterLockout(this.gameOverLayer, primary);
     }, SCREEN_INPUT_LOCKOUT_MS);
   }
 
@@ -276,14 +321,15 @@ export class RunEndScreens {
   showVictoryScreen(payload, ending = null) {
     const data = payload?.data || {};
     const finale = data.sector?.id === ENDING_SECTOR;
-    if (finale && !ending && !this.replay) {
+    if (!ending && this.opensChoice(data.sector?.id)) {
       this.showEndingChoice(payload);
       return;
     }
     this.showScreen('victory', { overlay: true, show: true });
+    inputLayers.push(this.victoryLayer);
 
     const refs = this.refs.victory;
-    const rush = data.bossRush;
+    const { mode = FIRST_RUN_MODE } = data;
     const sector = sectorById(data.sector?.id);
     const next = sectorById(data.sector?.next);
     refs.body.innerHTML = this.bodyMarkup(
@@ -296,14 +342,14 @@ export class RunEndScreens {
       ? `<span class="end-endings">Endings found <b>${loadRecords().endings.length} / ${ENDINGS.length}</b></span>`
       : inviteLine({
           outcome: 'victory',
-          bossRush: rush ?? null,
+          rush: data.rush ?? null,
           sector,
           next,
         });
     // A Boss Rush or a sector run ends here: no Deep Field after it; a
     // sector won opens the next one, and the map is where it goes back to
     // (ui/CampaignMap.js).
-    refs.continueBtn?.classList.toggle('hidden', Boolean(rush || sector));
+    refs.continueBtn?.classList.toggle('hidden', !mode.goesOnAfterVictory);
     if (refs.nextBtn) {
       refs.nextBtn.classList.toggle('hidden', !next);
       refs.nextBtn.dataset.sector = next?.id ?? '';
@@ -348,11 +394,20 @@ export class RunEndScreens {
         ? refs.quitBtn
         : next
           ? refs.nextBtn
-          : rush || sector
-            ? refs.restartBtn
-            : refs.continueBtn;
-      primary?.focus({ preventScroll: true });
+          : mode.goesOnAfterVictory
+            ? refs.continueBtn
+            : refs.restartBtn;
+      this.focusAfterLockout(this.victoryLayer, primary);
     }, SCREEN_INPUT_LOCKOUT_MS);
+  }
+
+  /**
+   * Whether a win in sector `sectorId` opens the choice between the endings
+   * (and is told the truth before it, ui/runCinematics.js): the campaign's
+   * last sector, never on a replay.
+   */
+  opensChoice(sectorId) {
+    return sectorId === ENDING_SECTOR && !this.replay;
   }
 
   /**
@@ -365,6 +420,7 @@ export class RunEndScreens {
     const options = this.refs.victory.choiceOptions;
     options.innerHTML = endingChoiceMarkup();
     this.showScreen('ending', { overlay: true, show: true });
+    inputLayers.push(this.choiceLayer);
     this.announceOverlay('ending', true);
     const buttons = this.choiceButtons();
     buttons.forEach((button) => {
@@ -375,7 +431,7 @@ export class RunEndScreens {
       buttons.forEach((button) => {
         button.disabled = false;
       });
-      buttons[0]?.focus({ preventScroll: true });
+      this.focusAfterLockout(this.choiceLayer, buttons[0]);
     }, SCREEN_INPUT_LOCKOUT_MS);
   }
 
@@ -387,9 +443,10 @@ export class RunEndScreens {
 
   /**
    * An ending picked on the choice: recorded once, the choice leaves, its
-   * lines play over the held shot, the HUD down to its transmission, as the
-   * Ring answers (Severance also dims the field), then the end credits and
-   * the final card.
+   * beats play (the ending's act 2), the HUD down to its transmission, as
+   * the Ring answers, then the end credits and the final card. Severance
+   * dims the field only where the scene draws no pictures (it darkens its
+   * own otherwise).
    * False when no choice is open.
    */
   chooseEnding(ending) {
@@ -397,14 +454,15 @@ export class RunEndScreens {
     if (!payload || !STORY.ending[ending]) return false;
     this.choice = null;
     this.showScreen('ending', { overlay: true, show: false });
+    inputLayers.remove(this.choiceLayer);
     this.announceOverlay('ending', false);
     updateRecords({ ending });
     const field = this.refs.victory.field;
     field?.classList.add('is-ending');
-    field?.classList.toggle('is-severed', ending === 'severance');
-    this.cinematics.playEnding(ending, () =>
+    const drawn = this.cinematics.playEnding(ending, () =>
       this.endCredits.play(() => this.showVictoryScreen(payload, ending))
     );
+    field?.classList.toggle('is-severed', ending === 'severance' && !drawn);
     return true;
   }
 
@@ -424,21 +482,24 @@ export class RunEndScreens {
       const option = event.target.closest?.('[data-ending]');
       if (option && !option.disabled) this.chooseEnding(option.dataset.ending);
     });
-    document.addEventListener('keydown', (event) => {
-      const buttons = this.choice ? this.choiceButtons() : [];
-      if (!buttons.length || buttons[0].disabled || event.repeat) return;
-      const picked = buttons[Number(event.key) - 1];
-      const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
-      if (picked) {
-        event.preventDefault();
-        this.chooseEnding(picked.dataset.ending);
-      } else if (step) {
-        event.preventDefault();
-        const at = Math.max(0, buttons.indexOf(document.activeElement));
-        const to = Math.min(buttons.length - 1, Math.max(0, at + step));
-        buttons[to].focus({ preventScroll: true });
-      }
-    });
+  }
+
+  // A key on the choice (its layer), once its options woke.
+  handleChoiceKey(event) {
+    const buttons = this.choiceButtons();
+    if (!buttons.length || buttons[0].disabled || event.repeat) return false;
+    const picked = buttons[Number(event.key) - 1];
+    const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+    if (picked) {
+      event.preventDefault();
+      this.chooseEnding(picked.dataset.ending);
+    } else if (step) {
+      event.preventDefault();
+      const at = Math.max(0, buttons.indexOf(document.activeElement));
+      const to = Math.min(buttons.length - 1, Math.max(0, at + step));
+      buttons[to].focus({ preventScroll: true });
+    }
+    return false;
   }
 
   // The death recap's "Copy seed link": this run's seed and difficulty as a

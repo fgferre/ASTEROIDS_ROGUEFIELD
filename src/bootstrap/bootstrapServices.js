@@ -1,46 +1,13 @@
-import { createServiceManifest } from './serviceManifest.js';
 import { isDebugLoggingEnabled } from '../core/debugLogging.js';
 
-export function bootstrapServices({
-  container,
-  manifestContext = {},
-  seed,
-  randomOverrides,
-  logger = console,
-} = {}) {
+// Second phase of boot: ServiceRegistry.setupServices registered every
+// service; this creates the eager ones, and a failure is thrown.
+export function bootstrapServices({ container, logger = console } = {}) {
   if (!container) {
     throw new Error('[bootstrapServices] DI container instance is required');
   }
 
-  const resolvedManifestContext = { ...manifestContext };
-
-  if (seed !== undefined && resolvedManifestContext.seed === undefined) {
-    resolvedManifestContext.seed = seed;
-  }
-
-  if (
-    randomOverrides !== undefined &&
-    resolvedManifestContext.randomOverrides === undefined
-  ) {
-    resolvedManifestContext.randomOverrides = randomOverrides;
-  }
-
-  const manifest = createServiceManifest(resolvedManifestContext);
-  const resolvedServices = {};
-
-  manifest.forEach((entry) => {
-    try {
-      if (entry.lazy) {
-        return;
-      }
-      const instance = container.resolve(entry.name);
-      resolvedServices[entry.name] = instance;
-    } catch (error) {
-      throw new Error(
-        `Failed to bootstrap service '${entry.name}': ${error.message}`
-      );
-    }
-  });
+  const resolvedServices = container.createEagerServices();
 
   if (
     isDebugLoggingEnabled() &&
@@ -58,8 +25,5 @@ export function bootstrapServices({
     logger.groupEnd();
   }
 
-  return {
-    manifest,
-    services: resolvedServices,
-  };
+  return { services: resolvedServices };
 }

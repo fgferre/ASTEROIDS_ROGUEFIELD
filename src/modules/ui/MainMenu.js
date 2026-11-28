@@ -12,7 +12,6 @@ import {
 } from '../../data/shipModels.js';
 import { isBossRushUnlocked, loadRecords } from '../../services/runRecords.js';
 import {
-  DAILY_DIFFICULTY,
   DIFFICULTY_LABELS,
   DIFFICULTY_PRESETS,
   difficultyId,
@@ -20,6 +19,7 @@ import {
   pressureRung,
 } from '../../data/difficulty.js';
 import { menuStatusItems, menuStatusMarkup } from './menuStatus.js';
+import { runModeFor } from '../../core/runMode.js';
 import { cardName, hullTraitsMarkup, hullUnlockText } from './hangar.js';
 import { install, onInstallable } from '../../bootstrap/installPrompt.js';
 
@@ -114,7 +114,10 @@ export class MainMenu {
 
   difficultyMarkup() {
     const hangar = this.hangar();
-    const daily = this.prepTab === 'daily';
+    // The Daily tab shows the preset a Daily Field forces.
+    const { forcedDifficulty } = runModeFor({
+      daily: this.prepTab === 'daily',
+    });
     const rungs = hangar.pressure.open;
     const ids = [
       ...Object.keys(DIFFICULTY_PRESETS),
@@ -123,24 +126,24 @@ export class MainMenu {
     const preset =
       difficultyId(this.settings?.getSetting('gameplay', 'difficulty')) ??
       'veteran';
-    const selected = daily
-      ? DAILY_DIFFICULTY
-      : hangar.pressure.selected > 0
+    const selected =
+      forcedDifficulty ??
+      (hangar.pressure.selected > 0
         ? pressureId(hangar.pressure.selected)
-        : preset;
+        : preset);
     const options = ids
       .map(
         (id) =>
           `<option value="${id}"${id === selected ? ' selected' : ''}>${DIFFICULTY_LABELS[id]}</option>`
       )
       .join('');
-    const note = daily
+    const note = forcedDifficulty
       ? 'Daily Field is always Veteran'
       : rungs > 0
         ? 'Rungs open in the Hangar'
         : '';
     return `<label class="prep-field__label" for="prep-difficulty-select">Difficulty</label>
-      <select id="prep-difficulty-select" class="prep-field__select"${daily ? ' disabled' : ''}>${options}</select>${
+      <select id="prep-difficulty-select" class="prep-field__select"${forcedDifficulty ? ' disabled' : ''}>${options}</select>${
         note ? `<p class="prep-field__note">${note}</p>` : ''
       }`;
   }

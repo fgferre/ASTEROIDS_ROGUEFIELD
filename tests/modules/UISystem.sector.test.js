@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import UISystem from '../../src/modules/UISystem.js';
-import { sectorById } from '../../src/data/sectors.js';
+import { runModeFor } from '../../src/core/runMode.js';
 import { STORY } from '../../src/data/story.js';
 
 describe('UISystem on a sector run', () => {
@@ -10,8 +10,9 @@ describe('UISystem on a sector run', () => {
       tacticalHud: { layout: { showLayerBanner } },
       cinematics: { introActive: false, prepareLayer() {} },
       queueTransmission: vi.fn(),
-      getService: (name) =>
-        name === 'game-session' ? { sector: sectorById('dense-core') } : null,
+      dependencies: {
+        'game-session': { mode: runModeFor({ sector: 'dense-core' }) },
+      },
     };
 
     UISystem.prototype.handleLayerStarted.call(ui, { wave: 6 });
@@ -19,7 +20,7 @@ describe('UISystem on a sector run', () => {
     expect(showLayerBanner).toHaveBeenCalledWith(1, {
       boss: false,
       sentinel: false,
-      bossRush: undefined,
+      title: null,
       chapter: 'CHAPTER II — THE DENSE CORE · RESONANCE CHAMBER',
       context: STORY.context['dense-core'],
     });
@@ -32,8 +33,9 @@ describe('UISystem on a sector run', () => {
       tacticalHud: { layout: { showLayerBanner } },
       cinematics: { introActive: false, prepareLayer() {} },
       queueTransmission: vi.fn(),
-      getService: (name) =>
-        name === 'game-session' ? { sector: sectorById('debris-wake') } : null,
+      dependencies: {
+        'game-session': { mode: runModeFor({ sector: 'debris-wake' }) },
+      },
     };
 
     UISystem.prototype.handleLayerStarted.call(ui, { wave: 1 });
@@ -41,7 +43,7 @@ describe('UISystem on a sector run', () => {
     expect(showLayerBanner).toHaveBeenCalledWith(1, {
       boss: false,
       sentinel: true,
-      bossRush: undefined,
+      title: null,
       chapter: 'CHAPTER I — THE OUTER RING · DEBRIS WAKE',
       context: STORY.context['debris-wake'],
     });
@@ -52,8 +54,9 @@ describe('UISystem on a sector run', () => {
       tacticalHud: { layout: { showLayerBanner } },
       cinematics: { introActive: false, prepareLayer() {} },
       queueTransmission: vi.fn(),
-      getService: (name) =>
-        name === 'game-session' ? { sector: sectorById('the-crucible') } : null,
+      dependencies: {
+        'game-session': { mode: runModeFor({ sector: 'the-crucible' }) },
+      },
     };
 
     UISystem.prototype.handleLayerStarted.call(ui, { wave: 17 });

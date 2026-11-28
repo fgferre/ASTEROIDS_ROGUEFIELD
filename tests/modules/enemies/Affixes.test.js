@@ -178,6 +178,7 @@ describe('Elite affixes', () => {
     const player = {
       position: { x: 160, y: 100 },
       takeDamage: vi.fn(() => ({ applied: true })),
+      shield: {},
     };
     const eventBus = { emit: vi.fn() };
     const facade = {
@@ -302,6 +303,7 @@ describe('mine blasts', () => {
     const player = {
       position: { x: 100, y: 100 },
       health: 100,
+      shield: {},
       takeDamage(amount) {
         this.health -= amount;
         return this.health;

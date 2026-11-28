@@ -1,4 +1,4 @@
-// The dependency map (`npm run validate:deps`, scripts/analyze-dependencies.js)
+// The dependency map (scripts/analyze-dependencies.js --validate-only)
 // reads the registry's import.meta.glob: content it loads is not an orphan, a
 // file nothing imports still is. Run on a small tree laid out like src/.
 import { spawnSync } from 'node:child_process';

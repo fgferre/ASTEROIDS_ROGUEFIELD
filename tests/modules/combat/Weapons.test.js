@@ -44,7 +44,8 @@ describe('Weapons', () => {
     const { weapons, shots, emitted } = makeWeapons();
     weapons.shootCooldown = 0;
 
-    weapons.handleShooting(0.016, { multishot: 3, damage: 10 });
+    // A step of exactly the cooldown: the clock carries nothing past it.
+    weapons.handleShooting(0, { multishot: 3, damage: 10 });
 
     expect(shots).toHaveLength(3);
     shots.forEach((shot) => expect(shot.damage).toBe(10));

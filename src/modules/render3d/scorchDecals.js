@@ -358,8 +358,8 @@ export class ScorchDecals {
       this.kind,
     ];
     for (const attribute of attributes) {
-      attribute.updateRange.offset = 0;
-      attribute.updateRange.count = n * attribute.itemSize;
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0, n * attribute.itemSize);
       attribute.needsUpdate = true;
     }
     return n;

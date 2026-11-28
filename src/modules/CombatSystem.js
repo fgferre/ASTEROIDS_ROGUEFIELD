@@ -6,6 +6,7 @@ import { Projectiles } from './combat/Projectiles.js';
 import { Weapons } from './combat/Weapons.js';
 import { HitResolution } from './combat/HitResolution.js';
 import { CardEffects } from './combat/CardEffects.js';
+import { routeCardEffects } from './cardEffectRoutes.js';
 import { burstFlak } from './combat/beamAndFan.js';
 import { kindledDied } from './combat/fanForms.js';
 import { thermiteDied } from './combat/missileForms.js';
@@ -63,6 +64,7 @@ class CombatSystem extends BaseSystem {
       bulletSpeed: () => this.weapons.bulletSpeed,
       spreadMode: () => this.weapons.spreadMode,
       computeParallelOffset,
+      weaponReach: () => this.weapons.reach,
     });
     this.projectiles = new Projectiles({
       physics: () => this.cachedPhysics,
@@ -143,63 +145,35 @@ class CombatSystem extends BaseSystem {
       this.projectiles.clearEnemyBullets();
     });
 
-    this.registerEventListener('upgrade-aiming-suite', (data) => {
-      this.cards.applyAimingUpgrade(data || {});
-    });
-
-    this.registerEventListener('upgrade-weapon-tuning', (data) => {
-      this.cards.applyWeaponTuning(data);
-    });
-
     this.registerEventListener('stasis-started', ({ duration } = {}) => {
       this.projectiles.freezeEnemyBullets(duration);
     });
 
-    // A weapon card names its weapon (src/content/weapons/).
-    this.registerEventListener('upgrade-weapon', (data = {}) => {
-      this.weapons.takeWeapon(data.weaponId);
-    });
-
-    // Cards that add a weapon behaviour keep the payload of their latest rank.
-    this.registerEventListener('upgrade-thermal-lens', (data) => {
-      this.cards.cardEffects.thermalLens = data;
-    });
-    this.registerEventListener('upgrade-chain-capacitor', (data) => {
-      this.cards.cardEffects.chainCapacitor = data;
-    });
-    this.registerEventListener('upgrade-static-shell', (data) => {
-      this.cards.cardEffects.staticShell = data;
-    });
-    this.registerEventListener('upgrade-gravity-brake', (data) => {
-      this.cards.cardEffects.gravityBrake = data;
-    });
-    this.registerEventListener('upgrade-cinder-trail', (data) => {
-      this.cards.cardEffects.cinderTrail = data;
-    });
-    this.registerEventListener('upgrade-ion-trail', (data) => {
-      this.cards.cardEffects.ionTrail = data;
-    });
-    this.registerEventListener('upgrade-afterburn', (data) => {
-      this.cards.cardEffects.afterburn = data;
-    });
-    this.registerEventListener('upgrade-long-burn', (data) => {
-      this.cards.cardEffects.longBurn = data;
-    });
-    this.registerEventListener('upgrade-threat-focus', (data) => {
-      this.cards.cardEffects.threatFocus = data;
-    });
-    this.registerEventListener('upgrade-execute-damage', (data) => {
-      this.cards.cardEffects.executeDamage = data;
-    });
-    this.registerEventListener('upgrade-kill-spark', (data) => {
-      this.cards.cardEffects.killSpark = data;
-    });
-    this.registerEventListener('upgrade-arc-lattice', (data) => {
-      this.cards.cardEffects.arcLattice = data;
-    });
-    this.registerEventListener('upgrade-dash-fire', (data) => {
-      this.cards.cardEffects.dashFire = data;
-    });
+    // The card effects routed to combat (src/modules/cardEffectRoutes.js): a
+    // card that adds a weapon behaviour keeps the payload of its latest rank
+    // where the card says; these compute.
+    routeCardEffects(
+      this,
+      'combat',
+      (event, fn) => this.registerEventListener(event, fn),
+      {
+        'upgrade-aiming-suite': (data) => {
+          this.cards.applyAimingUpgrade(data || {});
+        },
+        'upgrade-weapon-tuning': (data) => {
+          this.cards.applyWeaponTuning(data);
+        },
+        // A weapon card names its weapon (src/content/weapons/).
+        'upgrade-weapon': (data = {}) => {
+          this.weapons.takeWeapon(data.weaponId);
+        },
+        // The new flight's Auto Turret card: the cannon leaves the nose for the
+        // auto aim (PlayerSystem lifts noseAim on the same event).
+        'upgrade-auto-aim': () => {
+          this.targeting.setAimMode('auto');
+        },
+      }
+    );
 
     // Gyro Servos: every dash runs the cannon hot for a moment.
     this.registerEventListener('player-dashed', () => {
@@ -256,18 +230,13 @@ class CombatSystem extends BaseSystem {
       if (screen !== 'playing') {
         return;
       }
-      const next = this.spreadMode === 'concentrated' ? 'fan' : 'concentrated';
+      const next =
+        this.weapons.spreadMode === 'concentrated' ? 'fan' : 'concentrated';
       this.setSpreadMode(next);
       this.eventBus?.emit?.('combat-mode-toggled', {
         kind: 'spread',
         mode: next,
       });
-    });
-
-    // The new flight's Auto Turret card: the cannon leaves the nose for the
-    // auto aim (PlayerSystem lifts noseAim on the same event).
-    this.registerEventListener('upgrade-auto-aim', () => {
-      this.targeting.setAimMode('auto');
     });
 
     this.registerEventListener('toggle-aim-mode', (data = {}) => {
@@ -280,7 +249,7 @@ class CombatSystem extends BaseSystem {
       if (this.cachedPlayer.noseAim) {
         return;
       }
-      const next = this.aimMode === 'auto' ? 'manual' : 'auto';
+      const next = this.targeting.aimMode === 'auto' ? 'manual' : 'auto';
       this.targeting.setAimMode(next);
       this.eventBus?.emit?.('combat-mode-toggled', { kind: 'aim', mode: next });
     });
@@ -297,100 +266,7 @@ class CombatSystem extends BaseSystem {
   }
 
   // === TARGETING (combat/Targeting.js) ===
-  // Targeting owns this state. The 3D renderer, the fire paths and the aim
-  // regression suite read it on the combat object; the setters
-  // exist because that suite writes these fields.
-  get currentTarget() {
-    return this.targeting.currentTarget;
-  }
-
-  set currentTarget(value) {
-    this.targeting.currentTarget = value;
-  }
-
-  get currentTargetLocks() {
-    return this.targeting.currentTargetLocks;
-  }
-
-  set currentTargetLocks(value) {
-    this.targeting.currentTargetLocks = value;
-  }
-
-  get currentLockAssignments() {
-    return this.targeting.currentLockAssignments;
-  }
-
-  set currentLockAssignments(value) {
-    this.targeting.currentLockAssignments = value;
-  }
-
-  get predictedAimPoints() {
-    return this.targeting.predictedAimPoints;
-  }
-
-  get predictedAimPointsMap() {
-    return this.targeting.predictedAimPointsMap;
-  }
-
-  get targetIndicatorPulse() {
-    return this.targeting.targetIndicatorPulse;
-  }
-
-  get targetPulseDuration() {
-    return this.targeting.targetPulseDuration;
-  }
-
-  get targetingUpgradeLevel() {
-    return this.targeting.targetingUpgradeLevel;
-  }
-
-  get dangerScoreEnabled() {
-    return this.targeting.dangerScoreEnabled;
-  }
-
-  get dynamicPredictionEnabled() {
-    return this.targeting.dynamicPredictionEnabled;
-  }
-
-  get multiLockTargets() {
-    return this.targeting.multiLockTargets;
-  }
-
-  get aimMode() {
-    return this.targeting.aimMode;
-  }
-
-  get stickAim() {
-    return this.targeting.stickAim;
-  }
-
-  get _aimModeFlagSnapshot() {
-    return this.targeting._aimModeFlagSnapshot;
-  }
-
-  set _aimModeFlagSnapshot(value) {
-    this.targeting._aimModeFlagSnapshot = value;
-  }
-
-  get needsRetarget() {
-    return this.targeting.needsRetarget;
-  }
-
-  set needsRetarget(value) {
-    this.targeting.needsRetarget = value;
-  }
-
-  get targetUpdateTimer() {
-    return this.targeting.targetUpdateTimer;
-  }
-
-  set targetUpdateTimer(value) {
-    this.targeting.targetUpdateTimer = value;
-  }
-
-  get targetUpdateInterval() {
-    return this.targeting.targetUpdateInterval;
-  }
+  // Targeting owns the aim state; readers ask it (combat.targeting.aimMode).
 
   // Called on the combat object by the aim regression suite, the shooting
   // paths and (usingDynamicPrediction) the 3D renderer.
@@ -411,19 +287,16 @@ class CombatSystem extends BaseSystem {
   }
 
   // === PROJECTILES (combat/Projectiles.js) ===
-  // Projectiles owns the shots in flight. The 3D renderer, the HUD metrics,
-  // Herald and the test helpers read these arrays on the combat object; the
-  // weapons suite assigns `bullets`.
-  get bullets() {
-    return this.projectiles.bullets;
+  // Projectiles owns the shots in flight; readers ask it
+  // (combat.projectiles.bullets).
+
+  // What a Retry brings back of the combat: the enemy shots in flight.
+  getSnapshotState() {
+    return { enemyBullets: this.projectiles.getSnapshotState() };
   }
 
-  set bullets(value) {
-    this.projectiles.bullets = value;
-  }
-
-  get enemyBullets() {
-    return this.projectiles.enemyBullets;
+  restoreSnapshotState(snapshot) {
+    this.projectiles.restoreSnapshotState(snapshot.enemyBullets);
   }
 
   // Called on the combat object: EnemySystem forwards enemy shots, app.js
@@ -501,12 +374,12 @@ class CombatSystem extends BaseSystem {
     this.projectiles.updateEnemyBullets(deltaTime, player);
     const perf = this.projectiles.projectilePerf;
     perf.projectileUpdateMs = performance.now() - projectileUpdateStart;
-    perf.projectilePlayerCount = this.bullets.length;
-    perf.projectileEnemyCount = this.enemyBullets.length;
+    perf.projectilePlayerCount = this.projectiles.bullets.length;
+    perf.projectileEnemyCount = this.projectiles.enemyBullets.length;
 
     const enemies = this.cachedEnemies;
     this.cachedPhysics.forEachBulletCollision(
-      this.bullets,
+      this.projectiles.bullets,
       (bullet, asteroid) => {
         if (!asteroid || bullet.hit) {
           return;
@@ -518,117 +391,7 @@ class CombatSystem extends BaseSystem {
   }
 
   // === WEAPONS (combat/Weapons.js) ===
-  // Weapons owns the guns. The 3D renderer and the weapons, upgrade and aim
-  // suites read these fields on the combat object; the aim
-  // suite writes lastShotTime.
-  get weaponId() {
-    return this.weapons.weaponId;
-  }
-
-  get spreadMode() {
-    return this.weapons.spreadMode;
-  }
-
-  get evolutions() {
-    return this.weapons.evolutions;
-  }
-
-  get lanceLook() {
-    return this.weapons.lanceLook;
-  }
-
-  get trailLength() {
-    return this.weapons.trailLength;
-  }
-
-  get beams() {
-    return this.weapons.beams;
-  }
-
-  get scars() {
-    return this.weapons.scars;
-  }
-
-  get flung() {
-    return this.weapons.flung;
-  }
-
-  get shards() {
-    return this.weapons.shards;
-  }
-
-  get trench() {
-    return this.weapons.trench;
-  }
-
-  get flakBursts() {
-    return this.weapons.flakBursts;
-  }
-
-  get glances() {
-    return this.weapons.glances;
-  }
-
-  get kindled() {
-    return this.weapons.kindled;
-  }
-
-  get implosions() {
-    return this.weapons.implosions;
-  }
-
-  get scraps() {
-    return this.weapons.scraps;
-  }
-
-  get lodged() {
-    return this.weapons.lodged;
-  }
-
-  get thermite() {
-    return this.weapons.thermite;
-  }
-
-  get gravityWells() {
-    return this.weapons.gravityWells;
-  }
-
-  // firePatterns.js: the 3D weapon mirror draws them.
-  get blades() {
-    return this.weapons.blades;
-  }
-
-  get aura() {
-    return this.weapons.aura;
-  }
-
-  get pulses() {
-    return this.weapons.pulses;
-  }
-
-  get weaponForm() {
-    return this.weapons.weapon;
-  }
-
-  get bulletSpeed() {
-    return this.weapons.bulletSpeed;
-  }
-
-  get shootCooldown() {
-    return this.weapons.shootCooldown;
-  }
-
-  get baseShootCooldown() {
-    return this.weapons.baseShootCooldown;
-  }
-
-  get lastShotTime() {
-    return this.weapons.lastShotTime;
-  }
-
-  set lastShotTime(value) {
-    this.weapons.lastShotTime = value;
-  }
+  // Weapons owns the guns; readers ask it (combat.weapons.beams).
 
   // Called on the combat object: the HUD and the run recap read the weapon
   // state, the test helpers and suites fire, lay lanes and evolve.
@@ -649,40 +412,8 @@ class CombatSystem extends BaseSystem {
   }
 
   // === HITS AND CARDS (combat/HitResolution.js, combat/CardEffects.js) ===
-  // CardEffects owns what the cards leave on the Field. The 3D weapon mirror
-  // and the weapons, upgrade and afterburn suites read it on the combat
-  // object.
-  get arcs() {
-    return this.cards.arcs;
-  }
-
-  get wells() {
-    return this.cards.wells;
-  }
-
-  get burns() {
-    return this.cards.burns;
-  }
-
-  get slows() {
-    return this.cards.slows;
-  }
-
-  get pulls() {
-    return this.cards.pulls;
-  }
-
-  get cinders() {
-    return this.cards.cinders;
-  }
-
-  get ions() {
-    return this.cards.ions;
-  }
-
-  get afterburnTrail() {
-    return this.cards.afterburnTrail;
-  }
+  // CardEffects owns what the cards leave on the Field; readers ask it
+  // (combat.cards.arcs).
 
   // Called on the combat object by the weapons, upgrade, knockback, afterburn
   // and boss feedback suites.
@@ -747,7 +478,7 @@ class CombatSystem extends BaseSystem {
     super.reset();
     this.projectiles.reset();
     this.targeting.clearLocks();
-    this.lastShotTime = 0;
+    this.weapons.lastShotTime = 0;
     this.resetWeaponState();
     // Fix-pass-2 (C5): restore the in-run toggle defaults so the next run
     // starts at concentrated + auto regardless of how the previous run ended.

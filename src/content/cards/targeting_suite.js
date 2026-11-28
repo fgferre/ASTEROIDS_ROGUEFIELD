@@ -11,6 +11,7 @@ export default {
   icon: '🎯',
   themeColor: '#FFD166',
   unlockLevel: 3,
+  unlock: { by: 'start', at: 12 },
   // The nose cannon has no lock, so the suite needs the turret first.
   newFlightPrerequisites: [
     {
@@ -71,10 +72,11 @@ export default {
       levels: [
         {},
         {
-          description: 'Aims the fan ahead of fast targets, reducing misses.',
+          description:
+            'The fan deals +20% damage to elites, heralds and bosses. It bursts too close for the lead to add anything.',
         },
         {
-          description: `Locks one threat per shot of the volley, up to four, and splits the fan's bolts among them. Fire rate +${FIRE_RATE}%.`,
+          description: `Locks one threat per shot of the volley, up to four, and splits the fan's bolts among them. Fire rate +${FIRE_RATE}%. The fan keeps its +20% on elites, heralds and bosses.`,
         },
       ],
     },
@@ -132,7 +134,7 @@ export default {
             'Cuts deal +20% damage to elites, heralds and bosses. The Halo never aims: the lead adds nothing.',
         },
         {
-          description: `Fire rate +${FIRE_RATE}%. The cuts keep their +20% on elites, heralds and bosses.`,
+          description: `The blades may cut the same enemy again ${FIRE_RATE}% sooner. The cuts keep their +20% on elites, heralds and bosses.`,
         },
       ],
     },
@@ -144,6 +146,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-aiming-suite',
+          to: 'combat',
           payload: {
             resetWeights: true,
           },
@@ -151,6 +154,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-threat-focus',
+          to: 'combat',
+          lands: 'cards.cardEffects.threatFocus',
           payload: { damageMultiplier: 1.1 }, // proposta 16/11, Furnace only
         },
       ],
@@ -161,6 +166,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-aiming-suite',
+          to: 'combat',
           payload: {
             dynamicPrediction: {
               minLeadTime: 0.05,
@@ -172,6 +178,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-threat-focus',
+          to: 'combat',
+          lands: 'cards.cardEffects.threatFocus',
           payload: { damageMultiplier: 1.2 }, // proposta 16/11, Furnace only
         },
       ],
@@ -190,6 +198,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-aiming-suite',
+          to: 'combat',
           payload: {
             multiLockTargets: 4,
             cooldownMultiplier: MULTI_LOCK_COOLDOWN,

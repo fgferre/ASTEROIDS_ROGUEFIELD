@@ -15,6 +15,7 @@ export default {
   themeColor: '#FFD166',
   // The owner's choice, 17/11: the engine first, the turret certain at level 6.
   unlockLevel: 6,
+  unlock: { by: 'pilot', at: 4 },
   newFlightPrerequisites: [{ type: 'upgrade', id: 'propulsors', level: 1 }],
   tags: ['aim', 'turret'],
   text: {
@@ -31,10 +32,39 @@ export default {
       },
     ],
   },
+  // With a weapon that never aims it goes in on its own (deadFor): what it is
+  // there, where the build shows it.
+  weaponText: {
+    'shard-halo': {
+      levels: [
+        {
+          description:
+            'The Halo needs no aim: the turret only opens the way to the Targeting Matrix and the Flight Computer.',
+          highlights: ['Installed on its own: it takes no pick.'],
+        },
+      ],
+    },
+    'furnace-corona': {
+      levels: [
+        {
+          description:
+            'The Corona needs no aim: the turret only opens the way to the Targeting Matrix and the Flight Computer.',
+          highlights: ['Installed on its own: it takes no pick.'],
+        },
+      ],
+    },
+  },
   levels: [
     {
       rank: 1,
-      effects: [{ type: 'event', event: 'upgrade-auto-aim', payload: {} }],
+      effects: [
+        {
+          type: 'event',
+          event: 'upgrade-auto-aim',
+          to: ['player', 'combat'],
+          payload: {},
+        },
+      ],
     },
   ],
 };

@@ -1,6 +1,6 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
-import { familyForm } from './ui/upgradeCard.js';
+import { familyForm } from '../data/weapons.js';
 
 const WORLD_SERVICE_MAP = {
   player: 'player',
@@ -21,6 +21,8 @@ class WorldSystem extends BaseSystem {
     this.playerAlive = true;
     // Warden id → run time it arrived (its fight starts there).
     this.wardenArrivals = new Map();
+    // The enemy shots in flight at the last death (handlePlayerDeath).
+    this.shotsAtDeath = null;
 
     this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
   }
@@ -90,7 +92,7 @@ class WorldSystem extends BaseSystem {
   recordFamilyForm(kind, family) {
     const timeline = this.enemies.sessionStats.timeline;
     if (timeline.some((e) => e.kind === kind && e.family === family)) return;
-    const { weaponId } = this.combat;
+    const { weaponId } = this.combat.weapons;
     const { name } = familyForm(family, weaponId, kind === 'apex');
     this.recordRunEvent({ kind, family, weaponId, name });
   }
@@ -246,6 +248,10 @@ class WorldSystem extends BaseSystem {
       killedBy: player?.lastDamageSource ?? null,
     };
 
+    // The enemy shots in flight at this instant, for a Retry: the combat
+    // system clears them as it hears the death (session/deathSnapshot.js).
+    this.shotsAtDeath = this.combat.getSnapshotState();
+
     // Emit player-died FIRST so explosion triggers
     this.eventBus?.emit?.('player-died', data);
 
@@ -258,6 +264,7 @@ class WorldSystem extends BaseSystem {
   reset(options) {
     super.reset(options);
     this.playerAlive = true;
+    this.shotsAtDeath = null;
     this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
   }
 }

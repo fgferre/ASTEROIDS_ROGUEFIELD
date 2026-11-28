@@ -1,18 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createAsteroidGeometry } from '../../../src/modules/render3d/asteroidMesh.js';
-
-// The vendored r128 build is UMD: evaluated with an `exports` object it
-// fills that object instead of a global.
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const positions = (seed) =>
   Array.from(

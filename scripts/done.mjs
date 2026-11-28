@@ -12,7 +12,8 @@
 // 3. Key = the tree as `git add -A` would stage it (built in a temporary copy
 //    of the index; *.md left out except under src/public/, which ships) +
 //    this Node's version + the tests' pinned one + the installed lockfile. A
-//    stamp for the key skips the tests and the build. Stamps live in the git
+//    stamp for the key skips the tests and the build (the build still runs
+//    when dist/index.html is gone). Stamps live in the git
 //    common dir, shared by every worktree, one file per key; every run
 //    appends a line to done-log there.
 // GOLDEN_UPDATE in the environment runs everything and never stamps.
@@ -215,6 +216,11 @@ export function main({
   key = contentKey(root);
   const stamp = join(common, 'done-stamps', key);
   if (!force && !golden && existsSync(stamp)) {
+    if (!existsSync(join(root, 'dist', 'index.html'))) {
+      print('\njá verificado, mas não há dist/: só o build roda de novo\n');
+      const status = run('build', 'npm run build', root);
+      return finish(status === 0 ? 'hit+rebuilt' : 'fail at build', status);
+    }
     const at = new Date(readFileSync(stamp, 'utf8').split('\n')[0]);
     const hhmm = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
     print(

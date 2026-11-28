@@ -14,6 +14,7 @@ import { createSeededRandom } from '../asteroidMesh.js';
 import { colorOf } from '../batches.js';
 import { SHINE } from '../hullModel.js';
 import { mergeStatic } from '../mergeStatic.js';
+import { writeOwnAlpha } from '../ownAlpha.js';
 
 // The hard surfaces' finish is worn metal and stone (hullModel.js SHINE: a
 // set seen under the haze shows no finer shine); a glow loses `glowHaze`
@@ -89,13 +90,13 @@ const GEM_SURFACE = `
 gl_FragColor.rgb = mix(gl_FragColor.rgb, uHaze, vPlaceHaze * ${GEM.haze.toFixed(2)})
   * mix(${GEM.under.toFixed(2)}, 1.0, vPlaceUnder);`;
 
-function hazed(material, uniforms, kind) {
+function hazed(THREE, material, uniforms, kind) {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>${VERTEX_HEAD}`)
       .replace('#include <fog_vertex>', `#include <fog_vertex>${VERTEX}`);
-    shader.fragmentShader = shader.fragmentShader
+    shader.fragmentShader = writeOwnAlpha(THREE, shader.fragmentShader)
       .replace('#include <common>', `#include <common>${FRAGMENT_HEAD}`)
       .replace(
         '#include <emissivemap_fragment>',
@@ -117,6 +118,7 @@ function hazed(material, uniforms, kind) {
 function makeMaterial(THREE, kind, uniforms) {
   if (kind === 'matte') {
     return hazed(
+      THREE,
       new THREE.MeshStandardMaterial({ vertexColors: true, ...SHINE.worn }),
       uniforms,
       kind
@@ -125,6 +127,7 @@ function makeMaterial(THREE, kind, uniforms) {
   if (kind === 'gem') {
     const { body, finish } = GEM;
     return hazed(
+      THREE,
       new THREE.MeshStandardMaterial({
         vertexColors: true,
         color: new THREE.Color(body, body, body),
@@ -136,12 +139,14 @@ function makeMaterial(THREE, kind, uniforms) {
   }
   if (kind === 'lamp') {
     return hazed(
+      THREE,
       new THREE.MeshBasicMaterial({ vertexColors: true }),
       uniforms,
       kind
     );
   }
   return hazed(
+    THREE,
     new THREE.MeshBasicMaterial({
       vertexColors: true,
       transparent: true,

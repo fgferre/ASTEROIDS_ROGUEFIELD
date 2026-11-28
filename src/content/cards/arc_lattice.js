@@ -13,6 +13,7 @@ export default {
   icon: '🕸️',
   themeColor: PALETTE.status,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'choir-silenced' },
   tags: ['chain', 'auto-attack'],
   text: {
     name: 'Arc Lattice',
@@ -45,6 +46,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-arc-lattice',
+          to: 'combat',
+          lands: 'cards.cardEffects.arcLattice',
           // proposta 20/10
           payload: {
             interval: 1.2,
@@ -61,6 +64,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-arc-lattice',
+          to: 'combat',
+          lands: 'cards.cardEffects.arcLattice',
           // proposta 20/10
           payload: {
             interval: 1,
@@ -77,6 +82,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-arc-lattice',
+          to: 'combat',
+          lands: 'cards.cardEffects.arcLattice',
           // proposta 20/10
           payload: {
             interval: 0.8,

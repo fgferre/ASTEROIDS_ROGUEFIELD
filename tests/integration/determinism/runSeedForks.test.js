@@ -32,10 +32,8 @@ const SIMULATION_SERVICES = [
   'random',
   'game-state',
   'game-pools',
-  'garbage-collector',
   'settings',
   'difficulty',
-  'command-queue',
   ...UPDATE_ORDER,
   'effects',
   'game-session',
@@ -128,8 +126,6 @@ function createGame(bootSeed, bootSource) {
     },
     /** Mirrors the fixed-step body of app.js gameLoop. */
     step() {
-      services['game-pools'].update(STEP_SECONDS);
-      services['garbage-collector'].update(STEP_SECONDS);
       const adjusted = services.effects.update(STEP_SECONDS);
       for (const name of UPDATE_ORDER) {
         services[name].update(adjusted);

@@ -25,6 +25,7 @@
 
 import { ALL_HULLS } from '../../data/shipModels.js';
 import { DissolvePool } from './dissolve.js';
+import { POINT_DECAY } from './three.js';
 import { NOZZLE_HEIGHT, VISUAL_SCALE } from './hullModel.js';
 import * as hullLivery from './hullLivery.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
@@ -65,6 +66,8 @@ import {
   lightRetros,
 } from './player/jets.js';
 
+// No jet lit (still).
+const STILL_JETS = Object.freeze({});
 // proposta 17/11 (efeito/impacto): the ship's death breaks it into SHIP_PIECES
 // of its own build, thrown as a machine of SHIP_BREAK_RADIUS would be.
 const SHIP_PIECES = 14;
@@ -80,6 +83,9 @@ const TILT_PITCH = (8 * Math.PI) / 180;
 const TILT_FLANK = 0.8;
 const TILT_OMEGA = 11; // rad/s
 const TILT_DAMPING = 0.72;
+// The ship's hull panels cast; its turret, nozzles and canopy (radius under
+// this, world units) only receive.
+export const SHIP_MIN_CASTER = 5;
 
 export class PlayerMirror {
   constructor(THREE, scene, seeded) {
@@ -102,7 +108,7 @@ export class PlayerMirror {
     // A dark stand-in, on only while the ship is hidden (a blink, a death):
     // the lit programs are keyed on the count of lights shown, so without
     // it hiding the ship recompiles every lit material mid-play.
-    this.standIn = new THREE.PointLight(0x000000, 0, 1, 2);
+    this.standIn = new THREE.PointLight(0x000000, 0, 1, POINT_DECAY);
     this.standIn.visible = false;
     scene.add(this.standIn);
 
@@ -274,7 +280,9 @@ export class PlayerMirror {
     if (hidden) {
       this.light.intensity = 0;
       this.trailCount = 0;
-      player?.dashGhosts?.forEach((ghost) => this.hiddenGhosts.add(ghost));
+      player?.maneuvers.dashGhosts?.forEach((ghost) =>
+        this.hiddenGhosts.add(ghost)
+      );
       hideGhosts(this);
       this.flareFan.visible = false;
       return;
@@ -304,13 +312,13 @@ export class PlayerMirror {
       hull: player.maxHealth > 0 ? player.health / player.maxHealth : 1,
       cruise: CRUISE_SCALE,
     });
-    lightNeedles(this, player.lastThrusterState, dt);
+    lightNeedles(this, player.thrusters.lastThrusterState, dt);
     lightRetros(this, player, geometry, thrust.aux || 0, dt);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
     updateGuard(this, player, time);
 
-    updateGhosts(this, player.dashGhosts);
+    updateGhosts(this, player.maneuvers.dashGhosts);
 
     updateTrail(this, player, ribbons, geometry, main, cos, sin);
   }
@@ -332,7 +340,7 @@ export class PlayerMirror {
    * spring over `dt` s; level under reduced motion.
    */
   updateTilt(player, dt, reduced) {
-    const jets = player.lastThrusterState;
+    const jets = player.thrusters.lastThrusterState;
     const turn = jets.turnR - jets.turnL;
     const flank = TILT_FLANK * (jets.brakePort - jets.brakeStarboard);
     const lean = Math.abs(turn) >= Math.abs(flank) ? turn : flank;
@@ -358,6 +366,30 @@ export class PlayerMirror {
     // x: roll (positive lowers the starboard wing); z: the nose (positive up)
     this.group.rotation.x = tilt.roll;
     this.group.rotation.z = tilt.pitch;
+  }
+
+  /**
+   * A ship posed by a cinematic (the ending), after update(): level, its
+   * engines idle (no flame), no side jet, retro or brake flare, no muzzle
+   * flash, whatever the pilot holds; the simulation is untouched.
+   */
+  still(time) {
+    this.group.rotation.x = 0;
+    this.group.rotation.z = 0;
+    this.muzzleFrames = 0;
+    for (let i = 0; i < TURN_KEYS.length; i += 1) {
+      const jet = this.rcsJets[TURN_KEYS[i]];
+      jet.amount = 0;
+      jet.hold = 0;
+      jet.snap = 0;
+    }
+    lightNeedles(this, STILL_JETS, 0);
+    for (let i = 0; i < this.retros.length; i += 1) {
+      this.retros[i].mesh.visible = false;
+    }
+    this.flare = 0;
+    this.flareFan.visible = false;
+    lightEngines(this, 0, 0, time);
   }
 
   /** A shot left the nose: bump the ship light for a few frames. */

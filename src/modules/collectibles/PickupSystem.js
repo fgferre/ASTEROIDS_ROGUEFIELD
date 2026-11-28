@@ -22,6 +22,8 @@ import {
 import { WEAPON_APEX } from '../../data/weapons.js';
 import { ORB_VALUE } from '../../data/enemies/asteroid-configs.js';
 import { Chests } from './chests.js';
+import { routeCardEffects } from '../cardEffectRoutes.js';
+import { FIRST_RUN_MODE } from '../../core/runMode.js';
 
 const TWO_PI = Math.PI * 2;
 // Salts for the pickup and chest streams: a numeric fork leaves the root
@@ -108,14 +110,25 @@ export class PickupSystem extends BaseSystem {
       this.spawnPickup(this.rollKind(), x, y);
     });
 
-    this.registerEventListener('upgrade-lucky-fragment', (data) => {
-      this.rockDropChance = data.chance;
-    });
+    // The card effects routed to the pickups (src/modules/cardEffectRoutes.js).
+    routeCardEffects(this, 'pickups', (event, fn) =>
+      this.registerEventListener(event, fn)
+    );
     this.registerEventListener('progression-reset', () => {
       this.rockDropChance = 0;
     });
 
-    this.registerEventListener('game-started', () => this.reset());
+    // A run's first layer until its first 'wave-started', which a head
+    // start's picks hold back: the Boss Rush's first Warden, a sector's first
+    // layer, else 1 (outside audit 8, verdict A5: a plain 1 was wrong in the
+    // Boss Rush).
+    this.registerEventListener(
+      'game-started',
+      ({ mode = FIRST_RUN_MODE } = {}) => {
+        this.reset();
+        this.layer = mode.firstLayer;
+      }
+    );
   }
 
   // Motherlode (an Apex whose `eliteAlwaysDrops` is set) while the lance
@@ -320,6 +333,41 @@ export class PickupSystem extends BaseSystem {
       })
     );
     return tokens.concat(this.chests.snapshots());
+  }
+
+  // The pickups and chests on the field as plain data (the chest opening by
+  // index), the Overcharge left and the two streams: the death snapshot
+  // (session/deathSnapshot.js) puts them back on a retry.
+  getSnapshotState() {
+    const { list, opening } = this.chests;
+    return {
+      pickups: this.pickups.map((pickup) => ({ ...pickup })),
+      chests: list.map((chest) => ({ ...chest })),
+      opening: list.indexOf(opening),
+      overchargeRemaining: this.overchargeRemaining,
+      rockDropChance: this.rockDropChance,
+      layer: this.layer,
+      random: this.random.serialize(),
+      chestRandom: this.chestRandom.serialize(),
+    };
+  }
+
+  restoreSnapshotState(snapshot) {
+    this.pickups = snapshot.pickups.map((pickup) => ({ ...pickup }));
+    this.chests.list = snapshot.chests.map((chest) => ({ ...chest }));
+    this.chests.opening = this.chests.list[snapshot.opening] ?? null;
+    this.rockDropChance = snapshot.rockDropChance;
+    this.layer = snapshot.layer;
+    this.random.restore(snapshot.random);
+    this.chestRandom.restore(snapshot.chestRandom);
+    // The boost may have run out while the ship lay wrecked.
+    this.overchargeRemaining = snapshot.overchargeRemaining;
+    this.setOvercharge(
+      this.overchargeRemaining > 0
+        ? PICKUP_KINDS.overcharge.cooldownMultiplier
+        : 1
+    );
+    return true;
   }
 
   onReset() {

@@ -10,16 +10,20 @@
 // integers replay exactly. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
-export const REPLAY_VERSION = 12;
-// Recordings before version 12 are refused, as they no longer play back the
+export const REPLAY_VERSION = 13;
+// Recordings before version 13 are refused, as they no longer play back the
 // same: 8 drew its random streams from the page's boot seed, before 9 none
 // stored the run's Hangar setup, in 9 a pad's left stick held back fired the
 // dash forward and its D-pad lost thrust while the right stick aimed
 // (outside audit 5, 21/11), 10 flew the drag flight the jets' flight
-// replaced (22/11), and 11's Braking System braked the start's flight with a
-// turn key held or right after a tap of thrust (23/11). 12 also records the
-// strafe (Z and C, the strafe hold); a pad's left stick pushed sideways
-// strafes the start's flight.
+// replaced (22/11), 11's Braking System braked the start's flight with a
+// turn key held or right after a tap of thrust (23/11), and in 12 an enemy
+// taken from the pool again kept leftovers of its last life: a reused Tether
+// went off the step it appeared, without its blast, and Seeker Swarm
+// missiles chased enemies already released, at the field's corner (outside
+// audit 7, 25/11). Since 12 a recording also holds the strafe (Z and C, the
+// strafe hold); a pad's left stick pushed sideways strafes the start's
+// flight.
 
 // One step of input. Movement fields are held state; the rest are presses
 // that happened since the previous step. Field order is the bit order of the
@@ -234,6 +238,108 @@ export function serialize(recording) {
   return JSON.stringify(recording);
 }
 
+const fail = (what) => {
+  throw new Error(`[replay] Invalid recording: ${what}`);
+};
+
+const isStep = (value) => Number.isInteger(value) && value >= 0;
+const isText = (value) => typeof value === 'string' && value.length > 0;
+const isObject = (value) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+/** Longest run a recording may claim: 12 hours at 60 steps a second. */
+export const REPLAY_MAX_STEPS = 12 * 60 * 60 * 60;
+export const REPLAY_MODES = Object.freeze(['normal', 'daily', 'bossRush']);
+// The values of the Stick Sensitivity setting (settingsSchema.js).
+export const REPLAY_STICK_VALUES = Object.freeze(['low', 'medium', 'high']);
+const DAILY_DATE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+function checkInputs(inputs) {
+  let last = -1;
+  inputs.forEach((entry, index) => {
+    // [step, mask] or [step, mask, ...analog].
+    const analog = Array.isArray(entry) ? entry.slice(2) : null;
+    const wellFormed =
+      analog &&
+      isStep(entry[0]) &&
+      entry[0] > last &&
+      isStep(entry[1]) &&
+      (analog.length === 0 ||
+        (analog.length === INPUT_ANALOG_FIELDS.length &&
+          analog.every(
+            (value) =>
+              Number.isInteger(value) && Math.abs(value) <= ANALOG_RESOLUTION
+          )));
+    if (!wellFormed) fail(`input ${index}`);
+    last = entry[0];
+  });
+}
+
+function checkStick(stick) {
+  const wellFormed =
+    Array.isArray(stick) &&
+    stick.length > 0 &&
+    stick.every(
+      (entry, index) =>
+        Array.isArray(entry) &&
+        entry.length === 2 &&
+        isStep(entry[0]) &&
+        REPLAY_STICK_VALUES.includes(entry[1]) &&
+        (index === 0 ? entry[0] === 0 : entry[0] >= stick[index - 1][0])
+    );
+  if (!wellFormed) fail('stick');
+}
+
+function checkUpgrades(upgrades) {
+  const wellFormed =
+    Array.isArray(upgrades) &&
+    upgrades.every((item) => {
+      if (!Array.isArray(item) || item.length !== 2 || !isStep(item[0])) {
+        return false;
+      }
+      const entry = item[1];
+      if (isText(entry)) return true;
+      if (!isObject(entry)) return false;
+      if (entry.type === 'reroll') return true;
+      return (
+        (entry.type === 'banish' || entry.type === 'hold') && isText(entry.id)
+      );
+    });
+  if (!wellFormed) fail('upgrades');
+}
+
+// A run's Hangar setup (HangarService.getRunSetup): every key it writes and
+// no other, its numbers within what owning every item can give, with room to
+// spare (tests/core/replay.test.js checks that room against the items). A
+// link must not fly a ship with a hull of 100,000 or a magnet of 4,400 px.
+const isMultiplier = (value) =>
+  Number.isFinite(value) && value >= 0.25 && value <= 4;
+const isCount = (value) => Number.isInteger(value) && value >= 0 && value <= 20;
+const isTextList = (value) =>
+  Array.isArray(value) && value.every((item) => isText(item));
+const HANGAR_FIELDS = {
+  hullMultiplier: isMultiplier,
+  dashCooldownMultiplier: isMultiplier,
+  pickupRadiusMultiplier: isMultiplier,
+  extraRerolls: isCount,
+  extraBanishes: isCount,
+  holds: isCount,
+  openCards: isTextList,
+  sealed: isTextList,
+  startingCard: (value) => value === null || isText(value),
+};
+
+function checkHangar(hangar) {
+  const wellFormed =
+    isObject(hangar) &&
+    Object.keys(hangar).length === Object.keys(HANGAR_FIELDS).length &&
+    Object.entries(HANGAR_FIELDS).every(
+      ([key, valid]) => key in hangar && valid(hangar[key])
+    );
+  if (!wellFormed) fail('hangar');
+}
+
+/** Parses and checks a recording: anything the player could not read throws. */
 export function deserialize(text) {
   const data = typeof text === 'string' ? JSON.parse(text) : text;
   if (!data || data?.version !== REPLAY_VERSION) {
@@ -244,19 +350,46 @@ export function deserialize(text) {
   if (!Array.isArray(data.inputs) || !Number.isInteger(data.steps)) {
     throw new Error('[replay] Recording is missing inputs or steps');
   }
+  if (data.steps < 0 || data.steps > REPLAY_MAX_STEPS) fail('steps');
+  checkInputs(data.inputs);
+  // Before the setting (21/11) every pad run flew Medium.
+  const stick = data.stick ?? [[0, 'medium']];
+  checkStick(stick);
+  const upgrades = data.upgrades ?? [];
+  checkUpgrades(upgrades);
+  if (!REPLAY_MODES.includes(data.mode)) fail('mode');
+  const date = data.date ?? null;
+  if (
+    data.mode === 'daily'
+      ? !DAILY_DATE.test(date)
+      : date !== null && typeof date !== 'string'
+  ) {
+    fail('date');
+  }
+  const seedIsValid =
+    typeof data.seed === 'number'
+      ? Number.isFinite(data.seed)
+      : isText(data.seed);
+  if (!seedIsValid) fail('seed');
+  const hull = data.hull ?? null;
+  if (hull !== null && !isText(hull)) fail('hull');
+  if (!isText(data.difficulty)) fail('difficulty');
+  const sector = data.sector ?? null;
+  if (sector !== null && !isText(sector)) fail('sector');
+  const hangar = data.hangar ?? null;
+  if (hangar !== null) checkHangar(hangar);
   return {
     version: data.version,
     seed: data.seed,
-    hull: data.hull ?? null,
+    hull,
     difficulty: data.difficulty,
     mode: data.mode,
-    date: data.date ?? null,
-    sector: data.sector ?? null,
-    hangar: data.hangar ?? null,
-    // Before the setting (21/11) every pad run flew Medium.
-    stick: Array.isArray(data.stick) ? data.stick : [[0, 'medium']],
+    date,
+    sector,
+    hangar,
+    stick,
     steps: data.steps,
     inputs: data.inputs,
-    upgrades: Array.isArray(data.upgrades) ? data.upgrades : [],
+    upgrades,
   };
 }

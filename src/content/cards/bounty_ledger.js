@@ -9,6 +9,7 @@ export default {
   icon: '📜',
   themeColor: PALETTE.xp,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'herald-hunter' },
   tags: ['combo', 'xp'],
   text: {
     name: 'Bounty Ledger',

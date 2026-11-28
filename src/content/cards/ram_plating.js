@@ -10,6 +10,7 @@ export default {
   icon: '🐏',
   themeColor: PALETTE.boss,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 20 },
   tags: ['dash', 'contact damage'],
   text: {
     name: 'Ram Plating',
@@ -40,6 +41,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-ram-plating',
+          to: 'player',
+          lands: { 'maneuvers.dashContactDamage': 'damage' },
           payload: { damage: 20 },
         },
       ],
@@ -50,6 +53,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-ram-plating',
+          to: 'player',
+          lands: { 'maneuvers.dashContactDamage': 'damage' },
           payload: { damage: 35 },
         },
       ],
@@ -60,6 +65,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-ram-plating',
+          to: 'player',
+          lands: { 'maneuvers.dashContactDamage': 'damage' },
           payload: { damage: 50 },
         },
       ],

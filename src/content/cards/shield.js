@@ -7,6 +7,7 @@ export default {
   icon: '🛡️',
   themeColor: '#4ECDC4',
   unlockLevel: 1,
+  unlock: { by: 'start', at: 13 },
   tags: ['health', 'hull'],
   text: {
     name: 'Energy Shield',
@@ -40,6 +41,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-health-boost',
+          to: 'player',
           payload: { bonus: 50 },
         },
       ],
@@ -50,6 +52,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-health-boost',
+          to: 'player',
           payload: { bonus: 50 },
         },
       ],
@@ -60,6 +63,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-health-boost',
+          to: 'player',
           payload: { bonus: 75 },
         },
       ],

@@ -2,7 +2,8 @@
  * Health Heart System
  *
  * Manages health heart collectibles.
- * Hearts persist until collected or game over (not cleared on death/retry).
+ * Hearts persist until collected or game over; a retry puts back the ones
+ * on the field at death.
  */
 
 import {
@@ -12,6 +13,7 @@ import {
 } from '../../core/serviceUtils.js';
 import { debugLog } from '../../core/debugLogging.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
+import RandomService from '../../core/RandomService.js';
 import { clamp } from '../../utils/mathHelpers.js';
 import HealthHeart from './HealthHeart.js';
 
@@ -125,6 +127,36 @@ export class HealthHeartSystem {
     if (!this.cachedPlayer) {
       this.cachedPlayer = resolveService('player', this.dependencies);
     }
+  }
+
+  // The hearts on the field as plain data, each one's stream by where it
+  // stands: the death snapshot (session/deathSnapshot.js) puts them back on a
+  // retry.
+  getSnapshotState() {
+    return this.hearts.map(
+      ({ x, y, pulsePhase, collected, lifetime, random }) => ({
+        x,
+        y,
+        pulsePhase,
+        collected,
+        lifetime,
+        random: random?.serialize(),
+      })
+    );
+  }
+
+  restoreSnapshotState(snapshot) {
+    this.hearts = snapshot.map(
+      ({ x, y, pulsePhase, collected, lifetime, random: stream }) => {
+        const random = stream && new RandomService(stream.seed);
+        random?.restore(stream);
+        return Object.assign(new HealthHeart(x, y, { random, pulsePhase }), {
+          collected,
+          lifetime,
+        });
+      }
+    );
+    return true;
   }
 
   reset() {

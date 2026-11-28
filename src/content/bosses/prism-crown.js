@@ -16,6 +16,12 @@ export default {
   tier: 'sentinel',
   displayName: 'Prism Crown',
   subtitle: 'What is left of the hymn',
+  codex: {
+    lore: 'Nine sang the Ring closed; three were set in crystal to keep the note. The Crown still turns them toward anything that moves, and plays what is left of the hymn in light.',
+    hint: 'It shows its beams before it fires. Stand between them; strike while the mirrors are dark.',
+    glyph:
+      '<path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z"/><path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z" transform="rotate(120)"/><path d="M0,-15 L2.5,-10 L0,-5 L-2.5,-10Z" transform="rotate(240)"/><circle class="eye" r="3"/>',
+  },
   layer: 10, // proposta 12/11: the layer it fights on (health scales by it)
   // 70 % of Warden Choir's health on the same layer: Choir is Prime's base ×
   // its 1.1 (choir.js), so 0.7 × 1.1.

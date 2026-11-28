@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EventBus } from '../../src/core/EventBus.js';
 import { installDomStubs } from '../__helpers__/domStubs.js';
+import { runModeFor } from '../../src/core/runMode.js';
 import { BASTION_HULL_ID } from '../../src/data/shipModels.js';
 import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
 import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
@@ -89,6 +90,10 @@ describe('AchievementService', () => {
 
   it('a sector win is not a descent won; Null still counts on its death', () => {
     const { eventBus, unlocked } = setup();
+    eventBus.emit('wave-started', {
+      wave: 6,
+      mode: runModeFor({ sector: 'dense-core' }),
+    });
     eventBus.emit('run-won', {
       wave: 10,
       hullId: BASTION_HULL_ID,
@@ -97,6 +102,10 @@ describe('AchievementService', () => {
     expect(unlocked).toEqual(['first-victory']);
 
     eventBus.emit('boss-defeated', { bossKind: 'null' });
+    eventBus.emit('wave-started', {
+      wave: 15,
+      mode: runModeFor({ sector: 'wardens-reach' }),
+    });
     eventBus.emit('run-won', { wave: 15, sector: 'wardens-reach' });
     expect(unlocked).toContain('null-and-void');
   });
@@ -279,11 +288,17 @@ describe('AchievementService', () => {
 
   it('first-victory comes on a won run, never on a Boss Rush clear', () => {
     const { eventBus, unlocked } = setup();
-    eventBus.emit('wave-started', { wave: 1, bossRush: true });
+    eventBus.emit('wave-started', {
+      wave: 1,
+      mode: runModeFor({ bossRush: true }),
+    });
     eventBus.emit('run-won', { wave: 15 });
     expect(unlocked).not.toContain('first-victory');
 
-    eventBus.emit('wave-started', { wave: 1, bossRush: false });
+    eventBus.emit('wave-started', {
+      wave: 1,
+      mode: runModeFor({ bossRush: false }),
+    });
     eventBus.emit('run-won', { wave: 15 });
     expect(unlocked).toContain('first-victory');
   });

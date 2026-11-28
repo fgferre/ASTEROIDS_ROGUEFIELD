@@ -10,13 +10,14 @@ import {
   GAME_WIDTH,
   PLAYER_SAFE_SPAWN_DISTANCE,
 } from '../../core/GameConstants.js';
+import { resolveService } from '../../core/serviceUtils.js';
 
 export class RetryCountdown {
   /**
    * `eventBus`: emits 'session-retry-countdown'.
    * `gameState`: the raw game state (its canvas, before the session's).
    * `canvas()`: the session's canvas, once initialized.
-   * `resolveServiceInstance(name)`: a session service by name, or null.
+   * `services`: the session's services, found with resolveService.
    * `hasDeathSnapshot()` / `getDeathSnapshot()`: what the retry restores.
    * `restoreFromSnapshot({ snapshot })`: restores it; false on failure.
    * `prepareRandomForScope(scope, options)`: resets or restores the RNG.
@@ -28,7 +29,7 @@ export class RetryCountdown {
     eventBus,
     gameState,
     canvas,
-    resolveServiceInstance,
+    services,
     hasDeathSnapshot,
     getDeathSnapshot,
     restoreFromSnapshot,
@@ -41,7 +42,7 @@ export class RetryCountdown {
     this.eventBus = eventBus;
     this.gameState = gameState;
     this.canvas = canvas;
-    this.resolveServiceInstance = resolveServiceInstance;
+    this.services = services;
     this.hasDeathSnapshot = hasDeathSnapshot;
     this.getDeathSnapshot = getDeathSnapshot;
     this.restoreFromSnapshot = restoreFromSnapshot;
@@ -51,6 +52,9 @@ export class RetryCountdown {
     this.emitScreenChanged = emitScreenChanged;
     this.setSessionState = setSessionState;
     this.isRetryCountdownActive = false;
+    // The Retries left in this run (a run starts with one): the number lives
+    // here, #retry-count only shows it (outside audit 8, verdict A7).
+    this.retriesLeft = 0;
 
     this.retryCountdownElement = this.lookupDomElement('retry-countdown');
     this.retryButtonElement = this.lookupDomElement('retry-game-btn');
@@ -143,7 +147,7 @@ export class RetryCountdown {
       gameUI.classList.remove('hidden');
     }
 
-    const player = this.resolveServiceInstance('player');
+    const player = resolveService('player', this.services);
     if (player) {
       player.isRetrying = true;
     }
@@ -183,8 +187,8 @@ export class RetryCountdown {
     this.clearPendingGameOverTransition();
     this.isRetryCountdownActive = false;
 
-    const player = this.resolveServiceInstance('player');
-    const world = this.resolveServiceInstance('world');
+    const player = resolveService('player', this.services);
+    const world = resolveService('world', this.services);
     const snapshot = this.getDeathSnapshot();
 
     if (!snapshot) {
@@ -247,6 +251,22 @@ export class RetryCountdown {
       }
     }
 
+    // After every reset above (rebuilding the field, physics-reset,
+    // world-reset reseed or clear them): the layer's draws go on from the
+    // death (outside audit 8, verdict A9).
+    if (snapshot.enemies?.random) {
+      resolveService('enemies', this.services).restoreRandomStreams(
+        snapshot.enemies.random
+      );
+    }
+    // The enemy shots that were in flight at the death fly on (a snapshot
+    // taken outside a death has none).
+    if (snapshot.combat) {
+      resolveService('combat', this.services).restoreSnapshotState(
+        snapshot.combat
+      );
+    }
+
     const gameoverScreen = this.lookupDomElement('gameover-screen');
     if (gameoverScreen) {
       gameoverScreen.classList.add('hidden');
@@ -267,36 +287,17 @@ export class RetryCountdown {
   }
 
   getRetryCount() {
-    let element = this.retryCountElement;
-    if (!element || !element.isConnected) {
-      element = this.lookupDomElement('retry-count');
-      this.retryCountElement = element;
-    }
-
-    if (!element) {
-      return 0;
-    }
-
-    const parsed = parseInt(element.textContent || '0', 10);
-    return Number.isFinite(parsed) ? parsed : 0;
+    return this.retriesLeft;
   }
 
   setRetryCount(value) {
+    this.retriesLeft = Math.max(0, Math.trunc(value) || 0);
     let element = this.retryCountElement;
     if (!element || !element.isConnected) {
       element = this.lookupDomElement('retry-count');
       this.retryCountElement = element;
     }
-
-    if (!element) {
-      return;
-    }
-
-    const numeric = Number.isFinite(value)
-      ? value
-      : parseInt(String(value || '0'), 10);
-    const safeValue = Number.isFinite(numeric) ? Math.max(0, numeric) : 0;
-    element.textContent = String(safeValue);
+    if (element) element.textContent = String(this.retriesLeft);
   }
 
   setRetryButtonEnabled(enabled = true) {
@@ -393,7 +394,7 @@ export class RetryCountdown {
       y: GAME_HEIGHT / 2,
     };
 
-    const enemies = this.resolveServiceInstance('enemies');
+    const enemies = resolveService('enemies', this.services);
     const canvas = this.canvas() || this.gameState?.canvas || null;
 
     if (!enemies || !canvas) {

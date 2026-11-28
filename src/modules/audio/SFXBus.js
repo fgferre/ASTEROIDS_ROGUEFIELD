@@ -876,6 +876,9 @@ class SFXBus {
 
   playStoryReactor() {}
 
+  // The ending's beats: only their samples (one-shots, 1.5 s at most).
+  playEndingBeat() {}
+
   /** The reactors' loop fades (the interceptor launches). */
   stopStoryReactor() {
     this.samples.stop(

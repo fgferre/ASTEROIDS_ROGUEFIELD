@@ -27,6 +27,7 @@ import { ASTEROID_VARIANTS } from '../../../data/enemies/asteroid-configs.js';
 import { ELITE_AFFIXES } from '../../../data/enemies/affixes.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 import { requireRandom } from '../../../utils/randomHelpers.js';
+import { isReachableEnemy } from '../../PhysicsSystem.js';
 
 class EnemyDamageSystem {
   /**
@@ -442,9 +443,9 @@ class EnemyDamageSystem {
       return { applied: false };
     }
 
-    const wasShieldActive = Boolean(player.isShieldActive);
-    const previousShieldHP = Number.isFinite(player.shieldHP)
-      ? player.shieldHP
+    const wasShieldActive = Boolean(player.shield.isShieldActive);
+    const previousShieldHP = Number.isFinite(player.shield.shieldHP)
+      ? player.shield.shieldHP
       : 0;
     const previousHealth = Number.isFinite(player.health)
       ? player.health
@@ -454,8 +455,8 @@ class EnemyDamageSystem {
     const currentHealth = Number.isFinite(player.health)
       ? player.health
       : previousHealth;
-    const currentShieldHP = Number.isFinite(player.shieldHP)
-      ? player.shieldHP
+    const currentShieldHP = Number.isFinite(player.shield.shieldHP)
+      ? player.shield.shieldHP
       : 0;
 
     const healthChanged =
@@ -637,7 +638,8 @@ class EnemyDamageSystem {
 
     for (let i = 0; i < nearbyEnemies.length; i += 1) {
       const asteroid = nearbyEnemies[i];
-      if (!asteroid || asteroid.destroyed) {
+      // The full list (the fallback) holds phased Shades the query leaves out.
+      if (!isReachableEnemy(asteroid)) {
         continue;
       }
 

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AFFIX_IDS } from '../../../src/data/enemies/affixes.js';
 import { ALL_HULLS } from '../../../src/data/shipModels.js';
@@ -15,24 +14,14 @@ import {
   VARIANT_LOOKS,
 } from '../../../src/modules/render3d/enemyMirror.js';
 import { PlayerMirror } from '../../../src/modules/render3d/playerMirror.js';
+import { compileScene } from '../../../src/modules/render3d/warmUp.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
 import { createCanvasDocumentStub } from '../../__helpers__/stubs.js';
 import {
   cleanupGlobalState,
   setupGlobalMocks,
 } from '../../__helpers__/setup.js';
-
-// The vendored r128 build is UMD: evaluated with an `exports` object it
-// fills that object instead of a global.
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const seeded = (fn) => fn();
 
@@ -41,8 +30,7 @@ const seeded = (fn) => fn();
 function warmable() {
   const player = new PlayerSystem({
     eventBus: createEventBusMock(),
-    input: { getMovementInput: () => ({}) },
-    'command-queue': null,
+    input: { takeStepFrame: () => ({}) },
   });
   const renderer = new Renderer3D({
     player,
@@ -109,12 +97,16 @@ describe('Renderer3D.warmUp', () => {
     const progress = [];
     // The story is untold here: its freighter is made too.
     renderer.story = { warm: vi.fn() };
+    // The ending waits for the way to the Crucible.
+    renderer.ending = { warm: vi.fn(), warmHome: vi.fn() };
 
     const done = renderer.warmUp((value) => progress.push(value));
     await vi.runAllTimersAsync();
     await done;
     vi.useRealTimers();
     expect(renderer.story.warm).toHaveBeenCalledTimes(1);
+    expect(renderer.ending.warm).not.toHaveBeenCalled();
+    expect(renderer.ending.warmHome).not.toHaveBeenCalled();
 
     const kinds = create.mock.calls.map(([kind]) => kind);
     for (const kind of [...KNOWN_KINDS, 'boss-choir', 'boss-null']) {
@@ -184,9 +176,59 @@ describe('Renderer3D.warmUp', () => {
     );
   });
 
+  it('warms the ending once, on the journey to the Crucible only', () => {
+    const { renderer } = warmable();
+    renderer.ready();
+    renderer.ending = {
+      // compiled and drawn into the composer's target
+      warm: vi.fn((compile, post) => {
+        expect(post).toBe(true);
+        compile();
+      }),
+      warmHome: vi.fn(),
+    };
+    renderer.travel = { start: vi.fn() };
+    renderer.startCinematic = () => true;
+    renderer.playTravel({ to: 'debris-wake', durationMs: 1000 });
+    expect(renderer.ending.warm).not.toHaveBeenCalled();
+    renderer.playTravel({ to: 'the-crucible', durationMs: 1000 });
+    renderer.playTravel({ to: 'the-crucible', durationMs: 1000 });
+    expect(renderer.ending.warm).toHaveBeenCalledTimes(1);
+    expect(renderer.ending.warmHome).toHaveBeenCalledTimes(1);
+  });
+
+  it("warms the ending as the Crucible's first layer starts with no journey (?final=1)", () => {
+    const eventBus = createEventBusMock();
+    const renderer = new Renderer3D({
+      eventBus,
+      enemies: { waveManager: { mode: { sector: { id: 'the-crucible' } } } },
+      'menu-background': { withSeededMathRandom: seeded },
+    });
+    renderer.three = { camera: {} };
+    renderer.graphics = { postProcessing: true };
+    renderer.biome = { enterLayer: vi.fn() };
+    renderer.camera = { trigger: vi.fn() };
+    renderer.ending = { warm: vi.fn(), warmHome: vi.fn() };
+    eventBus.emit('wave-started', { wave: 19 });
+    eventBus.emit('wave-started', { wave: 20 });
+    expect(renderer.ending.warm).toHaveBeenCalledTimes(1);
+    expect(renderer.ending.warmHome).toHaveBeenCalledTimes(1);
+  });
+
+  it('warms the ending as it starts when no way to the Crucible did (?content=)', () => {
+    const { renderer } = warmable();
+    renderer.ready();
+    renderer.ending = { warm: vi.fn(), warmHome: vi.fn(), start: vi.fn() };
+    renderer.startCinematic = () => true;
+    renderer.playEndingBeat('opens', 1000);
+    renderer.playEndingBeat('twin', 1000, 'severance');
+    expect(renderer.ending.warm).toHaveBeenCalledTimes(1);
+    expect(renderer.ending.start).toHaveBeenCalledTimes(2);
+  });
+
   it('compiles every preset program variant, the current preset last', () => {
     const { renderer, variants } = warmable();
-    renderer.compileScene();
+    compileScene(renderer);
     // scene and overlay per variant; ultra (shadows, maps) last
     expect(variants.filter((_, i) => i % 2 === 0)).toEqual([
       'false/true',

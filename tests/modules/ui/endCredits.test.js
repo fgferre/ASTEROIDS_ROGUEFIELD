@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { EndCredits } from '../../../src/modules/ui/EndCredits.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 
 describe('End credits', () => {
   let restoreDom;
@@ -10,10 +11,6 @@ describe('End credits', () => {
   afterEach(() => restoreDom());
 
   it('roll until Enter, then hand over to the final card once', () => {
-    let onKey = null;
-    document.addEventListener = (type, handler) => {
-      if (type === 'keydown') onKey = handler;
-    };
     const classes = () => ({ add: vi.fn(), remove: vi.fn() });
     const refs = {
       overlay: {},
@@ -34,10 +31,14 @@ describe('End credits', () => {
     expect(refs.roll.classList.add).toHaveBeenCalledWith('is-rolling');
     expect(onDone).not.toHaveBeenCalled();
 
+    // Rolling, they are on top of the input layer stack until they end.
+    const layer = inputLayers.top();
+    expect(layer).toBe(credits.inputLayer);
     const key = { key: 'Enter', preventDefault: vi.fn() };
-    onKey(key);
-    onKey(key);
+    layer.onKey(key);
+    layer.onKey(key);
     expect(onDone).toHaveBeenCalledTimes(1);
+    expect(inputLayers.top()).toBe(null);
     expect(showScreen).toHaveBeenLastCalledWith('end-credits', {
       overlay: true,
       show: false,

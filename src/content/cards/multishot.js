@@ -28,6 +28,7 @@ export default {
   icon: '💥',
   themeColor: '#A56DFF',
   unlockLevel: 1,
+  unlock: { by: 'start', at: 5 },
   tags: ['projectiles', 'weaponry'],
   text: {
     name: 'Multishot',
@@ -104,6 +105,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-multishot',
+          to: 'player',
           payload: { bonus: 1 },
         },
       ],
@@ -114,6 +116,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-multishot',
+          to: 'player',
           payload: { bonus: 1 },
         },
       ],
@@ -124,6 +127,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-multishot',
+          to: 'player',
           payload: { bonus: 1 },
         },
       ],

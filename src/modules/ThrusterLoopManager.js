@@ -1,4 +1,16 @@
 import { requireRandom } from '../utils/randomHelpers.js';
+
+// A loop's gain goes back to the pool even if it was already disconnected
+// (a disconnect that threw kept it out of the pool for good: outside audit 8,
+// B9); the pool's own failure shows.
+function returnToPool(pool, gain) {
+  try {
+    gain.disconnect();
+  } catch (error) {
+    // Already disconnected: nothing to undo.
+  }
+  pool.returnGain(gain);
+}
 /**
  * Manages continuous thruster loop sounds for main, retro, and side thrusters.
  */
@@ -208,14 +220,7 @@ class ThrusterLoopManager {
 
     if (pool) {
       setTimeout(() => {
-        loop.gains.forEach((gain) => {
-          try {
-            gain.disconnect();
-            pool.returnGain(gain);
-          } catch (error) {
-            // Ignore pool cleanup failures.
-          }
-        });
+        loop.gains.forEach((gain) => returnToPool(pool, gain));
       }, 50);
     }
 
@@ -243,14 +248,7 @@ class ThrusterLoopManager {
       }
 
       if (pool) {
-        loop.gains.forEach((gain) => {
-          try {
-            gain.disconnect();
-            pool.returnGain(gain);
-          } catch (error) {
-            // Ignore pool cleanup failures.
-          }
-        });
+        loop.gains.forEach((gain) => returnToPool(pool, gain));
       }
 
       if (loop.filters && Array.isArray(loop.filters)) {

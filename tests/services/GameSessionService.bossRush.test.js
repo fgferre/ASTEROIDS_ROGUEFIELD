@@ -52,7 +52,7 @@ function clearUntilLayer(game, layer) {
 // A menu click, without the remote link's screen (remoteLink.js) between.
 const click = (game, id) => {
   game.session.menuButtons.linkIn = (options, start) => start();
-  game.session.handleDocumentClick({
+  game.session.menuButtons.handleDocumentClick({
     target: { closest: () => ({ id }) },
     preventDefault() {},
   });
@@ -103,22 +103,22 @@ describe('Boss Rush', () => {
     expect(wardens).toEqual(['prime', 'choir', 'null']);
     expect(game.session.getSessionState()).toBe('victory');
     expect(victories).toHaveLength(1);
-    const { bossRush } = victories[0].data;
-    expect(bossRush.stage).toBe(3);
-    expect(bossRush.bestStage).toBe(3);
-    expect(bossRush.bestTime).toBeGreaterThan(0);
+    const { rush } = victories[0].data;
+    expect(rush.stage).toBe(3);
+    expect(rush.bestStage).toBe(3);
+    expect(rush.bestTime).toBeGreaterThan(0);
     // The clear is the last Warden's death; the screen opened later, after
     // the spoils, and the badge still knows it is a new best.
     expect(victories[0].data.stats.timeElapsed).toBeGreaterThan(
-      bossRush.bestTime + 1
+      rush.bestTime + 1
     );
-    expect(bossRush.newBest).toBe(true);
-    expect(game.session.continueBeyondVictory()).toBe(false);
+    expect(rush.newBest).toBe(true);
+    expect(game.session.runEnd.continueBeyondVictory()).toBe(false);
     // The layer records only count full runs.
     expect(loadRecords()).toMatchObject({
       bestLayer: 0,
       bossRushStage: 3,
-      bossRushTime: bossRush.bestTime,
+      bossRushTime: rush.bestTime,
     });
   });
 
@@ -147,7 +147,7 @@ describe('Boss Rush', () => {
     game.eventBus.emit('player-died', game.services.world.buildRunSummary());
     vi.advanceTimersByTime(7000);
 
-    expect(gameovers[0].data.bossRush).toMatchObject({
+    expect(gameovers[0].data.rush).toMatchObject({
       stage: 2,
       bestTime: 0,
     });
@@ -161,14 +161,14 @@ describe('Boss Rush', () => {
     click(game, 'boss-rush-btn');
     expect(enemies.waveManager.currentWave).toBe(5);
     click(game, 'restart-game-btn');
-    expect(game.session.bossRush).toBe(true);
+    expect(game.session.mode.kind).toBe('bossRush');
     expect(enemies.waveManager.currentWave).toBe(5);
     click(game, 'start-game-btn');
-    expect(game.session.bossRush).toBe(false);
+    expect(game.session.mode.kind).not.toBe('bossRush');
     expect(enemies.waveManager.currentWave).toBe(1);
     click(game, 'boss-rush-btn');
     click(game, 'daily-field-btn');
-    expect(game.session.bossRush).toBe(false);
-    expect(game.services.difficulty.isDaily()).toBe(true);
+    expect(game.session.mode.kind).not.toBe('bossRush');
+    expect(game.session.mode.kind).toBe('daily');
   });
 });

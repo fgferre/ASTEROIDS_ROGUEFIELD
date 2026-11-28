@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
 import CombatSystem from '../../../src/modules/CombatSystem.js';
@@ -7,16 +6,7 @@ import {
   shotColor,
 } from '../../../src/modules/render3d/weaponMirror.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 function makeCombat() {
   return new CombatSystem({
@@ -109,7 +99,7 @@ describe('weapon mirror', () => {
   it('lights the Harmonic beam a little ahead of the ship, not over it', () => {
     const combat = makeCombat();
     const white = '#ffffff';
-    combat.beams.push({
+    combat.weapons.beams.push({
       x: 100,
       y: 300,
       ex: 600,
@@ -132,13 +122,17 @@ describe('weapon mirror', () => {
 
 describe('shotColor', () => {
   it('gives each shot the colour it is drawn in, and none to a bolt', () => {
-    const combat = { weaponId: 'scatter', lanceLook: { trail: '#b38cff' } };
+    const weapons = { weaponId: 'scatter', lanceLook: { trail: '#b38cff' } };
+    const combat = { weapons };
     expect(shotColor(combat, { kind: 'lance' })).toBe('#b38cff');
     expect(
       shotColor(combat, { kind: 'flak', colors: { tracer: '#ffb347' } })
     ).toBe('#ffb347');
     expect(
-      shotColor({ ...combat, weaponId: 'harmonic' }, { kind: 'beam' })
+      shotColor(
+        { weapons: { ...weapons, weaponId: 'harmonic' } },
+        { kind: 'beam' }
+      )
     ).toBe('#ffb347');
     expect(shotColor(combat, { kind: 'arc' })).toBe(null);
   });

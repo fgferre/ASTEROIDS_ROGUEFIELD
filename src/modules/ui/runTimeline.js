@@ -40,7 +40,7 @@ const sectorLayers = (sector) => sector.layers[1] - sector.layers[0] + 1;
 /**
  * The headline: `kicker` over `title` (with `of`), the `line` under it and a
  * `badge` ('New best', 'First clear') or null. `outcome` 'death' | 'victory';
- * `layer` the layer reached; `bossRush` its { stage } on a Boss Rush;
+ * `layer` the layer reached; `rush` its { stage } on a Boss Rush;
  * `sector` the sector of a sector run (src/data/sectors.js), its layers
  * counted from its first one, and `firstClear` its first win; `wardens`
  * killed.
@@ -48,7 +48,7 @@ const sectorLayers = (sector) => sector.layers[1] - sector.layers[0] + 1;
 export function runHeadline({
   outcome,
   layer,
-  bossRush,
+  rush,
   sector = null,
   firstClear = false,
   wardens,
@@ -78,18 +78,18 @@ export function runHeadline({
   if (outcome === 'victory') {
     return {
       kicker: 'The Ring is quiet',
-      title: bossRush ? 'Boss Rush cleared' : 'Field cleared',
+      title: rush ? 'Boss Rush cleared' : 'Field cleared',
       of: '',
-      line: bossRush
+      line: rush
         ? `${BOSS_RUSH_LAYERS.length} Wardens · ${formatRunTime(time)}`
         : `All ${RUN_FINAL_LAYER} layers · ${wardens} Wardens · ${formatRunTime(time)}`,
       badge: newBest ? 'New best' : null,
     };
   }
-  if (bossRush) {
+  if (rush) {
     return {
       kicker: 'Signal lost',
-      title: `Warden ${bossRush.stage}`,
+      title: `Warden ${rush.stage}`,
       of: `of ${BOSS_RUSH_LAYERS.length}`,
       line: 'Boss Rush',
       badge: null,
@@ -122,7 +122,7 @@ export function inviteLine({
   outcome,
   layer,
   bestAtStart,
-  bossRush,
+  rush,
   sector = null,
   next = null,
 }) {
@@ -140,11 +140,11 @@ export function inviteLine({
     return `The ${boss} waits at <b>Layer ${total}</b>. ${words} ${gap === 1 ? 'layer' : 'layers'} to go.`;
   }
   if (outcome === 'victory') {
-    return bossRush
+    return rush
       ? 'The Wardens will be back. <b>Beat the clock.</b>'
       : `The Deep Field goes on past layer ${RUN_FINAL_LAYER}. <b>Same build.</b>`;
   }
-  if (bossRush) return 'Three Wardens, back to back. <b>Again.</b>';
+  if (rush) return 'Three Wardens, back to back. <b>Again.</b>';
   if (bestAtStart > layer) {
     const gap = bestAtStart - layer;
     const words = NUMBER_WORDS[gap] ?? `${gap}`;

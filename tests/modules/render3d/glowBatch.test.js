@@ -1,16 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { GlowBatch } from '../../../src/modules/render3d/glowBatch.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 describe('GlowBatch', () => {
   it('instances each glow with its colour and scale, hidden when empty', () => {

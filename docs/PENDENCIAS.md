@@ -4,9 +4,41 @@ Lista viva do que está aberto, nas palavras do dono. Fechados em 19/10 pelo ver
 1, 3, 6, 7, 8, 9; e 10–14 (o goal de 18/10) feitos na conversa local em 19/10; 17 (câmera) fechado por ele em 20/10 —
 história no git. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 50.** (49 é do final do jogo, ramo `historia/final`.)
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 66.**
 
-## O BASTÃO — onde as sessões pararam (24/11) — a `main` está publicada até a versão 0.8.1 (PR do `publicar/0.8.1`, 24/11)
+## O BASTÃO — onde as sessões pararam (28/11) — a `main` está publicada até a versão 0.8.2 (PR do `publicar/0.8.2`, 28/11)
+
+**28/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a versão 0.8.2 vai ao ar por ordem dele — à
+pergunta "Publico a versão 0.8.2 com esta lista, a limpeza e a linha das regras?", _"Sim, publica"_ (27/11, perto da
+meia-noite) — pela PR do `publicar/0.8.2` para a `main`. Em 25/11 ele tinha respondido _"Ainda não"_ e pedido tudo
+antes: _"vamos resolver tudo antes de publicar,,,"_; das duas reformas grandes, _"Não, antes"_; do jeito de conferir,
+_"eu sou vou olhar depois que tudo estiver pronto."_; do visual do motor novo, _"vamos de B"_. Entra:
+
+- o final da campanha (49), com a escolha que cabe no celular e no celular muito pequeno (50, 51), as letras no tablet
+  (52) e o som das conchas (54); a pausa logo depois da escolha (53) segue como estava, medida e não consertada;
+- a peça que falha ao ligar (55) e o clarão dourado preso nas cenas (56);
+- o motor 3D novo (61), no visual B;
+- os consertos das auditorias de fora 7 e 8 (62), entre eles a reforma das teclas, do controle e do toque nas telas
+  (as Settings abrem por cima das cartas, do baú, da tela de morte, da vitória e da escolha do final), e as duas
+  reformas grandes: o Retry que continua a luta com o chefe de onde parou (64) e as cartas por um caminho só (65);
+- as cartas que fazem o que dizem, com o teste que vigia (63), e quatro decisões de carta: a cadência de tiro exata, o
+  Reactor Bleed e o Grav Anchor dizendo o que fazem, o empurrão do freio de emergência valendo por meio segundo, e o
+  segundo nível da Targeting Matrix com a Scatter Coil.
+
+As quatro decisões de carta entram como estavam no jogo de teste, pela recomendação da coordenadora: ele não trocou
+nenhuma, e os endereços de comparação saíram antes de publicar (um lembrete de fora, que ele passou junto com o sim).
+
+Nenhum desses itens fecha com a publicação: cada um fecha quando ele aprovar jogando. Ele não disse se jogou o jogo de
+teste antes do sim. Ninguém conferiu num aparelho de verdade: os menus com um controle, o celular (os botões de toque,
+o SKIP, a pausa com as Settings), a sensação do Retry com cada chefe, o final com o controle e o visual novo num
+iPhone; os números de sensação seguem dele.
+
+Os replays gravados antes desta versão deixam de tocar; progresso, pilotos e Hangar ficam intactos.
+
+**Fica de fora:** as vozes das cinco falas novas do final (37); o equilíbrio completo (27); a segunda parte da abertura
+(o carregamento que trava no Tesla e no celular; o trabalho está guardado no ramo `abertura/sem-travar`); um botão no
+celular para abrir as Settings com as cartas ou a escolha do final na tela (botão novo na tela é escolha dele); quatro
+sobras de desenho em tela pequena (no `BACKLOG.md`).
 
 **24/11 (vale sobre o que estiver mais abaixo e disser outra coisa):** a versão 0.8.1 vai ao ar por ordem dele — à
 pergunta "Publico a versão 0.8.1 com esta lista, a limpeza e a linha das regras?", _"Sim, publica"_ — pela PR do
@@ -376,6 +408,34 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   da tecla/botao o contorno. nem precisa montar regua para isso so fazer o que pedi simples assim"_. Construído: segurar
   1,5 s o Espaço, o Start (Options no PlayStation) ou o botão SKIP na tela pula a cena; um toque rápido vai para a
   próxima fala. Fecha quando ele aprovar jogando.
+- **(55)** Uma peça que falha ao ligar (25/11): _"Se uma peça do jogo falhar ao ligar, o menu aparece normal e o Launch
+  não faz nada, sem aviso."_ Ele quer resolvido antes da próxima publicação. Construído no ramo `aviso/falha-ao-ligar`:
+  se uma peça falha ao ligar, a tela de carregamento fica, a nave apaga o motor e a linha de baixo diz, em vermelho,
+  "The game could not start. Reload the page to try again."; o menu não abre por trás. Antes, o navegador mostrava uma
+  caixinha "Game failed to start. Reload the page." e, ao fechá-la, o menu abria normal. Ligar sem falha ficou igual.
+  Fecha quando ele aprovar vendo.
+- **(62)** As auditorias de fora 7 e 8 antes de publicar (25/11): _"vamos resolver tudo antes de publicar,,,"_ (incluindo
+  _"A segunda parte da auditoria, que a nuvem faz depois desta publicação"_); _"nao deveriamos resolver os problemas
+  apontados pelo gemini antes de fazer outras coisas? duvida honesta e aceito sua decisao"_. Recusados por ele, não se
+  constroem: o Retry como recomeço da fase (_"nao vamos fazer isso."_), o botão de salvar replay (_"nao precisa tb"_) e o
+  jogo instalado sem internet (_"nao quero..."_). Sobre o limite de 1.200 linhas: _"pode ser revisto sempre..."_; fica, e
+  arquivo no limite se reparte. Em curso no ramo `reformas/auditorias-7-e-8`, um item por vez.
+- **(63)** As cartas fazem o que dizem (25/11): _"queria ter certeza que todos os upgrades e cartas estao funcionando e que
+  fazem real diferença no jogo e que nao sao apresentados no sorteio se nao servem mais para nada... isso deve ter uma
+  matriz de evolucao que demonstra em algum liugar no codigo para gente nao conseguir criar coisas defeituosas assim,
+  certo? fizemso algo assim? depois dos consertos grandes que fizemos nessas rodadas algo pode ter parado de funionar?"_;
+  e _"vamos resolver tudo antes de publicar,,,"_. Em curso no ramo `cartas/consertos-e-matriz`: os consertos e um teste
+  que falha quando alguém cria uma carta defeituosa. Fecha quando ele aprovar jogando.
+- **(64)** O Retry no meio da luta com um chefe continua a luta de onde parou (26/11): à pergunta "As duas reformas
+  grandes ficam para depois de publicar?", _"Não, antes"_; com _"vamos resolver tudo antes de publicar,,,"_ (25/11).
+  Recusado por ele, não se constrói: o Retry refeito como recomeço da fase (_"nao vamos fazer isso."_). Em curso no ramo
+  `reformas/retry-chefes`: o chefe e cada inimigo voltam como estavam na morte, o ataque em curso incluído, e um teste
+  falha se um chefe ou inimigo novo voltar diferente. Fica mais duro que no jogo publicado. Fecha quando ele aprovar
+  jogando.
+- **(65)** As cartas falam com o jogo por um caminho só (26/11, ponto B6 da auditoria de fora 8). À pergunta se as duas
+  reformas grandes ficavam para depois de publicar: _"Não, antes"_; com o que ele já tinha dito em 25/11: _"vamos
+  resolver tudo antes de publicar,,,"_. Em curso no ramo `cartas/ligacao-unica`: cada carta diz a que parte do jogo o
+  efeito vai, e um ponto só o entrega; nada muda no jogo.
 
 ## Som (palavras dele, 19/11)
 
@@ -406,6 +466,76 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   corretamente no jogo. Não vamos fazer isso agora, mas deixe registrado."_ → o estudo é `docs/GAME_DESIGN_MASTER_PLAN.md`
   (§3 e a parte de meta entre partidas); o jogo já tem moeda (Salvage) e loja (Hangar). Não começar sem ele pedir; até
   lá, não calibrar a campanha para ser vencível sem loja.
+- **(49)** O final da campanha (23/11, depois de zerar): _"Decidi uma coisa, precisamos pensar em um endgame mais
+  interessante. Tem que ter uma animação um fechamento melhor para história, um cutscne mais poderoso."_ Ao primeiro
+  cartão: _"pense numa coisa menos maluca e mais reveladora de plot twist para o final. mas está mutio etéreo e sem pé
+  nem cabeça demais, menos mistério agora e mais um pouco de relsolucao, mas sem perder o ar de david lynch...."_ A
+  verdade escolhida (24/11): _"A, um de nós"_. A encenação: _"por que que a gente não aproveita tudo e faz o final mais
+  épico? Eu gostei de todas as tomadas que você fez. [...] não vamos desperdiçar esses trabalhos"_; ao filme-rascunho
+  do final inteiro: _"Serve: é este"_; às cinco falas novas: _"Serve assim"_. Textos inteiros em
+  `quadro/respostas/endgame-e-cutscenes-23-11.txt`, `final-do-jogo-1-23-11.txt`, `final-do-jogo-2-24-11.txt` e
+  `final-do-jogo-3-e-4-24-11.txt`. Construído no ramo `historia/final`, em três atos. Antes da escolha: Sovereign
+  vencido fica inteiro, se fecha e se abre, e a verdade é dita em sete falas sobre os lugares que provam cada uma (o
+  Anel foi feito para guardar a gente; os quarenta vivos estão a bordo do Wake); a escolha vem depois, com o texto de
+  sempre. Depois da escolha: o Crisol responde à vista, a volta para casa (o Wake inteiro, os reatores firmes; em
+  Severance a nave entra no hangar, o Anel apaga e o Wake vai embora; em Stewardship ninguém vai para casa) e a última
+  imagem (outro Wake num berço do Crisol, vazio, uma janela acesa). Cinco falas são novas e ainda não têm voz gravada
+  (37). Fora das cenas, só a morte de Sovereign mudou: ele não se quebra em pedaços (onde a cena não é desenhada,
+  como com movimento reduzido, queima no lugar). Toda vitória no Crisol toca o final, também para quem já venceu.
+  Cartão de conferência `final-do-jogo-5` (25/11) com os dois finais filmados pelo jogo; à pergunta "o final está
+  como queria?", depois de ver o cartão: _"Está bom"_. Ele não disse que jogou. Fecha quando ele aprovar jogando.
+- **(50)** A escolha do final cortada no celular (25/11, num recado à coordenadora, ao saber pelo cartão do final que
+  por toque as últimas linhas de cada opção ficavam fora da tela): _"se a escolha do final está cortando texto no
+  celular, quero ver isso antes de publicar — não quero estrear o final novo cortado no celular."_ Construído no ramo
+  `historia/final`: no celular deitado, por toque, a tela da escolha cabe inteira na altura, as duas opções com todas
+  as linhas, sem rolar, a 844×390 e a 667×375 (também a 932×430). Só os espaços apertaram; o texto não mudou, e o
+  título de cada opção ficou um pouco menor (32 para 28), porque STEWARDSHIP passava da borda na tela mais estreita.
+  No computador e no tablet a tela ficou igual. Num celular de 568×320 ainda não cabe. Cartão de conferência
+  `final-do-jogo-6`. Fecha quando ele aprovar vendo.
+- **(51)** A escolha do final ainda não cabia num celular muito pequeno (25/11, da lista que ele colou da página de
+  publicar ao decidir resolver tudo antes: _"Celular muito pequeno e antigo: a escolha do final ainda não cabe."_).
+  Construído no ramo `historia/final`: a 568×320, por toque, as duas opções aparecem inteiras, sem rolar. Só nesse
+  tamanho o título CHOOSE e os nomes das opções ficam um tamanho menor (53 para 29 e 28 para 23) e as últimas folgas
+  fecham; nada muda de 667×375 para cima. Duas alternativas foram mostradas no cartão `final-do-jogo-7` (o título ao
+  lado de SOVEREIGN DOWN, que cabe mas desloca o cabeçalho; os rótulos em cima do texto, que não cabe). Fecha quando
+  ele aprovar vendo.
+- **(52)** No tablet, as letras da tela da escolha do final são pequenas (25/11, ao decidir resolver os defeitos
+  conhecidos antes de publicar: _"vamos resolver antes de publicar entao, nao tem porque... a nao ser que me convença
+  do contrario com bons argumentos..."_; da lista que ele colou da página de publicar: _"Tablet: as letras dessa tela
+  são pequenas."_). Construído no ramo `historia/final`: por toque num tablet deitado a tela é desenhada maior; a
+  menor letra foi de 7 para 12 px e as frases das opções de 11 para 18 (a 1024×768), sem estourar a tela; tablets
+  maiores ficam no mesmo tamanho. No computador nada mudou. Cartão `final-do-jogo-7`. Fecha quando ele aprovar vendo.
+- **(53)** A pausa de cinco centésimos de segundo logo depois da escolha do final (25/11, da lista que ele colou da
+  página de publicar: _"No final: um intervalo de cinco centésimos de segundo logo depois da escolha, que já
+  existia"_). Medida de novo e **não consertada**. Não vem do código do jogo: na escolha o jogo gasta menos de um
+  milésimo de segundo. Só apareceu com um mouse em cima da página no instante em que a tela da escolha dá lugar à
+  cena: mouse imitado clicando na opção, 8 de 8 escolhas (de cinco a sete centésimos; uma de nove com a máquina no
+  limite de carga); teclado com o mouse imitado parado na página, 2 de 3; por toque imitado, nenhuma de 2; teclado
+  sem mouse na página, nenhuma. Acontece uma vez por final e cai no corte, onde a imagem inteira muda; consertar
+  pediria mexer em como as telas trocam debaixo do mouse no jogo todo. Tudo foi medido com mouse, teclado e toque
+  imitados, na tela do computador: não se sabe se é igual com um mouse de verdade, nem num celular de verdade.
+  Cartão `final-do-jogo-7`. Fecha se ele jogar com o mouse e não sentir tranco depois de escolher; se sentir, vale
+  ir atrás.
+- **(54)** O som das conchas do chefe nem sempre tocava na primeira cena do final (25/11, da lista que ele colou da
+  página de publicar: _"No final: um intervalo de cinco centésimos de segundo logo depois da escolha, que já existia;
+  e o som das conchas do chefe nem sempre toca na cena."_). A causa: o jogo não repete o mesmo som em menos de um
+  segundo e meio, e a luta usa esse som quando o chefe se fecha; se ele caía logo depois, a cena ficava muda.
+  Construído no ramo `historia/final`: a cena conta a vez dela separada da luta; os sons da luta não mudaram. Medido
+  em seis partidas de teste: tocou nas seis, quatro delas com o chefe caindo de um décimo de segundo a um segundo
+  depois de se fechar; na mesma situação, sem o conserto, não tocou. Um efeito: se o som da luta ainda estiver soando
+  quando o chefe cai, o da cena entra no lugar dele. Cartão `final-do-jogo-7`. Fecha quando ele ouvir jogando.
+- **(56)** O clarão dourado preso na abertura (25/11, ao saber que o defeito é real e está também na 0.8.1
+  publicada: _"vamos resolver tudo antes de publicar,,,"_). Quem lança pelo mapa qualquer setor depois do primeiro via
+  as cenas de antes da partida (a história da Wake, a viagem, a descida) tingidas de âmbar; no primeiro setor, onde
+  todo piloto novo começa, elas sempre foram roxo e laranja. A causa: esses setores começam a partida já com níveis
+  (as cartas de partida: 2 no segundo setor, 26 no Crisol), o jogo acende o clarão dourado de subir de nível a cada
+  um deles no lançamento, e essas cenas seguram a partida parada, então o clarão não se apagava. Construído no ramo
+  `historia/final`: enquanto uma dessas cenas segura a partida o clarão não é desenhado; ele aparece como sempre no
+  instante em que a partida começa e a cada nível ganho jogando. Medido lançando o Crisol, três vezes de cada lado:
+  aceso a abertura inteira antes, apagado em todas as amostras depois; do começo da partida em diante, igual. Os
+  outros setores não foram medidos um a um: a regra é a mesma no código. **Muda o que ele vê há tempos:** as cenas
+  de abertura dele deixam de ser âmbar. Cartão `final-do-jogo-7`, com o antes e depois. Fecha quando ele aprovar
+  vendo.
 
 ## Cenário (palavras dele, 19/11, na conferência)
 
@@ -429,3 +559,13 @@ antigos restam ~29); o erro de console `game-session` → `renderer` ao carregar
   `lascas-do-menu-1`: _"Pedras escuras do menu — Três jeitos, o mesmo instante: Nossos asteroides, pequenos e ao
   longe"_. Só no menu; no jogo os pedaços ficam como estão (coordenadora, 23/11). Ramo `conserto/lascas-do-menu`;
   fecha quando ele conferir.
+- **(61)** O motor 3D novo (25/11, a uma auditoria de fora que propôs trocar o three r128, de 2021, por uma versão
+  atual): _"pode ser uma boa sim. vamos fazer, pode melhorar o app"_; e, sobre trazer antes e depois de cada cena,
+  _"nao preicsa antes depois do three... nao deve ser tao complexo assim..."_; e, na conversa do motor,
+  _"nao precisa ser 100% igual, pode variar um pouco cores sem problema..."_. Construído no ramo `motor/three-novo`:
+  o three vem do npm, fixado na r187 (a mais nova, de 30/10/2026), num arquivo próprio que quem volta não baixa de novo;
+  subiu de dez em dez versões, cada degrau com o menu, a nave do Hangar, um setor em ultra e em low, um chefe de perto,
+  a história, a viagem e o final comparados quadro a quadro com o jogo de hoje: a mesma cara (diferença só em bordas
+  finas). O quadro custa cerca de 5% a mais neste Mac (medido lado a lado), jogo pronto um pouco antes (0,1 a 0,4 s).
+  Junto (auditoria 8, B3): durante a partida a tela do menu deixa de segurar cerca de 380 MB da placa. Fecha quando
+  ele jogar a versão nova.

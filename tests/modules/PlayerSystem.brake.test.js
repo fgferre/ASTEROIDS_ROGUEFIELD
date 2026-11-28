@@ -42,7 +42,7 @@ describe('PlayerSystem brake upgrade (FIX-02)', () => {
   function makePlayer() {
     const eventBus = createEventBusMock();
     const input = {
-      getMovementInput: vi.fn(() => ({
+      takeStepFrame: vi.fn(() => ({
         up: false,
         down: false,
         left: false,
@@ -52,7 +52,6 @@ describe('PlayerSystem brake upgrade (FIX-02)', () => {
     const player = new PlayerSystem({
       eventBus,
       input,
-      'command-queue': null,
     });
     // Reset to a clean starting state — PlayerSystem constructor sets defaults
     // but other test cases below mutate position/velocity directly, so we
@@ -140,15 +139,15 @@ describe('PlayerSystem brake upgrade (FIX-02)', () => {
   it('braking damping increases monotonically across ranks 1, 2, 3', () => {
     const { player: r1Player, eventBus: r1Bus } = makePlayer();
     applyBrakingRanks(r1Bus, BRAKING_RANKS.slice(0, 1));
-    const r1 = r1Player.brakingDamping;
+    const r1 = r1Player.flight.brakingDamping;
 
     const { player: r2Player, eventBus: r2Bus } = makePlayer();
     applyBrakingRanks(r2Bus, BRAKING_RANKS.slice(0, 2));
-    const r2 = r2Player.brakingDamping;
+    const r2 = r2Player.flight.brakingDamping;
 
     const { player: r3Player, eventBus: r3Bus } = makePlayer();
     applyBrakingRanks(r3Bus, BRAKING_RANKS.slice(0, 3));
-    const r3 = r3Player.brakingDamping;
+    const r3 = r3Player.flight.brakingDamping;
 
     expect(r1).toBeGreaterThan(0);
     expect(r2).toBeGreaterThan(r1);
@@ -176,11 +175,10 @@ describe('Braking System 3: emergency brake', () => {
   function makePlayer(vy) {
     const eventBus = createEventBusMock();
     const movement = { up: false, down: false, left: false, right: false };
-    const input = { getMovementInput: vi.fn(() => ({ ...movement })) };
+    const input = { takeStepFrame: vi.fn(() => ({ ...movement })) };
     const player = new PlayerSystem({
       eventBus,
       input,
-      'command-queue': null,
     });
     player.setFlightScheme('modern', false);
     player.position = { x: 400, y: 300 };

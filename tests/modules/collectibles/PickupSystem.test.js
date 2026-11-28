@@ -172,15 +172,15 @@ describe('PickupSystem', () => {
   it('Overcharge halves the fire interval for 8 s', () => {
     const game = startGame();
     const { combat } = game.services;
-    const base = combat.shootCooldown;
+    const base = combat.weapons.shootCooldown;
 
     dropOnPlayer(game, 'overcharge');
-    expect(combat.shootCooldown).toBeCloseTo(base / 2);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(base / 2);
 
     stepFor(game, PICKUP_KINDS.overcharge.duration - 0.5);
-    expect(combat.shootCooldown).toBeCloseTo(base / 2);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(base / 2);
     stepFor(game, 1);
-    expect(combat.shootCooldown).toBeCloseTo(base);
+    expect(combat.weapons.shootCooldown).toBeCloseTo(base);
   });
 
   it('Repair restores 25 hull', () => {

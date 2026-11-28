@@ -82,12 +82,13 @@ export function openingShotFromUrl() {
 // How much the frame's edges darken (the game's soft vignette, NORTE §2).
 const VIGNETTE = 0.5;
 
-// Linear → sRGB after the bloom, as the game's composer ends.
+// Three's Linear and linear → sRGB after the bloom, as the game's composer ends.
 const OUTPUT_SHADER = {
   uniforms: {
     tDiffuse: { value: null },
     uVignette: { value: 0 },
     uAspect: { value: 1 },
+    toneMappingExposure: { value: 1 },
   },
   vertexShader: `
 varying vec2 vUv;
@@ -96,6 +97,7 @@ void main() {
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`,
   fragmentShader: `
+#include <tonemapping_pars_fragment>
 uniform sampler2D tDiffuse;
 uniform float uVignette;
 uniform float uAspect;
@@ -103,8 +105,9 @@ varying vec2 vUv;
 void main() {
   vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
   float edge = smoothstep(0.35, 1.1, length(p));
-  vec3 color = texture2D(tDiffuse, vUv).rgb * (1.0 - uVignette * edge);
-  gl_FragColor = LinearTosRGB(vec4(color, 1.0));
+  vec3 color = LinearToneMapping(texture2D(tDiffuse, vUv).rgb)
+    * (1.0 - uVignette * edge);
+  gl_FragColor = sRGBTransferOETF(vec4(color, 1.0));
 }`,
 };
 
@@ -129,18 +132,24 @@ export function createOpeningScene(menu, random, shotName = null) {
 
   // The game's lights (sceneSetup.js): warm key from the upper left, cool
   // fill, a hemisphere so the dark sides never go void.
-  const key = new THREE.DirectionalLight(colorOf(THREE, '#fff1e2'), 1.6);
+  const key = new THREE.DirectionalLight(
+    colorOf(THREE, '#fff1e2'),
+    1.6 * Math.PI
+  );
   const keyDir = new THREE.Vector3(
     KEY_LIGHT_DIR.x * Math.cos(KEY_ELEVATION),
     Math.sin(KEY_ELEVATION),
     KEY_LIGHT_DIR.y * Math.cos(KEY_ELEVATION)
   );
-  const fill = new THREE.DirectionalLight(colorOf(THREE, '#64748b'), 0.35);
+  const fill = new THREE.DirectionalLight(
+    colorOf(THREE, '#64748b'),
+    0.35 * Math.PI
+  );
   fill.position.set(0.7, 0.3, 0.65);
   const hemi = new THREE.HemisphereLight(
     colorOf(THREE, '#2a3346'),
     colorOf(THREE, '#050608'),
-    0.3
+    0.3 * Math.PI
   );
   world.add(key, key.target, fill, hemi);
 
@@ -155,8 +164,8 @@ export function createOpeningScene(menu, random, shotName = null) {
     space.invalidateBakes()
   );
 
-  // The post chain: the world in linear HDR, the game's bloom, sRGB out,
-  // then the menu's scene over it and the edges smoothed.
+  // The post chain: the world in linear HDR, the game's bloom, three's Linear
+  // and sRGB out, then the menu's scene over it and the edges smoothed.
   const size = renderer.getDrawingBufferSize(new THREE.Vector2());
   const target = new THREE.WebGLRenderTarget(size.x, size.y, {
     minFilter: THREE.LinearFilter,
@@ -165,33 +174,25 @@ export function createOpeningScene(menu, random, shotName = null) {
     type: THREE.HalfFloatType,
   });
   const composer = new THREE.EffectComposer(renderer, target);
-  const worldPass = new THREE.RenderPass(world, camera);
-  const renderWorld = worldPass.render.bind(worldPass);
-  worldPass.render = (...args) => {
-    const toneMapping = renderer.toneMapping;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderWorld(...args);
-    renderer.toneMapping = toneMapping;
-  };
-  composer.addPass(worldPass);
+  // Sized in drawing-buffer pixels (setSize below), so at ratio 1: it takes
+  // the renderer's, the device's, and would draw the chain at twice the
+  // screen's width and height.
+  composer.setPixelRatio(1);
+  composer.addPass(new THREE.RenderPass(world, camera));
   const bloomPass = new THREE.UnrealBloomPass(
     new THREE.Vector2(size.x, size.y),
     BLOOM.strength,
     BLOOM.radius,
     BLOOM.threshold
   );
-  [
-    bloomPass.renderTargetBright,
-    ...bloomPass.renderTargetsHorizontal,
-    ...bloomPass.renderTargetsVertical,
-  ].forEach((rt) => {
-    rt.texture.type = THREE.HalfFloatType;
-    rt.depthBuffer = false;
-  });
   composer.addPass(bloomPass);
   const output = new THREE.ShaderPass(OUTPUT_SHADER);
   output.uniforms.uVignette.value = VIGNETTE;
   output.uniforms.uAspect.value = size.x / size.y;
+  // The world's exposure is the menu renderer's (it tone-maps nothing itself).
+  Object.defineProperty(output.uniforms.toneMappingExposure, 'value', {
+    get: () => renderer.toneMappingExposure,
+  });
   composer.addPass(output);
   const overlayPass = new THREE.RenderPass(overlayScene, overlayCamera);
   overlayPass.clear = false;
@@ -199,7 +200,7 @@ export function createOpeningScene(menu, random, shotName = null) {
   composer.addPass(overlayPass);
   // The last pass draws to the screen: it stays on at every quality (the
   // menu's own pass alone would draw only the hull).
-  if (THREE.SMAAPass) composer.addPass(new THREE.SMAAPass(size.x, size.y));
+  if (THREE.SMAAPass) composer.addPass(new THREE.SMAAPass());
 
   const biomes = new BiomeController(THREE, {
     key,

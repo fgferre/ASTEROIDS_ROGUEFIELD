@@ -10,6 +10,7 @@ export default {
   icon: '🍀',
   themeColor: PALETTE.xp,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'apex-predator' },
   tags: ['pickups', 'collection'],
   text: {
     name: 'Lucky Fragment',
@@ -32,6 +33,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-lucky-fragment',
+          to: 'pickups',
+          lands: { rockDropChance: 'chance' },
           payload: { chance: 0.1 },
         },
       ],

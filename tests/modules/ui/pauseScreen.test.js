@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installDomStubs } from '../../__helpers__/domStubs.js';
 import { PauseScreen } from '../../../src/modules/ui/PauseScreen.js';
+import { inputLayers } from '../../../src/modules/input/inputLayers.js';
 
 describe('Pause screen', () => {
   let restoreDom;
@@ -50,10 +51,6 @@ describe('Pause screen', () => {
   });
 
   it('Escape with the quit armed only disarms it: the game never hears that press', () => {
-    let onKey;
-    window.addEventListener = (name, fn, capture) => {
-      if (name === 'keydown' && capture) onKey = fn;
-    };
     const classes = new Set();
     const exitBtn = {
       textContent: 'Quit to menu',
@@ -72,15 +69,9 @@ describe('Pause screen', () => {
     });
     pause.bindPauseControls();
     pause.updatePauseScreen(true);
-    const escape = (repeat = false) => {
-      const event = {
-        key: 'Escape',
-        repeat,
-        stopImmediatePropagation: vi.fn(),
-      };
-      onKey(event);
-      return event.stopImmediatePropagation.mock.calls.length > 0;
-    };
+    // Its layer on top of the input layer stack: true takes the key alone.
+    const escape = (repeat = false) =>
+      inputLayers.top().onKey({ key: 'Escape', repeat });
 
     pause.confirmQuit(exitBtn);
     expect(exitBtn.textContent).toBe('Quit? Press again');

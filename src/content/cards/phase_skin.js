@@ -10,6 +10,7 @@ export default {
   icon: '👻',
   themeColor: PALETTE.text,
   unlockLevel: 3,
+  unlock: { by: 'license', at: 7, cost: 250 },
   tags: ['dash', 'invulnerability'],
   text: {
     name: 'Phase Skin',
@@ -30,6 +31,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-phase-skin',
+          to: 'player',
+          lands: { 'maneuvers.dashAfterInvulnerability': 'duration' },
           payload: { duration: 0.4 },
         },
       ],

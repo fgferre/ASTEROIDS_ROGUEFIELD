@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { biomeForLayer } from '../../../src/data/biomes.js';
 import { SECTORS, sectorById } from '../../../src/data/sectors.js';
@@ -8,16 +7,9 @@ import { buildTheCrucible } from '../../../src/modules/render3d/places/theCrucib
 import { PLACE_SETS } from '../../../src/modules/render3d/places/index.js';
 import { createPlaceKit } from '../../../src/modules/render3d/places/kit.js';
 import { crystal } from '../../../src/modules/render3d/places/pieces.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import { buildWake } from '../../../src/modules/render3d/travel/wake.js';
+import { lightWake } from '../../../src/modules/render3d/travel/wakeRig.js';
+import THREE from '../../../src/modules/render3d/three.js';
 
 // A BiomeController look standing in one place.
 const lookAt = (place) => ({
@@ -139,5 +131,43 @@ describe('place backdrop sets', () => {
     set.update(1.1, 1);
     set.update(1.15, 0);
     expect(star.uLevel.value).toBeLessThan(0.5);
+  });
+
+  it("builds the last image's twin on the opening's Wake: its geometry and maps shared, its own darker paint, no light, the opening's untouched", () => {
+    const kit = createPlaceKit(THREE, new THREE.Color(), {});
+    const set = buildTheCrucible(THREE, kit);
+    const wake = buildWake(THREE);
+    lightWake(THREE, wake, -1); // the opening's rig, in the Wake's group
+    const painted = wake.group.children.filter((part) => part.isMesh);
+    const before = painted.map((part) => part.material.envMapIntensity);
+
+    const slip = set.slip(wake);
+    expect(set.slip(wake)).toBe(slip);
+    const twin = [];
+    slip.frame.traverse((part) => part.isMesh && twin.push(part));
+    painted.forEach((part, i) => {
+      const copy = twin.find((mesh) => mesh.geometry === part.geometry);
+      expect(copy, part.name).toBeDefined();
+      expect(copy.material).not.toBe(part.material);
+      expect(copy.material.map).toBe(part.material.map);
+      expect(copy.material.onBeforeCompile).toBe(part.material.onBeforeCompile);
+      expect(copy.material.customProgramCacheKey()).toBe(
+        part.material.customProgramCacheKey()
+      );
+      expect(copy.material.envMapIntensity).toBeLessThan(before[i]);
+      expect(part.material.envMapIntensity).toBe(before[i]);
+    });
+    // none of the opening's lights, lamps or rig came along
+    const lights = [wake.lights.windows, wake.lights.lamps, wake.lights.floods]
+      .concat(wake.lights.beacons, wake.lights.engines)
+      .flatMap((light) => light.children.map((mesh) => mesh.geometry));
+    twin.forEach((mesh) => expect(lights).not.toContain(mesh.geometry));
+    let lit = 0;
+    slip.object.traverse((part) => (lit += part.isLight ? 1 : 0));
+    expect(lit).toBe(0);
+    expect(painted.every((part) => part.parent === wake.group)).toBe(true);
+    expect(slip.pane.geometry.getAttribute('position').count).toBeGreaterThan(
+      0
+    );
   });
 });

@@ -1,17 +1,20 @@
 // src/modules/enemies/systems/EnemyCombatRelay.js
 // What enemy fire hands to CombatSystem (the projectile payload, its source
-// filled in) and how a shield shockwave pushes the enemies around it.
+// filled in), what a boss's attack hands to the physics, and how a shield
+// shockwave pushes the enemies around it.
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import {
   SHIELD_SHOCKWAVE_FORCE,
   SHIELD_SHOCKWAVE_RADIUS,
 } from '../../../data/constants/gameplay.js';
+import { isReachableEnemy } from '../../PhysicsSystem.js';
 
 export class EnemyCombatRelay {
   /**
    * @param {object} kit What the relay needs from EnemySystem: bosses and
    *   enemyRandom (its boss and random-scope modules), getAsteroids,
-   *   getPhysics, getCachedCombat and applyDirectDamageToPlayer.
+   *   getPhysics, getCachedCombat, applyDirectDamageToPlayer, getCachedPlayer
+   *   and getEnemySystem.
    */
   constructor(kit) {
     this.kit = kit;
@@ -42,6 +45,63 @@ export class EnemyCombatRelay {
 
   applyDirectDamageToPlayer(...args) {
     return this.kit.applyDirectDamageToPlayer(...args);
+  }
+
+  // A boss's attack payload (a charge or an area hit) on to the physics,
+  // unless the physics sent it.
+  handleBossAttackPayload(data = {}) {
+    if (!data || data.processedBy === 'physics') {
+      return;
+    }
+
+    const physics = this.physics;
+    const attackType =
+      data.type ||
+      data.attackType ||
+      data.event ||
+      data.kind ||
+      data.mode ||
+      null;
+
+    const boss = this.bosses.resolveBossReference(data) || data.boss || null;
+    const player = data.player || this.kit.getCachedPlayer();
+
+    const payload = {
+      ...data,
+      boss,
+      player,
+      enemiesSystem: this.kit.getEnemySystem(),
+    };
+
+    if (!attackType && !payload.radius && !payload.knockback) {
+      return;
+    }
+
+    switch (attackType) {
+      case 'charge':
+      case 'charge-impact':
+      case 'charge-collision':
+      case 'boss-charge':
+        physics.handleBossChargeCollision(payload);
+        break;
+      case 'area':
+      case 'area-damage':
+      case 'nova':
+      case 'shockwave':
+      case 'boss-area':
+        physics.applyBossAreaDamage(payload);
+        break;
+      default:
+        if (payload.collisionType === 'boss-charge') {
+          physics.handleBossChargeCollision(payload);
+          break;
+        }
+
+        if (payload.radius) {
+          physics.applyBossAreaDamage(payload);
+        }
+        break;
+    }
   }
 
   normalizeEnemyProjectilePayload(data = {}) {
@@ -170,7 +230,8 @@ export class EnemyCombatRelay {
 
     for (let i = 0; i < nearbyEnemies.length; i += 1) {
       const asteroid = nearbyEnemies[i];
-      if (!asteroid || asteroid.destroyed) {
+      // The full list (the fallback) holds phased Shades the query leaves out.
+      if (!isReachableEnemy(asteroid)) {
         continue;
       }
 

@@ -1,9 +1,10 @@
 import { IS_DEV } from '../../core/env.js';
 
+// Development only: the last lines in memory, a ring that drops the oldest,
+// saved to a file on request (GameDebugLogger.download() in the console).
+// Until 26/11/2026 every line was also written to localStorage each second.
 const MAX_LOG_ENTRIES = 50000;
-const TRIM_BATCH_SIZE = 10000;
-const STORAGE_KEY = 'game-debug-log';
-const PERSIST_DELAY_MS = 1000;
+const OLD_STORAGE_KEY = 'game-debug-log';
 
 const safeStringify = (value) => {
   if (value === undefined) {
@@ -24,19 +25,15 @@ const safeStringify = (value) => {
 export class GameDebugLogger {
   static isEnabled = false;
   static entries = [];
+  static next = 0;
   static sessionStart = null;
-  static persistTimer = null;
-  static lifecycleBound = false;
 
   static init() {
     if (this.isEnabled) {
       return;
     }
 
-    if (
-      typeof window === 'undefined' ||
-      typeof window.localStorage === 'undefined'
-    ) {
+    if (typeof window === 'undefined') {
       return;
     }
 
@@ -46,30 +43,19 @@ export class GameDebugLogger {
 
     this.isEnabled = true;
     this.entries = [];
+    this.next = 0;
     this.sessionStart = Date.now();
+    window.GameDebugLogger = this;
 
+    // The copy an older build left in this browser (it filled the origin's
+    // quota with up to 50,000 lines).
     try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch (error) {
-      console.warn('[GameDebugLogger] Failed to clear previous log', error);
+      window.localStorage?.removeItem(OLD_STORAGE_KEY);
+    } catch {
+      // Site data blocked: nothing was written there either.
     }
 
-    this.bindLifecycleFlush();
     this.log('INIT', 'GameDebugLogger initialized');
-  }
-
-  static bindLifecycleFlush() {
-    if (this.lifecycleBound) {
-      return;
-    }
-
-    this.lifecycleBound = true;
-    window.addEventListener('pagehide', () => this.persist());
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') {
-        this.persist();
-      }
-    });
   }
 
   static getTimestamp() {
@@ -105,37 +91,12 @@ export class GameDebugLogger {
     const serializedData = hasData ? ` - ${safeStringify(data)}` : '';
     const entry = `[${timestamp}] [${normalizedCategory}] ${safeMessage}${serializedData}`;
 
-    this.entries.push(entry);
-
-    if (this.entries.length > MAX_LOG_ENTRIES) {
-      const removed = this.entries.splice(0, TRIM_BATCH_SIZE);
-      const trimmedEntry = `[${this.getTimestamp()}] [TRIMMED] Removed ${removed.length} oldest entries`;
-      this.entries.unshift(trimmedEntry);
+    if (this.entries.length < MAX_LOG_ENTRIES) {
+      this.entries.push(entry);
+    } else {
+      this.entries[this.next] = entry;
     }
-
-    if (this.persistTimer === null) {
-      this.persistTimer = setTimeout(() => this.persist(), PERSIST_DELAY_MS);
-    }
-  }
-
-  static persist() {
-    if (this.persistTimer !== null) {
-      clearTimeout(this.persistTimer);
-      this.persistTimer = null;
-    }
-
-    if (!this.isEnabled) {
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(STORAGE_KEY, this.entries.join('\n'));
-    } catch (error) {
-      console.warn(
-        '[GameDebugLogger] Failed to persist log to localStorage',
-        error
-      );
-    }
+    this.next = (this.next + 1) % MAX_LOG_ENTRIES;
   }
 
   static getLogContent() {
@@ -143,7 +104,11 @@ export class GameDebugLogger {
       return '';
     }
 
-    return this.entries.join('\n');
+    // Oldest first: once the ring is full it starts at the next slot.
+    return [
+      ...this.entries.slice(this.next),
+      ...this.entries.slice(0, this.next),
+    ].join('\n');
   }
 
   static download() {
@@ -174,20 +139,9 @@ export class GameDebugLogger {
       return;
     }
 
-    if (this.persistTimer !== null) {
-      clearTimeout(this.persistTimer);
-      this.persistTimer = null;
-    }
-
     this.entries = [];
+    this.next = 0;
     this.sessionStart = Date.now();
-
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch (error) {
-      console.warn('[GameDebugLogger] Failed to clear localStorage log', error);
-    }
-
     this.log('STATE', 'Debug log cleared');
   }
 }

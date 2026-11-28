@@ -1,6 +1,6 @@
 // src/__tests__/core/ObjectPool.test.js
-import { describe, test, expect, beforeAll, afterEach, vi } from 'vitest';
-import { ObjectPool, TTLObjectPool } from '../../src/core/ObjectPool.js';
+import { describe, test, expect, beforeAll } from 'vitest';
+import { ObjectPool } from '../../src/core/ObjectPool.js';
 
 describe('ObjectPool', () => {
   const createPool = () =>
@@ -105,13 +105,6 @@ describe('ObjectPool', () => {
       expect(pool.getStats().available).toBe(8);
     });
 
-    test('should shrink pool', () => {
-      const pool = createPool();
-      pool.shrink(2);
-
-      expect(pool.getStats().available).toBe(3);
-    });
-
     test('should release all objects', () => {
       const pool = createPool();
       pool.acquire();
@@ -176,82 +169,5 @@ describe('ObjectPool', () => {
       expect(validationResult.valid).toBe(true);
       expect(validationResult.errors).toHaveLength(0);
     });
-  });
-
-  describe.concurrent('Auto Management', () => {
-    test('should auto-expand when utilization is high', () => {
-      const pool = createPool();
-      // Acquire most objects to create high utilization
-      for (let i = 0; i < 4; i++) {
-        pool.acquire();
-      }
-
-      const initialSize = pool.getStats().totalSize;
-      pool.autoManage({ targetUtilization: 0.5 });
-
-      expect(pool.getStats().totalSize).toBeGreaterThan(initialSize);
-    });
-
-    test('should auto-shrink when utilization is low', () => {
-      const pool = createPool();
-      // Create many available objects
-      pool.expand(10);
-
-      const initialAvailable = pool.getStats().available;
-      pool.autoManage({ targetUtilization: 0.7 });
-
-      expect(pool.getStats().available).toBeLessThan(initialAvailable);
-    });
-  });
-});
-
-// Note: TTLObjectPool tests require sequential execution due to fake timer usage
-describe.sequential('TTLObjectPool', () => {
-  let ttlPool;
-
-  beforeEach(() => {
-    vi.useFakeTimers();
-    ttlPool = new TTLObjectPool(
-      () => ({ data: null }),
-      (obj) => {
-        obj.data = null;
-      },
-      3,
-      10
-    );
-  });
-
-  afterEach(() => {
-    try {
-      // no-op: pool state reset happens per test through fresh instantiation
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  test('should acquire object with TTL', () => {
-    const obj = ttlPool.acquire(1000); // 1 second TTL
-    expect(obj).toBeDefined();
-    expect(ttlPool.getStats().objectsWithTTL).toBe(1);
-  });
-
-  // Optimization: vi.useFakeTimers() to avoid real delays (60ms → instant)
-  test('should release expired objects on update', () => {
-    ttlPool.acquire(50); // 50ms TTL
-
-    // Wait for expiration
-    vi.advanceTimersByTime(60);
-
-    ttlPool.update();
-
-    expect(ttlPool.getStats().inUse).toBe(0);
-    expect(ttlPool.getStats().objectsWithTTL).toBe(0);
-  });
-
-  test('should clear TTL tracking on manual release', () => {
-    const obj = ttlPool.acquire(1000);
-    ttlPool.release(obj);
-
-    expect(ttlPool.getStats().objectsWithTTL).toBe(0);
   });
 });

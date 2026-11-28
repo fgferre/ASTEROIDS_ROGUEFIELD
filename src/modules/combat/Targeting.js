@@ -29,6 +29,7 @@ export class Targeting {
    * `bulletSpeed()`: the lance's current speed (the lead and the danger speed reference).
    * `spreadMode()`: 'concentrated' or 'fan' (the shots a lock is worth).
    * `computeParallelOffset(playerPos, aimPoint, duplicateIndex, duplicateCount, enemy)`: the lane offset of a duplicate lock.
+   * `weaponReach()`: how far the weapon in hand strikes (Weapons.reach).
    */
   constructor({
     player,
@@ -38,6 +39,7 @@ export class Targeting {
     bulletSpeed,
     spreadMode,
     computeParallelOffset,
+    weaponReach,
   }) {
     this.player = player;
     this.enemies = enemies;
@@ -46,6 +48,7 @@ export class Targeting {
     this.bulletSpeed = bulletSpeed;
     this.spreadMode = spreadMode;
     this.computeParallelOffset = computeParallelOffset;
+    this.weaponReach = weaponReach;
 
     this.currentTarget = null;
     this.targetUpdateTimer = 0;
@@ -285,7 +288,16 @@ export class Targeting {
       return;
     }
 
+    // A target the weapon reaches comes before one it does not: a lock past
+    // a short weapon's reach (the Scatter Coil's burst, the Arc Caster's
+    // jump) turned it away from what it could hit (card matrix, 25/11).
+    const reach = this.weaponReach();
+    const reachable = ({ enemy, distance }) =>
+      distance - (enemy.radius || 0) <= reach;
     const sorted = candidates.sort((a, b) => {
+      if (reachable(a) !== reachable(b)) {
+        return reachable(a) ? -1 : 1;
+      }
       if (scoringEnabled && b.score !== a.score) {
         return b.score - a.score;
       }

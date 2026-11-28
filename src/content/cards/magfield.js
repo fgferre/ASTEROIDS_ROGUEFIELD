@@ -7,6 +7,7 @@ export default {
   icon: '🧲',
   themeColor: '#C08BFF',
   unlockLevel: 1,
+  unlock: { by: 'start', at: 21 },
   tags: ['collection', 'magnetism'],
   text: {
     name: 'Magnetic Field',
@@ -44,6 +45,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-magnetism',
+          to: 'player',
           payload: { multiplier: 1.4 },
         },
       ],
@@ -60,6 +62,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-magnetism',
+          to: 'player',
           payload: { multiplier: 1.25 },
         },
       ],
@@ -76,6 +79,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-magnetism',
+          to: 'player',
           payload: { multiplier: 1.15 },
         },
       ],

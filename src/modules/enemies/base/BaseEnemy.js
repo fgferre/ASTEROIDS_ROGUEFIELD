@@ -28,6 +28,7 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 import RandomService from '../../../core/RandomService.js';
+import { captureState, restoreState } from './enemyState.js';
 import { ELITE_AFFIXES } from '../../../data/enemies/affixes.js';
 import {
   absorbFrontalHit,
@@ -517,15 +518,31 @@ export class BaseEnemy {
     this.tags.add(tag);
   }
 
+  /** What a Retry brings back of it, copied at the death (enemyState.js). */
+  getSnapshotState() {
+    return captureState(this);
+  }
+
+  /**
+   * Sets getSnapshotState's copy back once it is rebuilt; `findEnemy(id)`
+   * links the enemies it named.
+   */
+  restoreSnapshotState(state, findEnemy) {
+    restoreState(this, state, findEnemy);
+  }
+
   /**
    * Resets enemy state for object pooling.
    * Called when returning enemy to pool.
    */
   resetForPool() {
-    // Reset core state
+    // Reset core state. No id: what still holds this enemy (a missile's
+    // target, a burn) checks the id and lets go, as for a new one.
+    this.id = null;
     this.alive = false;
     this.initialized = false;
     this.lastHitTime = -Infinity;
+    this.hitFlashSeconds = HIT_FLASH_SECONDS;
     this.useComponents = false;
 
     // Reset position & velocity
@@ -554,9 +571,13 @@ export class BaseEnemy {
     this.rotation = 0;
     this.rotationSpeed = 0;
 
-    // Clear metadata
+    // Clear metadata (a Warden's minion is marked in boss/minions.js)
     this.tags.clear();
     this.spawnedBy = null;
+    this.spawnSource = null;
+    this.spawnedByBossId = null;
+    this.isBossMinion = false;
+    this.metadata = null;
     this.resetAffixes([]);
 
     // Reset components

@@ -8,9 +8,10 @@ export const HALF_W = GAME_WIDTH / 2;
 export const HALF_H = GAME_HEIGHT / 2;
 
 // Colors are authored in sRGB (palette, simulation); lighting and blending
-// run in linear, and the composer encodes back to sRGB at the end.
+// run in linear, and the composer encodes back to sRGB at the end. Three
+// reads a CSS string or a hex as sRGB and keeps it in linear.
 export function colorOf(THREE, css) {
-  return new THREE.Color(css).convertSRGBToLinear();
+  return new THREE.Color(css);
 }
 
 // Parsed linear colors, keyed by the CSS string the simulation stores.
@@ -40,7 +41,6 @@ export function rgbOf(THREE, css) {
     } catch {
       color.set(0xffffff);
     }
-    color.convertSRGBToLinear();
     rgb = [color.r, color.g, color.b];
     colorCache.set(key, rgb);
   }
@@ -165,8 +165,8 @@ export class PointBatch {
     this.material.uniforms.uScale.value = pointScale;
     for (let i = 0; i < this.attributes.length; i += 1) {
       const attribute = this.attributes[i];
-      attribute.updateRange.offset = 0;
-      attribute.updateRange.count = this.count * attribute.itemSize;
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0, this.count * attribute.itemSize);
       attribute.needsUpdate = true;
     }
     this.geometry.setDrawRange(0, this.count);
@@ -204,7 +204,7 @@ varying float vAcross;
 void main() {
   float a = min(1.0, abs(vAcross));
   gl_FragColor = vec4(vColor * (1.0 - a * a), 1.0);
-  #include <encodings_fragment>
+  #include <colorspace_fragment>
 }`;
 
 const MAX_POLYLINE = 64;
@@ -525,8 +525,8 @@ export class RibbonBatch {
   end() {
     for (let i = 0; i < this.attributes.length; i += 1) {
       const attribute = this.attributes[i];
-      attribute.updateRange.offset = 0;
-      attribute.updateRange.count = this.verts * attribute.itemSize;
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0, this.verts * attribute.itemSize);
       attribute.needsUpdate = true;
     }
     this.geometry.setDrawRange(0, (this.verts / 4) * 6);
@@ -587,7 +587,7 @@ void main() {
   gl_FragColor = vHeat < 0.0
     ? vec4(vColor * (0.25 + 0.75 * facing), 1.0)
     : vec4(mix(vColor * 0.7, vec3(hot), core), 1.0);
-  #include <encodings_fragment>
+  #include <colorspace_fragment>
 }`;
 
 /** The shapes' triangles: { position, normal, part } flat arrays. */
@@ -787,11 +787,11 @@ export class CapsuleBatch {
     this.mesh.count = this.count;
     if (this.count === 0) return;
     const matrices = this.mesh.instanceMatrix;
-    matrices.updateRange.offset = 0;
-    matrices.updateRange.count = this.count * 16;
+    matrices.clearUpdateRanges();
+    matrices.addUpdateRange(0, this.count * 16);
     matrices.needsUpdate = true;
-    this.tint.updateRange.offset = 0;
-    this.tint.updateRange.count = this.count * 4;
+    this.tint.clearUpdateRanges();
+    this.tint.addUpdateRange(0, this.count * 4);
     this.tint.needsUpdate = true;
   }
 }

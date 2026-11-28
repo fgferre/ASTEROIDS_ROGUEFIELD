@@ -57,6 +57,8 @@ export class CardEffects {
     this.targeting = targeting;
     this.weapons = weapons;
     this.hits = hits;
+    // The brake's shove is not cut by the enemy's top speed for 0.5 s (card
+    // decision 8, not confirmed)
 
     this.resetWeaponTuning();
     this.resetCardState();
@@ -314,6 +316,52 @@ export class CardEffects {
     });
   }
 
+  // At the death: the card-roll count (kills after it roll on), each enemy
+  // burning, slowed or pulled, by its id (the Retry rebuilds the field), its
+  // timers where they stood, and the pull wells; a retry
+  // (session/deathSnapshot.js) puts them back on the rebuilt enemies.
+  getSnapshotState() {
+    const byId = (effects) =>
+      [...effects.values()].map((entry) => ({
+        ...entry,
+        ...(entry.spreadTo && { spreadTo: entry.spreadTo.map((e) => e.id) }),
+      }));
+    return {
+      cardRolls: this.cardRolls,
+      burns: byId(this.burns),
+      slows: byId(this.slows),
+      pulls: byId(this.pulls),
+      wells: this.wells.map((well) => ({ ...well })),
+    };
+  }
+
+  restoreSnapshotState(snapshot) {
+    this.cardRolls = snapshot.cardRolls;
+    const field = new Map();
+    this.enemies().forEachActiveEnemy((enemy) => field.set(enemy.id, enemy));
+    const back = (entries) =>
+      new Map(
+        entries
+          .filter(({ id }) => field.has(id))
+          .map((entry) => [
+            field.get(entry.id),
+            {
+              ...entry,
+              ...(entry.spreadTo && {
+                spreadTo: entry.spreadTo.flatMap((id) =>
+                  field.has(id) ? [field.get(id)] : []
+                ),
+              }),
+            },
+          ])
+      );
+    this.burns = back(snapshot.burns);
+    this.slows = back(snapshot.slows);
+    this.pulls = back(snapshot.pulls);
+    this.wells = snapshot.wells.map((well) => ({ ...well }));
+    return true;
+  }
+
   // Deterministic card roll (no game RNG here, like the arc jitter).
   rollCardChance(chance) {
     this.cardRolls += 1;
@@ -337,7 +385,7 @@ export class CardEffects {
     if (
       player.isDead ||
       player._quitExplosionHidden ||
-      !(player.dashTimer > 0)
+      !(player.maneuvers.dashTimer > 0)
     ) {
       this.afterburnDashing = false;
       return;
@@ -392,7 +440,8 @@ export class CardEffects {
     });
   }
 
-  // Pushes every enemy within `radius` straight away from `origin`.
+  // Pushes every enemy within `radius` straight away from `origin`, free of
+  // its own top speed for 0.5 s (MovementComponent's clamps).
   shoveFrom(origin, radius, speed) {
     if (!origin) return;
     this.weapons().forEachSolidEnemy((enemy) => {
@@ -401,6 +450,7 @@ export class CardEffects {
       const reach = radius + (enemy.radius || 0);
       if (dx * dx + dy * dy > reach * reach) return;
       this.hits().pushEnemy(enemy, dx, dy, speed);
+      enemy.shoveFreeTimer = 0.5;
     });
   }
 

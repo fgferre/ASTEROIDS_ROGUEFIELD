@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   BIOMES,
@@ -6,18 +5,9 @@ import {
   BiomeTransition,
 } from '../../../src/data/biomes.js';
 import { BiomeController } from '../../../src/modules/render3d/biomes3d.js';
+import THREE from '../../../src/modules/render3d/three.js';
 
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
-
-const linear = (css) => new THREE.Color(css).convertSRGBToLinear();
+const linear = (css) => new THREE.Color(css);
 
 describe('BiomeController', () => {
   it('fades lights, bloom, nebula and dust onto the next biome in 2 s', () => {
@@ -40,15 +30,15 @@ describe('BiomeController', () => {
 
     controller.update(transition);
     const [outer, core] = BIOMES;
-    expect(targets.key.intensity).toBeCloseTo(outer.keyIntensity);
+    expect(targets.key.intensity).toBeCloseTo(outer.keyIntensity * Math.PI);
 
     for (let t = 0; t < BIOME_FADE_SECONDS + 0.1; t += 1 / 60) {
       transition.update(1 / 60);
       controller.update(transition);
     }
-    expect(targets.key.intensity).toBeCloseTo(core.keyIntensity);
+    expect(targets.key.intensity).toBeCloseTo(core.keyIntensity * Math.PI);
     expect(targets.key.color.getHex()).toBe(linear(core.keyColor).getHex());
-    expect(targets.fill.intensity).toBeCloseTo(core.fillIntensity);
+    expect(targets.fill.intensity).toBeCloseTo(core.fillIntensity * Math.PI);
     expect(targets.bloomPass.strength).toBeCloseTo(0.9 * core.bloomScale);
     const last = looks[looks.length - 1];
     expect(last.mix).toBe(1);
@@ -79,15 +69,17 @@ describe('BiomeController', () => {
     transition.enterLayer(6);
     controller.update(transition);
     const core = BIOMES[1];
-    expect(targets.fill.intensity).toBeCloseTo(core.fillIntensity);
+    expect(targets.fill.intensity).toBeCloseTo(core.fillIntensity * Math.PI);
     expect(targets.hemi.intensity).toBeCloseTo(0.3);
 
     controller.targets.fillScale = 0.85;
     controller.targets.hemiScale = 0.9;
     controller.applied = null;
     controller.update(transition);
-    expect(targets.fill.intensity).toBeCloseTo(core.fillIntensity * 0.85);
+    expect(targets.fill.intensity).toBeCloseTo(
+      core.fillIntensity * 0.85 * Math.PI
+    );
     expect(targets.hemi.intensity).toBeCloseTo(0.27);
-    expect(targets.key.intensity).toBeCloseTo(core.keyIntensity);
+    expect(targets.key.intensity).toBeCloseTo(core.keyIntensity * Math.PI);
   });
 });

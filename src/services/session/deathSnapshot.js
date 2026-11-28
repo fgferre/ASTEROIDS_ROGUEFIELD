@@ -1,11 +1,13 @@
 // src/services/session/deathSnapshot.js
 //
 // What a retry rewinds to: the snapshot taken when the ship dies (hull and
-// health, build, field, physics, RNG state) and its restoration, with the
+// health, build, field, physics, RNG state, the rewards on the field and
+// rolled) and its restoration, with the
 // upgrade effects re-applied on top of the reset stats.
 
 import { debugLog } from '../../core/debugLogging.js';
 import { logRandomSnapshot } from './randomScopes.js';
+import { resolveService } from '../../core/serviceUtils.js';
 
 export class DeathSnapshot {
   /**
@@ -14,7 +16,7 @@ export class DeathSnapshot {
    * `seedInfo`: the boot seed `{ seed, source }` (the RNG scopes' own object).
    * `currentRandomSnapshot()`: the RNG snapshot of the current scope, or null.
    * `prepareRandomForScope(scope, options)`: resets or restores the RNG.
-   * `resolveServiceInstance(name)`: a session service by name, or null.
+   * `services`: the session's services, found with resolveService.
    * `getConfiguredHullId()`: the hull the player flies.
    * `applyConfiguredPlayerHull({ hullId })`: puts a hull on the player.
    */
@@ -24,7 +26,7 @@ export class DeathSnapshot {
     seedInfo,
     currentRandomSnapshot,
     prepareRandomForScope,
-    resolveServiceInstance,
+    services,
     getConfiguredHullId,
     applyConfiguredPlayerHull,
   }) {
@@ -33,7 +35,7 @@ export class DeathSnapshot {
     this.seedInfo = seedInfo;
     this.currentRandomSnapshot = currentRandomSnapshot;
     this.prepareRandomForScope = prepareRandomForScope;
-    this.resolveServiceInstance = resolveServiceInstance;
+    this.services = services;
     this.getConfiguredHullId = getConfiguredHullId;
     this.applyConfiguredPlayerHull = applyConfiguredPlayerHull;
     this.randomSnapshot = null;
@@ -63,8 +65,8 @@ export class DeathSnapshot {
    * `restoreBuild` puts it back on freshly reset systems, at full health.
    */
   captureBuild() {
-    const player = this.resolveServiceInstance('player');
-    const progression = this.resolveServiceInstance('progression');
+    const player = resolveService('player', this.services);
+    const progression = resolveService('progression', this.services);
     return {
       progression: progression.serialize(),
       // Card choices the win left unmade (levels from the spoils).
@@ -75,8 +77,8 @@ export class DeathSnapshot {
   }
 
   restoreBuild(build) {
-    const player = this.resolveServiceInstance('player');
-    const progression = this.resolveServiceInstance('progression');
+    const player = resolveService('player', this.services);
+    const progression = resolveService('progression', this.services);
     progression.restoreState(build.progression);
     this.reapplyProgressionUpgrades({
       progression,
@@ -89,10 +91,10 @@ export class DeathSnapshot {
   }
 
   createDeathSnapshot() {
-    const player = this.resolveServiceInstance('player');
-    const enemies = this.resolveServiceInstance('enemies');
-    const physics = this.resolveServiceInstance('physics');
-    const progression = this.resolveServiceInstance('progression');
+    const player = resolveService('player', this.services);
+    const enemies = resolveService('enemies', this.services);
+    const physics = resolveService('physics', this.services);
+    const progression = resolveService('progression', this.services);
 
     if (!player || !enemies || !physics || !progression) {
       console.warn(
@@ -146,25 +148,29 @@ export class DeathSnapshot {
     const enemySnapshot =
       typeof enemies.getSnapshotState === 'function'
         ? enemies.getSnapshotState()
-        : typeof enemies.exportState === 'function'
-          ? enemies.exportState()
-          : null;
+        : null;
 
     const physicsSnapshot =
       typeof physics.getSnapshotState === 'function'
         ? physics.getSnapshotState()
-        : typeof physics.exportState === 'function'
-          ? physics.exportState()
-          : null;
+        : null;
+
+    // The enemy shots in flight at the death (the world kept them before the
+    // combat system cleared them), put back at the end of the Retry
+    // (retryCountdown.js), after the resets that clear them.
+    const combatSnapshot =
+      resolveService('world', this.services)?.shotsAtDeath ?? null;
 
     const snapshot = {
       player: playerSnapshot,
       progression: progressionSnapshot,
       enemies: enemySnapshot,
       physics: physicsSnapshot,
+      combat: combatSnapshot,
       timestamp: Date.now(),
       randomSeed: this.gameState?.randomSeed ?? this.seedInfo.seed,
       random: randomSnapshot,
+      rewards: this.captureRewards(),
     };
 
     this.deathSnapshot = snapshot;
@@ -190,10 +196,10 @@ export class DeathSnapshot {
       return false;
     }
 
-    const player = this.resolveServiceInstance('player');
-    const enemies = this.resolveServiceInstance('enemies');
-    const physics = this.resolveServiceInstance('physics');
-    const progression = this.resolveServiceInstance('progression');
+    const player = resolveService('player', this.services);
+    const enemies = resolveService('enemies', this.services);
+    const physics = resolveService('physics', this.services);
+    const progression = resolveService('progression', this.services);
 
     if (!player || !enemies || !physics || !progression) {
       console.warn('[Retry] Cannot restore snapshot - missing services');
@@ -230,7 +236,7 @@ export class DeathSnapshot {
 
     this.applyConfiguredPlayerHull({ hullId: payload.player?.hullId });
     // The orbs' pull starts from base too: the upgrades are re-applied below.
-    this.resolveServiceInstance('xpOrbs').resetMagnetism();
+    resolveService('xp-orbs', this.services).resetMagnetism();
 
     let progressionRestored = false;
     if (payload.progression && typeof progression.restoreState === 'function') {
@@ -239,19 +245,6 @@ export class DeathSnapshot {
           progression.restoreState(payload.progression) !== false;
       } catch (error) {
         console.warn('[Retry] Failed to restore progression snapshot:', error);
-      }
-    } else if (
-      payload.progression &&
-      typeof progression.deserialize === 'function'
-    ) {
-      try {
-        progression.deserialize(payload.progression, { suppressEvents: false });
-        progressionRestored = true;
-      } catch (error) {
-        console.warn(
-          '[Retry] Failed to deserialize progression snapshot:',
-          error
-        );
       }
     }
 
@@ -350,12 +343,6 @@ export class DeathSnapshot {
       } catch (error) {
         console.warn('[Retry] Failed to restore enemy snapshot:', error);
       }
-    } else if (payload.enemies && typeof enemies.importState === 'function') {
-      try {
-        enemiesRestored = enemies.importState(payload.enemies) !== false;
-      } catch (error) {
-        console.warn('[Retry] Failed to import enemy snapshot:', error);
-      }
     }
 
     if (!enemiesRestored) {
@@ -374,12 +361,6 @@ export class DeathSnapshot {
       } catch (error) {
         console.warn('[Retry] Failed to restore physics snapshot:', error);
       }
-    } else if (payload.physics && typeof physics.importState === 'function') {
-      try {
-        physicsRestored = physics.importState(payload.physics) !== false;
-      } catch (error) {
-        console.warn('[Retry] Failed to import physics snapshot:', error);
-      }
     }
 
     if (!physicsRestored) {
@@ -389,6 +370,8 @@ export class DeathSnapshot {
         physics.reset();
       }
     }
+
+    this.restoreRewards(payload.rewards);
 
     this.deathSnapshot = payload;
     if (payload.random) {
@@ -405,6 +388,34 @@ export class DeathSnapshot {
     }
 
     return true;
+  }
+
+  // What holds the player's rewards: the field's orbs, hearts, pickups and
+  // chests, and the card-roll count. Shots still in flight after the death
+  // kill on; their drops and rolls must not outlive a retry.
+  rewardHolders() {
+    return {
+      xpOrbs: resolveService('xp-orbs', this.services),
+      healthHearts: resolveService('healthHearts', this.services),
+      pickups: resolveService('pickups', this.services),
+      cards: resolveService('combat', this.services)?.cards,
+    };
+  }
+
+  captureRewards() {
+    const rewards = {};
+    Object.entries(this.rewardHolders()).forEach(([name, holder]) => {
+      if (typeof holder?.getSnapshotState === 'function') {
+        rewards[name] = holder.getSnapshotState();
+      }
+    });
+    return rewards;
+  }
+
+  restoreRewards(rewards = {}) {
+    Object.entries(this.rewardHolders()).forEach(([name, holder]) => {
+      if (rewards[name]) holder.restoreSnapshotState(rewards[name]);
+    });
   }
 
   reapplyProgressionUpgrades({ progression, snapshot } = {}) {
@@ -522,7 +533,7 @@ export class DeathSnapshot {
     // The Flight Computer's briefing was read when the card was taken: a
     // restored build flies modern at once, with no second briefing.
     if (progression.getUpgradeCount('flight_computer') > 0) {
-      this.resolveServiceInstance('player').setFlightScheme('modern', false);
+      resolveService('player', this.services).setFlightScheme('modern', false);
     }
 
     return { reapplied, total, errors };

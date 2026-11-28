@@ -11,6 +11,7 @@ import { createSeededRandom } from '../asteroidMesh.js';
 import { colorOf } from '../batches.js';
 import { skin, slab } from '../enemies/shapes.js';
 import { mergeStatic } from '../mergeStatic.js';
+import { BEACON_GAIN, WAKE_COLORS } from './wakeHull.js';
 import { CARGO_FACES } from './wakeSurface.js';
 
 // Non-indexed copy, optionally mirrored across the centre plane (z → −z,
@@ -268,7 +269,7 @@ export function createKit(THREE, seed, tile) {
     add(
       set,
       box(c.x - h, c.x + h, c.y - h, c.y + h, c.z - h, c.z + h),
-      paint(css, gain),
+      paint(css, css === WAKE_COLORS.beacon ? gain * BEACON_GAIN : gain),
       { uv: false }
     );
     if (spill > 0) {

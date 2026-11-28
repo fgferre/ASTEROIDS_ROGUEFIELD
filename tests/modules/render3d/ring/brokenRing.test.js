@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   BrokenRing,
@@ -10,16 +9,7 @@ import {
   RING,
   ringPoint,
 } from '../../../../src/modules/render3d/ring/ringShape.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../../src/modules/render3d/three.js';
 
 // The gameplay camera (cameraRig.js): the follow shot on world (x, z), its
 // distance × `k`, tilted `tilt`° — the field's centre, its left (the break in
@@ -154,6 +144,18 @@ describe('BrokenRing', () => {
     ]);
     // Finer levels are kept for the next approach.
     expect(ring.object.children.length).toBe(built);
+  });
+
+  it('sorts every chunk at the centre, and draws only the chunks in view', () => {
+    const ring = new BrokenRing(THREE);
+    ring.follow = 0;
+    ring.update(closeCamera(ring, 30, RING_LOD.mid * 2));
+    ring.chunks.forEach((chunk) => {
+      expect(chunk.meshes[0].geometry.boundingSphere.center.length()).toBe(0);
+    });
+    const shown = ring.chunks.filter((c) => c.meshes[c.level].visible);
+    expect(shown[0]).toBe(ring.chunks[0]);
+    expect(shown.length).toBeLessThan(ring.chunks.length);
   });
 
   it('forces one level everywhere when asked', () => {

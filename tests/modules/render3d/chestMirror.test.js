@@ -1,17 +1,7 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ChestMirror } from '../../../src/modules/render3d/chestMirror.js';
 import { PickupMirror } from '../../../src/modules/render3d/pickupMirror.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 const chest = (open = 0, fade = 0) => ({
   kind: 'chest',

@@ -8,7 +8,7 @@ import { DEFAULT_HUD_PRESET, getHudPreset } from '../../data/ui/hudPresets.js';
 import { sameLayout } from './hud/editor/layoutHistory.js';
 import { LAYER_MODIFIERS } from '../../data/layers.js';
 import { bossTier } from '../../data/enemies/boss.js';
-import { localLayer } from '../../data/sectors.js';
+import { FIRST_RUN_MODE } from '../../core/runMode.js';
 import { STORY } from '../../data/story.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
 import { AAAHudLayout } from './AAAHudLayout.js';
@@ -64,11 +64,11 @@ export class TacticalHud {
     xpOrbs,
     renderer,
     shieldKey,
-    sector = () => null,
+    mode = () => FIRST_RUN_MODE,
   }) {
     this.refs = refs;
     this.shieldKey = shieldKey;
-    this.sector = sector;
+    this.mode = mode;
     this.player = player;
     this.enemies = enemies;
     this.progression = progression;
@@ -208,11 +208,8 @@ export class TacticalHud {
       enemies && typeof enemies.getWaveState === 'function'
         ? enemies.getWaveState() || null
         : null;
-    const sector = this.sector();
-    // Before a head start's first layer the sector still reads layer 1.
-    const layer = sector
-      ? Math.max(1, localLayer(sector, waveState?.current ?? 0))
-      : waveState?.current ?? 1;
+    // Before a head start's first layer a sector still reads layer 1.
+    const layer = this.mode().shownLayer(waveState?.current ?? 1);
     const dash = player ? player.getDashCooldownFraction() : 0;
 
     if (player || force) {
@@ -228,8 +225,8 @@ export class TacticalHud {
           Number(shieldState.currentHP ?? shieldState.currentHits ?? 0) || 0;
         maxShield = Number(shieldState.maxHP ?? shieldState.maxHits ?? 0) || 0;
       } else {
-        shield = Number(player?.shieldHP ?? 0) || 0;
-        maxShield = Number(player?.shieldMaxHP ?? 0) || 0;
+        shield = Number(player?.shield?.shieldHP ?? 0) || 0;
+        maxShield = Number(player?.shield?.shieldMaxHP ?? 0) || 0;
       }
 
       // The broken shield's cooldown (player/shield.js), read as it runs.
@@ -332,7 +329,7 @@ export class TacticalHud {
             enemies: enemies.getActiveEnemies(),
             pickups: this.pickups()?.getActivePickups() || [],
             orbs: this.xpOrbs()?.xpOrbs || [],
-            shots: combat?.enemyBullets || [],
+            shots: combat?.projectiles.enemyBullets || [],
             now: performance.now(),
           },
           this.radarMemory
@@ -388,7 +385,7 @@ export class TacticalHud {
           if (e.type !== 'asteroid' || hitsWithin(ship, e, horizon))
             out.push(e);
         }
-        for (const shot of combat?.enemyBullets || []) {
+        for (const shot of combat?.projectiles.enemyBullets || []) {
           if (shot.active === false || shot.hit) continue;
           if (hitsWithin(ship, shot, horizon)) out.push(shot);
         }

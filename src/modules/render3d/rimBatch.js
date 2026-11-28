@@ -80,7 +80,8 @@ export class RimBatch {
     this.object.visible = n > 0;
     if (!n) return;
     [this.positions, this.colors].forEach((attribute) => {
-      attribute.updateRange.count = n * 6;
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0, n * 6);
       attribute.needsUpdate = true;
     });
   }

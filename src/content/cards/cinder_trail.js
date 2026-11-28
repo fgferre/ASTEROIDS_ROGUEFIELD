@@ -10,6 +10,7 @@ export default {
   icon: '🔥',
   themeColor: PALETTE.shot,
   unlockLevel: 2,
+  unlock: { by: 'start', at: 4 },
   tags: ['thrusters', 'burn'],
   text: {
     name: 'Cinder Trail',
@@ -42,6 +43,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-cinder-trail',
+          to: 'combat',
+          lands: 'cards.cardEffects.cinderTrail',
           payload: { damage: 6, life: 0.6, tickInterval: 0.2, radius: 10 },
         },
       ],
@@ -52,6 +55,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-cinder-trail',
+          to: 'combat',
+          lands: 'cards.cardEffects.cinderTrail',
           payload: { damage: 12, life: 0.6, tickInterval: 0.2, radius: 10 },
         },
       ],
@@ -62,6 +67,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-cinder-trail',
+          to: 'combat',
+          lands: 'cards.cardEffects.cinderTrail',
           payload: { damage: 18, life: 0.6, tickInterval: 0.2, radius: 10 },
         },
       ],

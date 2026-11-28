@@ -22,6 +22,8 @@ import {
   splitFieldRef,
 } from './settings/settingsGroups.js';
 import { asArray } from '../upgradeCatalog.js';
+import { resolveService } from '../../core/serviceUtils.js';
+import { inputLayers } from '../input/inputLayers.js';
 
 export class SettingsPanel {
   /**
@@ -34,8 +36,9 @@ export class SettingsPanel {
    * `setHudBaseScale(scale)`: the HUD scale setting; HUD and viewport follow.
    * `livePreset()`: the preset Auto quality runs now (Graphics preview).
    * `openHudEditor()`: HUD & text → Edit HUD Layout.
-   * `getService(name)`: the live 'difficulty' (Pressure rung, greys Difficulty)
-   *   and 'player' (cannon on the nose, greys the aim-mode key).
+   * `dependencies`: UISystem's, for the live 'difficulty' (Pressure rung,
+   *   greys Difficulty) and 'player' (cannon on the nose, greys the aim-mode
+   *   key).
    */
   constructor({
     refs,
@@ -47,7 +50,7 @@ export class SettingsPanel {
     setHudBaseScale,
     livePreset,
     openHudEditor,
-    getService,
+    dependencies,
   }) {
     this.refs = refs;
     this.pauseSettingsBtn = pauseSettingsBtn;
@@ -58,7 +61,7 @@ export class SettingsPanel {
     this.setHudBaseScale = setHudBaseScale;
     this.livePreset = livePreset;
     this.openHudEditor = openHudEditor;
-    this.getService = getService;
+    this.dependencies = dependencies;
     this.settingsSchema = [];
     this.schemaByCategory = new Map();
     this.settingsState = {
@@ -69,6 +72,15 @@ export class SettingsPanel {
       folds: {},
       capture: null,
       previousFocus: null,
+    };
+    // Open, on top of the input layer stack (and staying there): the game's
+    // actions pass none.
+    this.inputLayer = {
+      name: 'settings',
+      element: refs.overlay,
+      passes: [],
+      staysOnTop: true,
+      onKey: (event) => this.handleSettingsKeyDown(event),
     };
     this.initializeSettingsMetadata();
   }
@@ -215,12 +227,6 @@ export class SettingsPanel {
           this.closeSettingsPanel();
         }
       });
-      // Capture phase: before InputSystem's listener commits Esc as a binding.
-      document.addEventListener(
-        'keydown',
-        (event) => this.handleSettingsKeyDown(event),
-        true
-      );
     }
 
     asArray(settingsRefs.closeButtons).forEach((button) => {
@@ -432,9 +438,8 @@ export class SettingsPanel {
       : Number.isFinite(Number(values.hudScale))
         ? Number(values.hudScale)
         : 1;
-    const baseScale = Math.max(0.6, Math.min(1.4, hudScale));
 
-    this.setHudBaseScale(baseScale);
+    this.setHudBaseScale(hudScale);
   }
 
   deriveVisualPreferences(
@@ -615,6 +620,7 @@ export class SettingsPanel {
 
     this.settingsState.isOpen = true;
     this.settingsState.source = source;
+    inputLayers.push(this.inputLayer);
     // Capture focus before opening
     this.settingsState.previousFocus = document.activeElement;
 
@@ -623,7 +629,6 @@ export class SettingsPanel {
 
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden', 'false');
-    document.body?.classList.add('is-settings-open');
     this.announceVisibility(true, { source });
 
     const activeTab = overlay.querySelector(
@@ -634,15 +639,32 @@ export class SettingsPanel {
     }
   }
 
-  // Escape closes Settings without also reaching the game's pause binding.
+  // A key on top of the stack (input/inputLayers.js). A binding waiting for its
+  // input takes every key (InputSystem's key-pressed makes it the binding),
+  // none for the screens under it or the game; else Escape closes Settings
+  // without also reaching the game's pause binding.
   handleSettingsKeyDown(event) {
-    const state = this.settingsState;
-    if (event.key !== 'Escape' || !state.isOpen || state.capture) {
-      return;
+    if (this.settingsState.capture) {
+      event.preventDefault();
+      return true;
     }
+    if (event.key !== 'Escape') return false;
     event.preventDefault();
-    event.stopPropagation();
     this.closeSettingsPanel();
+    return true;
+  }
+
+  /** The run goes back to play under it (the cards closed, a scene over, a
+   * Retry's countdown ended): it waits paused, as when Settings opens in
+   * flight; closing resumes it. Only a run in play is paused, so a second
+   * call changes nothing. */
+  holdRun() {
+    if (!this.settingsState.isOpen) return;
+    this.settingsState.source = 'playing';
+    const state = resolveService('game-state', this.dependencies);
+    if (state.getScreen() === 'playing' && !state.isPaused()) {
+      this.emit('toggle-pause');
+    }
   }
 
   closeSettingsPanel({ resumeRun = true } = {}) {
@@ -676,9 +698,9 @@ export class SettingsPanel {
       overlay.setAttribute('aria-hidden', 'true');
     }
 
-    document.body?.classList.remove('is-settings-open');
     this.cancelBindingCapture();
     this.settingsState.isOpen = false;
+    inputLayers.remove(this.inputLayer);
     this.announceVisibility(false, { source });
     if (resumeRun && source === 'playing') this.emit('toggle-pause');
   }
@@ -720,11 +742,12 @@ export class SettingsPanel {
   inactiveState(valuesByCategory) {
     return {
       value: (categoryId, key) => valuesByCategory[categoryId]?.[key],
-      pressureRung: this.getService?.('difficulty')?.getPressure() ?? 0,
+      pressureRung:
+        resolveService('difficulty', this.dependencies)?.getPressure() ?? 0,
       // Out of a run (opened from the menu) there is no cannon: counts as nose.
       aimByNose:
         this.settingsState.source === 'menu' ||
-        (this.getService?.('player')?.noseAim ?? true),
+        (resolveService('player', this.dependencies)?.noseAim ?? true),
     };
   }
 

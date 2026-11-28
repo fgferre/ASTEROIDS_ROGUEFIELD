@@ -10,6 +10,7 @@ export default {
   icon: '🔍',
   themeColor: PALETTE.shot,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'full-set' },
   tags: ['damage', 'weapon'],
   text: {
     name: 'Thermal Lens',
@@ -91,6 +92,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-thermal-lens',
+          to: 'combat',
+          lands: 'cards.cardEffects.thermalLens',
           payload: { beamLengthMultiplier: 1.4, lanceDamageMultiplier: 1.15 },
         },
       ],

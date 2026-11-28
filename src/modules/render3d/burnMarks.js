@@ -39,7 +39,7 @@ export class BurnMarks {
    * every burn; `three` the scene's parts (decals, enemy views, smoke).
    */
   update(dt, combat, player, three, hitSparks) {
-    const burns = combat?.burns;
+    const burns = combat?.cards.burns;
     if (!burns?.size || !three) return;
     this.clock += dt;
     const flare = combat.weapons.hasApex('thermal');

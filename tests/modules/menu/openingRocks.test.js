@@ -1,18 +1,8 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createOpeningRocks } from '../../../src/modules/menu/openingRocks.js';
 import { createSeededRandom } from '../../../src/modules/render3d/asteroidMesh.js';
 import { FieldBackdrop } from '../../../src/modules/render3d/fieldBackdrop.js';
-
-const THREE = {};
-new Function(
-  'exports',
-  'module',
-  readFileSync(
-    new URL('../../../src/public/libs/three.min.js', import.meta.url),
-    'utf8'
-  )
-)(THREE, {});
+import THREE from '../../../src/modules/render3d/three.js';
 
 // The game's rock views, reduced to what the menu's rocks use; `frame` holds
 // the views pushed since the last begin().

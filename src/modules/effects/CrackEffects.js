@@ -75,80 +75,10 @@ export class CrackEffects {
     const baseLifetime = 0.2 + intensity * 0.08;
     const burst = event.burst || {};
 
-    const segmentsInput = Array.isArray(event.segments) ? event.segments : [];
-    const sanitizedSegments = segmentsInput
-      .map((segment) => {
-        if (!segment) {
-          return null;
-        }
-
-        const startX = Number.isFinite(segment.start?.x)
-          ? segment.start.x
-          : Number.isFinite(segment.x1)
-            ? segment.x1
-            : 0;
-        const startY = Number.isFinite(segment.start?.y)
-          ? segment.start.y
-          : Number.isFinite(segment.y1)
-            ? segment.y1
-            : 0;
-        const endX = Number.isFinite(segment.end?.x)
-          ? segment.end.x
-          : Number.isFinite(segment.x2)
-            ? segment.x2
-            : 0;
-        const endY = Number.isFinite(segment.end?.y)
-          ? segment.end.y
-          : Number.isFinite(segment.y2)
-            ? segment.y2
-            : 0;
-        const length = Number.isFinite(segment.length)
-          ? segment.length
-          : Math.hypot(endX - startX, endY - startY);
-
-        if (!Number.isFinite(length) || length <= 0.2) {
-          return null;
-        }
-
-        return {
-          id: segment.id || null,
-          width: Number.isFinite(segment.width) ? segment.width : 1,
-          length,
-          start: { x: startX, y: startY },
-          end: { x: endX, y: endY },
-          type: segment.type || 'line',
-        };
-      })
-      .filter(Boolean);
-
-    const createSegmentKey = (segment) => {
-      const startX = Number.isFinite(segment.start?.x) ? segment.start.x : 0;
-      const startY = Number.isFinite(segment.start?.y) ? segment.start.y : 0;
-      const endX = Number.isFinite(segment.end?.x) ? segment.end.x : 0;
-      const endY = Number.isFinite(segment.end?.y) ? segment.end.y : 0;
-      const type = segment.type || 'line';
-      return [
-        segment.id ?? 'no-id',
-        startX.toFixed(4),
-        startY.toFixed(4),
-        endX.toFixed(4),
-        endY.toFixed(4),
-        type,
-      ].join(':');
-    };
-
-    const segments = [];
-    const seenSegments = new Set();
-
-    sanitizedSegments.forEach((segment) => {
-      const key = createSegmentKey(segment);
-      if (seenSegments.has(key)) {
-        return;
-      }
-
-      seenSegments.add(key);
-      segments.push(segment);
-    });
+    // Asteroid already sanitizes and de-duplicates; only the too-short ones go.
+    const segments = (event.segments ?? []).filter(
+      (segment) => Number.isFinite(segment.length) && segment.length > 0.2
+    );
 
     if (!segments.length) {
       return;

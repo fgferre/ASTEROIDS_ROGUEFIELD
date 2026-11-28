@@ -99,6 +99,7 @@ export default {
     icon: '⚡',
     themeColor: PALETTE.status,
     unlockLevel: 3,
+    unlock: { by: 'start', at: 26 },
     tags: ['weapon', 'weaponry'],
     text: {
       name: 'Arc Caster',

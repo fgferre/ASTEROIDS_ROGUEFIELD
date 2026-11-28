@@ -4,13 +4,9 @@ import { STORY } from '../../data/story.js';
 import { biomeForLayer } from '../../data/biomes.js';
 import { BOSS_KINDS, bossKindForLayer } from '../../data/enemies/boss.js';
 import { RUN_FINAL_LAYER } from '../../data/constants/gameplay.js';
-import {
-  BOSS_RUSH_LAYERS,
-  bossRushDirectorFor,
-  directorFor,
-  enemiesFor,
-} from '../../data/layers.js';
-import { localLayer, sectorById, sectorStage } from '../../data/sectors.js';
+import { enemiesFor } from '../../data/layers.js';
+import { localLayer } from '../../data/sectors.js';
+import { FIRST_RUN_MODE } from '../../core/runMode.js';
 import { voiceFor } from '../audio/voiceLines.js';
 
 /** How long a line stays on screen once it is fully typed. */
@@ -138,6 +134,22 @@ export function endingTransmissions(ending, holdMs) {
   return spokenInOrder(STORY.ending[ending].lines, `ending:${ending}`, holdMs);
 }
 
+/**
+ * The truth before the ending's choice, in order (core/cinematics.js
+ * REVELATION_BEATS): Sovereign's last words, the new lines (STORY.revelation)
+ * and, before the fourth, the Quarantine Grid's fence line under its own key
+ * (its recording plays again).
+ */
+export function revelationTransmissions() {
+  const told = spokenInOrder(STORY.revelation, 'revelation');
+  return [
+    wardenTransmission(0, 'defeated', 'sovereign'),
+    ...told.slice(0, 3),
+    stageTransmission('quarantine-grid', 3),
+    ...told.slice(3),
+  ];
+}
+
 /** The line a sector's `stage` (1-based) opens with, or null. */
 export function stageTransmission(sectorId, stage) {
   const line = STORY.stage[sectorId]?.[stage];
@@ -166,14 +178,13 @@ export function victoryTransmission() {
   return { key: 'victory', speaker: STORY.speaker.ring, text: STORY.victory };
 }
 
-// What `layer` can say in a run (`sector`, `bossRush`), as the UI says it:
+// What `layer` can say in a run in `mode` (src/core/runMode.js), as the UI says it:
 // its chapter and stage lines (handleLayerStarted), its boss's, its Herald's,
 // the sightings of the machines it can field (cast as LayerSchedule casts
 // them, its boss's escorts too) and the death lines in its Warden's mouth.
-function layerLines(layer, sector, bossRush) {
-  const director = bossRush
-    ? bossRushDirectorFor(layer)
-    : sectorStage(sector, layer) ?? directorFor(layer);
+function layerLines(layer, mode) {
+  const { sector } = mode;
+  const director = mode.layerPlan(layer, 0);
   const biome = biomeForLayer(layer, sector);
   const kind = director.bossKind ?? bossKindForLayer(layer);
   const roles = [
@@ -189,7 +200,7 @@ function layerLines(layer, sector, bossRush) {
   return [
     biome.layers[0] === layer && chapterTransmission(biome.id, sector?.id),
     sector && stageTransmission(sector.id, localLayer(sector, layer)),
-    bossRush && layer === BOSS_RUSH_LAYERS[0] && bossRushTransmission(),
+    mode.rushStage(layer) === 1 && bossRushTransmission(),
     warden && wardenTransmission(layer, 'warning', kind),
     warden && wardenTransmission(layer, 'last', kind),
     ...(warden ? winTransmissions(layer, director.bossKind) : []),
@@ -203,23 +214,16 @@ function layerLines(layer, sector, bossRush) {
 }
 
 /**
- * Every line run `start` (game-started's { sector, bossRush }) can say in
- * its fight, once each: a sector run's or Boss Rush's on all its layers; a
- * Descent's from `layer` to the end of its chapter and one layer on (asked
- * again as each layer starts). The journey and the ending are not in it.
+ * Every line a run in `mode` can say in its fight, once each, on the layers
+ * it readies from `layer` (voiceLayers: a sector's or a Boss Rush's all of
+ * them, a Descent's the stretch ahead, asked again as each layer starts). The
+ * journey and the ending are not in it.
  */
-export function runVoiceLines({ sector: id, bossRush } = {}, layer = 1) {
-  const sector = sectorById(id);
-  const rush = Boolean(bossRush) && !sector;
-  const [first, last] = sector
-    ? sector.layers
-    : [layer, Math.max(layer, biomeForLayer(layer).layers[1]) + 1];
-  const layers = rush
-    ? BOSS_RUSH_LAYERS
-    : Array.from({ length: last - first + 1 }, (_, i) => first + i);
+export function runVoiceLines(mode = FIRST_RUN_MODE, layer = 1) {
   const lines = new Map();
-  layers
-    .flatMap((n) => layerLines(n, sector, rush))
+  mode
+    .voiceLayers(layer)
+    .flatMap((n) => layerLines(n, mode))
     .filter(Boolean)
     .forEach((line) => lines.set(`${line.key}|${line.speaker}`, line));
   return [...lines.values()];

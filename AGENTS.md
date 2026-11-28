@@ -13,7 +13,7 @@ How to work
 
 * Before starting: if the request seems mistaken, has a simpler path, or misses something (existing code, an edge case, a trap below), say so in one or two sentences. Then do what was asked, unless it's on the ask list. State any assumption.
 * Do what was asked, no more. If you spot a bug or an improvement nearby, leave it and add one line to `BACKLOG.md`.
-* Before writing a helper, system, or util, look for an existing one and extend it. One way to do each thing (this repo already has three ways to resolve a service — don't add a fourth).
+* Before writing a helper, system, or util, look for an existing one and extend it. One way to do each thing.
 * Do the simplest thing that works. No abstractions, options, or config for needs that don't exist yet. No defensive `typeof x === 'function'` around a dependency the manifest guarantees.
 * Change as little as possible: targeted edits, not whole-file rewrites. Match the patterns already in the file; formatting is Prettier's job.
 * When you replace something, delete the old version. No commented-out code, unused functions, legacy flags, or leftover files.

@@ -7,6 +7,7 @@ export default {
   icon: '💠',
   themeColor: '#5EC8FF',
   unlockLevel: 2,
+  unlock: { by: 'medal', medal: 'ring-breaker' },
   tags: ['escudo', 'defesa ativa'],
   prerequisites: [
     {
@@ -58,6 +59,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-deflector-shield',
+          to: 'player',
           payload: { level: 1 },
         },
       ],
@@ -68,6 +70,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-deflector-shield',
+          to: 'player',
           payload: { level: 2 },
         },
       ],
@@ -78,6 +81,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-deflector-shield',
+          to: 'player',
           payload: { level: 3 },
         },
       ],
@@ -88,6 +92,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-deflector-shield',
+          to: 'player',
           payload: { level: 4 },
         },
       ],
@@ -98,6 +103,7 @@ export default {
         {
           type: 'event',
           event: 'upgrade-deflector-shield',
+          to: 'player',
           payload: { level: 5 },
         },
       ],

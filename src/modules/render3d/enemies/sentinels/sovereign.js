@@ -1,6 +1,7 @@
 import { PALETTE } from '../../../../data/constants/palette.js';
 import { SENTINEL_KINDS } from '../../../../data/enemies/boss.js';
 import { colorOf } from '../../batches.js';
+import { takeSceneSky } from '../../hullModel.js';
 import { addRimLight } from '../../rimLight.js';
 import { arcSweep, revolve } from '../shapes.js';
 import {
@@ -115,7 +116,7 @@ export function createSovereign(sk) {
   } = sk;
   // proposta 12/11: the boss light over it, pale gold and dim, so the
   // lining stays dark against the shell
-  const BOSS_LIGHT = new THREE.Color('#ffe2b0').multiplyScalar(0.4);
+  const BOSS_LIGHT = new THREE.Color('#fff2d8').multiplyScalar(0.4);
   // Sovereign, Continuance's seat: a pale lacquered egg standing in a gold
   // collar, ringed by two polished halos that float round it. The egg's upper
   // face is eight shells (an inlaid rib down each, two bands across, a band
@@ -147,6 +148,7 @@ export function createSovereign(sk) {
       flatShading: true,
     })
   );
+  takeSceneSky(kit.scene, [shellMaterial, metalMaterial]);
   // Turned and swept parts carry no uv: the panel maps go on from above,
   // leaning with the height so walls get their share.
   function mapped(geometry) {
@@ -478,6 +480,7 @@ export function createSovereign(sk) {
       metalness: 0.5,
       envMapIntensity: 2,
     });
+    takeSceneSky(kit.scene, [coreMaterial]);
     const heartMaterial = new THREE.MeshBasicMaterial({ toneMapped: false });
     const heart = new THREE.Mesh(heartGeometry, heartMaterial);
     heart.position.set(0, GEM_Y, 0);
@@ -602,6 +605,8 @@ export function createSovereign(sk) {
     view.ring.rotation.y = -turn;
     view.heart.rotation.y = time * 0.7;
     const open = clamp01(boss.plateOpen ?? 0);
+    // the ending opens the shells past the fight's widest (endingScene.js)
+    const shells = Math.max(0, boss.plateOpen ?? 0);
     const order = boss.order ?? 'protect';
     const both = order === 'both';
     for (const p of view.plates) {
@@ -609,7 +614,7 @@ export function createSovereign(sk) {
       const half = both
         ? clamp01(0.5 + 2 * Math.sin(turn + p.angle - split))
         : 1;
-      const amount = open * half;
+      const amount = shells * half;
       p.hinge.position.x = SHELL_SLIDE * amount;
       p.tilt.rotation.z = -SHELL_TILT * amount;
     }

@@ -9,10 +9,7 @@ import { BaseSystem } from '../core/BaseSystem.js';
 import { ASTEROID_SIZES, PHYSICS_CELL_SIZE } from '../core/GameConstants.js';
 import { SpatialHash } from '../core/SpatialHash.js';
 import { resolveService } from '../core/serviceUtils.js';
-import {
-  createFallbackHandler,
-  validateSnapshot,
-} from '../utils/StateManager.js';
+import { createFallbackHandler } from '../utils/StateManager.js';
 import { BOSS_CONFIG } from '../data/constants/visual.js';
 import { getContent, listContent } from '../content/registry.js';
 import { IS_DEV } from '../core/env.js';
@@ -28,11 +25,17 @@ import { ImpactFeedback } from './physics/ImpactFeedback.js';
 import { BulletHits } from './physics/BulletHits.js';
 import { PlayerContact } from './physics/PlayerContact.js';
 import { BossAttacks } from './physics/BossAttacks.js';
-import {
-  ASTEROID_POOL_ID,
-  applySnapshotStateToEnemy,
-  serializeAsteroidForSnapshot,
-} from './physics/snapshotEntries.js';
+
+// Who a hit, a blast or a push can reach: a live enemy, and never a phased
+// Shade (`intangible`), which touches nothing; the radar still asks for it
+// with `includeIntangible`.
+export function isReachableEnemy(enemy, includeIntangible = false) {
+  return (
+    Boolean(enemy) &&
+    !enemy.destroyed &&
+    (includeIntangible || !enemy.intangible)
+  );
+}
 
 class PhysicsSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -572,32 +575,15 @@ class PhysicsSystem extends BaseSystem {
     }
   }
 
-  exportState() {
-    const asteroids = [];
-    for (const asteroid of this.activeEnemies) {
-      const snapshot = serializeAsteroidForSnapshot(asteroid);
-      if (snapshot) {
-        asteroids.push(snapshot);
-      }
-    }
-
-    return {
-      version: 1,
-      asteroids,
-    };
+  // The enemies keep their own state for a Retry (enemies/base/enemyState.js);
+  // physics only tracks the rebuilt field again.
+  getSnapshotState() {
+    return { version: 2 };
   }
 
-  importState(snapshot) {
-    if (!validateSnapshot(snapshot, ['asteroids'])) {
+  restoreSnapshotState(snapshot) {
+    if (!snapshot) {
       return this._handleSnapshotFallback('invalid snapshot payload');
-    }
-
-    const asteroidSnapshots = Array.isArray(snapshot.asteroids)
-      ? snapshot.asteroids
-      : null;
-
-    if (!asteroidSnapshots) {
-      return this._handleSnapshotFallback('missing asteroid list');
     }
 
     this.refreshEnemyReference({ suppressWarning: true });
@@ -606,46 +592,11 @@ class PhysicsSystem extends BaseSystem {
       return this._handleSnapshotFallback('enemy system unavailable');
     }
 
-    const availableEnemies = enemySystem.getAllAsteroids();
-
-    const enemyByPoolId = new Map();
-    const liveEnemies = [];
-    for (let i = 0; i < availableEnemies.length; i += 1) {
-      const enemy = availableEnemies[i];
-      if (!enemy || enemy.destroyed) {
-        continue;
-      }
-
-      liveEnemies.push(enemy);
-
-      const poolId = enemy[ASTEROID_POOL_ID];
-      if (poolId != null) {
-        enemyByPoolId.set(poolId, enemy);
-      }
-    }
-
     this.clearDerivedEnemyTrackingState();
-
-    for (let i = 0; i < asteroidSnapshots.length; i += 1) {
-      const entry = asteroidSnapshots[i];
-      if (!entry || entry.poolId == null) {
-        continue;
+    for (const enemy of enemySystem.getAllAsteroids()) {
+      if (enemy && !enemy.destroyed) {
+        this.registerEnemy(enemy);
       }
-
-      const enemy = enemyByPoolId.get(entry.poolId);
-      if (!enemy || enemy.destroyed) {
-        continue;
-      }
-
-      applySnapshotStateToEnemy(enemy, entry);
-    }
-
-    if (asteroidSnapshots.length > 0 && liveEnemies.length === 0) {
-      return this._handleSnapshotFallback('no asteroids restored');
-    }
-
-    for (let i = 0; i < liveEnemies.length; i += 1) {
-      this.registerEnemy(liveEnemies[i]);
     }
 
     this.bootstrapCompleted = true;
@@ -653,22 +604,6 @@ class PhysicsSystem extends BaseSystem {
     this._snapshotFallbackWarningIssued = false;
     this.warnOnBossTrackingMismatch({ reason: 'snapshot-import' });
     return true;
-  }
-
-  getSnapshotState() {
-    return this.exportState();
-  }
-
-  captureSnapshot() {
-    return this.exportState();
-  }
-
-  restoreSnapshotState(snapshot) {
-    return this.importState(snapshot);
-  }
-
-  applySnapshot(snapshot) {
-    return this.importState(snapshot);
   }
 
   update() {
@@ -700,15 +635,8 @@ class PhysicsSystem extends BaseSystem {
     // Use SpatialHash for efficient nearby object retrieval
     const searchRadius = Math.max(radius, this.maxEnemyRadius);
     const candidates = this.spatialHash.query(x, y, searchRadius, {
-      filter: (obj) => {
-        // Active enemies only; a phased Shade (`intangible`) touches nothing
-        // (the radar still asks for it with `includeIntangible`).
-        return (
-          this.activeEnemies.has(obj) &&
-          !obj.destroyed &&
-          (includeIntangible || !obj.intangible)
-        );
-      },
+      filter: (obj) =>
+        this.activeEnemies.has(obj) && isReachableEnemy(obj, includeIntangible),
       sorted: false,
     });
 
@@ -723,10 +651,8 @@ class PhysicsSystem extends BaseSystem {
 
     for (const boss of this.activeBosses) {
       if (
-        !boss ||
-        boss.destroyed ||
         !this.activeEnemies.has(boss) ||
-        (boss.intangible && !includeIntangible)
+        !isReachableEnemy(boss, includeIntangible)
       ) {
         continue;
       }

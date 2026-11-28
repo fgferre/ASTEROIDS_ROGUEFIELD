@@ -362,8 +362,8 @@ export function runScenarioDriver(
           player.velocity.vy = 0;
           // Modern controls move on screen axes: `right` keeps the hull on its
           // rightward drift; `up` would turn it to face the top of the screen.
-          if (player.cachedMovementInput)
-            player.cachedMovementInput.right = true;
+          if (player.movementInput.cachedMovementInput)
+            player.movementInput.cachedMovementInput.right = true;
         } else if (player?.velocity) {
           // Slow circular drift (scenario-only) to exercise camera/telegraphs.
           const heading = simulatedSeconds * 0.6;

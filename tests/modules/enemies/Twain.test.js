@@ -91,7 +91,7 @@ describe('Twain', () => {
         generation: SPLIT.generations,
       });
 
-      enemies.importState(enemies.exportState());
+      enemies.restoreSnapshotState(enemies.getSnapshotState());
       const [restored] = twains();
       expect(restored.generation).toBe(SPLIT.generations);
       restored.takeDamage(restored.maxHealth);

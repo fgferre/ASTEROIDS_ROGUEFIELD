@@ -10,7 +10,7 @@
 
 import { createAsteroidGeometry } from './asteroidMesh.js';
 import { HALF_H, HALF_W } from './batches.js';
-import { SHINE } from './hullModel.js';
+import { SHINE, takeSceneSky } from './hullModel.js';
 
 // proposta 17/10: pool, shape and motion of the chunks.
 const VARIANTS = 4;
@@ -94,6 +94,7 @@ export class DebrisChunks {
       ...PLATE_SHINE,
       flatShading: true,
     });
+    takeSceneSky(scene, [this.plateMaterial]);
     this.plates = [];
     this.plateCounts = new Int32Array(PLATE_VARIANTS);
     for (let v = 0; v < PLATE_VARIANTS; v += 1) {

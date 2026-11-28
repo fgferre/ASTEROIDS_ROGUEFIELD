@@ -10,6 +10,8 @@ import { BOSS_RUSH_LAYERS } from '../../data/layers.js';
 import { PICKUP_KINDS } from '../../data/pickups.js';
 import { nextSector } from '../../data/sectors.js';
 import { loadRecords, updateRecords } from '../runRecords.js';
+import { resolveService } from '../../core/serviceUtils.js';
+import { FIRST_RUN_MODE } from '../../core/runMode.js';
 
 // The end screens wait for the transmission on air (the last words) to end,
 // up to the cap.
@@ -29,7 +31,7 @@ const SPOILS_CHECK_MS = 100;
 export class RunEnd {
   /**
    * `eventBus`: emits 'run-won' and 'run-continued'.
-   * `resolveServiceInstance(name)`: a session service by name, or null.
+   * `services`: the session's services, found with resolveService.
    * `getSessionState()` / `setSessionState(state, meta)`: the session state.
    * `setScreen(screen)` / `emitScreenChanged(screen, meta)`: the screen.
    * `getConfiguredHullId()`: the hull the player flies.
@@ -37,7 +39,7 @@ export class RunEnd {
    */
   constructor({
     eventBus,
-    resolveServiceInstance,
+    services,
     getSessionState,
     setSessionState,
     setScreen,
@@ -46,7 +48,7 @@ export class RunEnd {
     findSafeSpawnPoint,
   }) {
     this.eventBus = eventBus;
-    this.resolveServiceInstance = resolveServiceInstance;
+    this.services = services;
     this.getSessionState = getSessionState;
     this.setSessionState = setSessionState;
     this.setScreen = setScreen;
@@ -59,66 +61,65 @@ export class RunEnd {
     this.transmissionOnAir = false;
     // True once the player continues past the final Warden (endless run).
     this.endless = false;
-    // Boss Rush run: the three Wardens back to back (startNewRun); the
-    // Wardens killed so far.
-    this.bossRush = false;
+    // The kind of run (src/core/runMode.js), set by startNewRun; the
+    // Wardens a run scored by Wardens (the Boss Rush) has killed so far.
+    this.mode = FIRST_RUN_MODE;
     this.bossRushWardens = 0;
-    // Sector run (src/data/sectors.js): the sector played, or null.
-    this.sector = null;
   }
 
   handleBossDefeatedEvent(payload = {}) {
-    if (this.bossRush && payload?.wave !== RUN_FINAL_LAYER) {
+    if (this.mode.wardensGivePicks && payload?.wave !== this.mode.lastLayer) {
       // Boss Rush: a card pick for each Warden before the last (not over
       // the death screen).
       this.bossRushWardens += 1;
       if (this.getSessionState() === 'running') {
-        const progression = this.resolveServiceInstance('progression');
+        const progression = resolveService('progression', this.services);
         progression.emitLevelUp(progression.applyLevelUp());
         progression.emitExperienceChanged();
       }
       return;
     }
-    const finalLayer = this.sector ? this.sector.layers[1] : RUN_FINAL_LAYER;
     if (
-      payload?.wave !== finalLayer ||
+      payload?.wave !== this.mode.lastLayer ||
       this.endless ||
       this.getSessionState() === 'victory'
     ) {
       return;
     }
 
-    if (this.bossRush) {
+    if (this.mode.scoredByWardens) {
       this.bossRushWardens += 1;
     }
-    this.resolveServiceInstance('enemies')?.waveManager?.holdWaves(
+    resolveService('enemies', this.services)?.waveManager?.holdWaves(
       VICTORY_SPOILS_SECONDS
     );
     const { pullSpeed, pullAcceleration } = PICKUP_KINDS.magnet;
-    this.resolveServiceInstance('xpOrbs')?.startGlobalPull(
+    resolveService('xp-orbs', this.services)?.startGlobalPull(
       VICTORY_SPOILS_SECONDS,
       pullSpeed,
       pullAcceleration
     );
     this.setSessionState('victory', { reason: 'final-boss-defeated' });
-    this.resolveServiceInstance('player').guardSteadily(
+    resolveService('player', this.services).guardSteadily(
       VICTORY_SCREEN_MAX_DELAY_MS / 1000
     );
     this.eventBus.emit('run-won', {
       wave: payload.wave,
       hullId: this.getConfiguredHullId(),
-      ...(this.sector && { sector: this.sector.id }),
+      ...(this.mode.sector && { sector: this.mode.sector.id }),
     });
 
     // The clear time is the Warden's death, not the screen's opening: the
     // spoils and the last line that come between are no part of the record.
-    const world = this.resolveServiceInstance('world');
+    const world = resolveService('world', this.services);
     const clearTime = world?.runClock();
     const open = () => {
       const summary = world?.buildRunSummary() ?? {};
       const data = {
         ...summary,
         ...this.recordRunReached(summary, { won: true, clearTime }),
+        // The end screens ask the run's kind (src/core/runMode.js).
+        mode: this.mode,
       };
       this.setScreen('victory');
       this.emitScreenChanged('victory', { source: 'run-won', data });
@@ -146,7 +147,7 @@ export class RunEnd {
    * after a Boss Rush or a sector run.
    */
   continueBeyondVictory() {
-    if (this.getSessionState() !== 'victory' || this.bossRush || this.sector) {
+    if (this.getSessionState() !== 'victory' || !this.mode.goesOnAfterVictory) {
       return false;
     }
 
@@ -155,14 +156,14 @@ export class RunEnd {
     // Lost between the final Warden's death and this screen: the run is won,
     // so the ship comes back the way a Retry brings it (full hull, a safe
     // spot, a moment of invulnerability).
-    const player = this.resolveServiceInstance('player');
+    const player = resolveService('player', this.services);
     player.endSteadyGuard();
     if (player.isDead) {
       player.health = player.maxHealth;
       player.respawn(this.findSafeSpawnPoint(), 3);
-      this.resolveServiceInstance('world').reset();
+      resolveService('world', this.services).reset();
     }
-    this.resolveServiceInstance('enemies')?.waveManager?.resumeWaves();
+    resolveService('enemies', this.services)?.waveManager?.resumeWaves();
     this.setScreen('playing');
     this.emitScreenChanged('playing', { source: 'run-continued' });
     this.setSessionState('running', { reason: 'run-continued' });
@@ -174,7 +175,7 @@ export class RunEnd {
    * Records the layer and time in a run summary (and in today's Daily Field
    * record on a Daily Field run); returns `{ bestLayer }` for the end screen.
    * A Boss Rush records only its clear time (on a win) and returns
-   * `{ bossRush: { stage, bestStage, bestTime } }`, `stage` the Warden it
+   * `{ rush: { stage, bestStage, bestTime } }`, `stage` the Warden it
    * reached. A sector run records only its clear (`won`) and returns
    * `{ sector: { id, time, bestTime, firstClear, next } }`, `next` the next
    * sector's id on a win, else null. `clearTime` (a win): the run's time when
@@ -182,8 +183,9 @@ export class RunEnd {
    */
   recordRunReached(summary = {}, { won = false, clearTime } = {}) {
     const runTime = clearTime ?? summary.stats?.timeElapsed;
-    if (this.sector) {
-      const { id } = this.sector;
+    if (this.mode.writesSectorRecord) {
+      const { sector } = this.mode;
+      const { id } = sector;
       const time = Math.floor(runTime ?? 0);
       const before = loadRecords();
       const firstClear = won && !before.sectorsWon.includes(id);
@@ -199,17 +201,17 @@ export class RunEnd {
           firstClear,
           // The Boss Rush's rule: faster than the record before; a tie is not.
           newBest: won && time > 0 && (beforeTime === 0 || time < beforeTime),
-          next: won ? nextSector(this.sector)?.id ?? null : null,
+          next: won ? nextSector(sector)?.id ?? null : null,
         },
       };
     }
-    if (this.bossRush) {
+    if (this.mode.writesRushRecord) {
       const cleared = this.bossRushWardens === BOSS_RUSH_LAYERS.length;
       const time = cleared ? Math.floor(runTime ?? 0) : 0;
       const before = loadRecords().bossRushTime;
       const records = updateRecords({ bossRushTime: time });
       return {
-        bossRush: {
+        rush: {
           stage: Math.min(this.bossRushWardens + 1, BOSS_RUSH_LAYERS.length),
           bestStage: records.bossRushStage,
           bestTime: records.bossRushTime,
@@ -224,7 +226,7 @@ export class RunEnd {
       layer: typeof wave === 'number' ? wave : wave?.current,
       time: summary.stats?.timeElapsed,
     };
-    this.resolveServiceInstance('difficulty').recordRun(reached);
+    resolveService('difficulty', this.services).recordRun(reached);
     return { bestLayer: updateRecords(reached).bestLayer };
   }
 

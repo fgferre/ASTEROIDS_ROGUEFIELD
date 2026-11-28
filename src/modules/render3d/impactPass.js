@@ -1,8 +1,9 @@
 // Big hits kick the lens: a brief radial chromatic aberration (R out, B in,
 // zero at the centre) plus a short radial blur, as a ShaderPass after the
 // bloom. The same pass lays a fine film grain and a soft vignette over every
-// frame when the quality preset allows them, and it ends in the sRGB step,
-// so the output pass only runs on frames it does not (sceneSetup.js).
+// frame when the quality preset allows them, and it ends in the tone curve
+// and the sRGB step, so the output pass only runs on frames it does not
+// (sceneSetup.js).
 // The same pass bends space round the ship while the Gravity Brake is held
 // (a lens: the band between LENS_INNER and its reach is pulled inward, red
 // a little more than blue), and along a line while a Field trench holds
@@ -49,15 +50,20 @@ export function lensPull(slowFraction) {
  * GLSL for a pass that reads the composer's scene: `sceneAt(uv)` is the
  * scene plus the bloom's half-res result (`tBloom`, × `uBloom`: 1 on frames
  * the bloom ran), the sum UnrealBloomPass's own last draw would have left
- * in the scene target (additive, × its alpha). sceneSetup.js foldBloom.
+ * in the scene target (premultiplied additive: its colour added as it is),
+ * tone-mapped with three's Linear curve at `toneMappingExposure` (the scene
+ * draws in linear HDR: three tone-maps only what it draws to the screen).
+ * sceneSetup.js foldBloom, toneAtEnd.
  */
 export const SCENE_READ = `
+#include <tonemapping_pars_fragment>
 uniform sampler2D tDiffuse;
 uniform sampler2D tBloom;
 uniform float uBloom;
 vec3 sceneAt(vec2 uv) {
-  vec4 bloom = texture2D(tBloom, uv);
-  return texture2D(tDiffuse, uv).rgb + uBloom * bloom.a * bloom.rgb;
+  return LinearToneMapping(
+    texture2D(tDiffuse, uv).rgb + uBloom * texture2D(tBloom, uv).rgb
+  );
 }`;
 
 const IMPACT_SHADER = {
@@ -71,6 +77,7 @@ const IMPACT_SHADER = {
     uVignette: { value: 0 },
     tBloom: { value: null },
     uBloom: { value: 0 },
+    toneMappingExposure: { value: 1 },
     uLensAt: { value: null },
     uLensReach: { value: null },
     uLens: { value: 0 },
@@ -164,7 +171,7 @@ void main() {
     0.0
   );
   color = g * g;
-  gl_FragColor = LinearTosRGB(vec4(color, 1.0));
+  gl_FragColor = sRGBTransferOETF(vec4(color, 1.0));
 }`,
 };
 

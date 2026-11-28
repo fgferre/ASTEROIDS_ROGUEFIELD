@@ -14,9 +14,15 @@ import {
 } from '../data/hangar.js';
 import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
-import { sectorById } from '../data/sectors.js';
+import { FIRST_RUN_MODE } from '../core/runMode.js';
 import { DEFAULT_HULL_ID } from '../data/shipModels.js';
-import { isProgressHeld, loadJSON, saveProgress } from '../core/storage.js';
+import { routeCardEffects } from '../modules/cardEffectRoutes.js';
+import {
+  isPilotStale,
+  isProgressHeld,
+  loadJSON,
+  saveProgress,
+} from '../core/storage.js';
 
 /** The first save: `{ salvage, owned }`. Read once, never written again. */
 export const HANGAR_STORAGE_KEY_V1 = 'roguefield:hangar:v1';
@@ -118,7 +124,7 @@ export default class HangarService {
 
     eventBus.on('game-started', (payload = {}) => this.startRun(payload));
     eventBus.on('boss-defeated', () => {
-      if (this.bossRush) this.bossRushWardens += 1;
+      if (this.mode.scoredByWardens) this.bossRushWardens += 1;
     });
     eventBus.on('run-won', () => {
       this.won = true;
@@ -130,10 +136,13 @@ export default class HangarService {
     eventBus.on('pickup-collected', ({ kind } = {}) => {
       if (kind === 'salvage') this.cacheSalvage += PICKUP_KINDS.salvage.salvage;
     });
-    // The Salvage Cache card: a pick with nothing left to offer, paid with the
-    // rest at the run's end, at the difficulty's rate.
-    eventBus.on('card-salvage', () => {
-      this.cacheSalvage += SALVAGE_PER_CARD_CACHE;
+    // The card effects routed to the Hangar (src/modules/cardEffectRoutes.js).
+    routeCardEffects(this, 'hangar', (event, fn) => eventBus.on(event, fn), {
+      // The Salvage Cache card: a pick with nothing left to offer, paid with
+      // the rest at the run's end, at the difficulty's rate.
+      'card-salvage': () => {
+        this.cacheSalvage += SALVAGE_PER_CARD_CACHE;
+      },
     });
     eventBus.on('player-died', (summary = {}) => this.award(summary));
     // A quit from the pause pays the layers already cleared, not the one in
@@ -146,10 +155,9 @@ export default class HangarService {
     });
   }
 
-  startRun({ bossRush = false, sector = null } = {}) {
+  startRun({ mode = FIRST_RUN_MODE } = {}) {
     this.won = false;
-    this.bossRush = bossRush;
-    this.sector = sectorById(sector);
+    this.mode = mode;
     this.bossRushWardens = 0;
     this.cacheSalvage = 0;
     this.runAwarded = 0;
@@ -178,7 +186,7 @@ export default class HangarService {
    */
   climbPressure() {
     const rung = this.difficulty.getPressure();
-    if (isProgressHeld() || this.bossRush || rung === 0) return;
+    if (isProgressHeld() || !this.mode.winClimbsPressure || rung === 0) return;
     if (rung > this.pressure.open) return;
     this.pressure.best = Math.max(this.pressure.best, rung);
     if (rung === this.pressure.open) {
@@ -189,6 +197,7 @@ export default class HangarService {
 
   /** The rung the next runs fly (0 for none), if it is open. */
   setPressure(rung) {
+    if (isPilotStale()) return false;
     if (rung < 0 || rung > this.pressure.open) return false;
     this.pressure.selected = rung;
     this.difficulty.setPressure(rung);
@@ -228,8 +237,10 @@ export default class HangarService {
         layer: quit ? layer - 1 : layer,
         kills: runSummary.stats?.totalKills ?? runSummary.stats?.kills,
         won: this.won,
-        bossRushWardens: this.bossRush ? this.bossRushWardens : null,
-        firstLayer: this.sector?.layers[0] ?? 1,
+        bossRushWardens: this.mode.scoredByWardens
+          ? this.bossRushWardens
+          : null,
+        firstLayer: this.mode.firstLayer,
       }) +
         this.cacheSalvage) *
         multiplier
@@ -266,6 +277,8 @@ export default class HangarService {
     const item = ITEMS_BY_ID.get(id);
     if (!item || this.owned[id] || this.salvage < item.cost) return false;
     if (this.lockOf(item)) return false;
+    // Another tab changed this pilot: the write would be dropped, so sell nothing.
+    if (isPilotStale()) return false;
     this.salvage -= item.cost;
     this.owned[id] = true;
     this.persist();
@@ -321,6 +334,7 @@ export default class HangarService {
 
   /** Buys a licence on sale; it starts switched on. */
   buyLicense(id) {
+    if (isPilotStale()) return false;
     const entry = LICENSES_BY_ID.get(id);
     if (!entry || this.licenses[id] || this.salvage < entry.cost) return false;
     this.salvage -= entry.cost;
@@ -332,6 +346,7 @@ export default class HangarService {
 
   /** Switches a held licence on or off, free: off takes the card out of the draw. */
   setLicenseOn(id, on) {
+    if (isPilotStale()) return false;
     if (!this.licenses[id]) return false;
     if (on) delete this.licensesOff[id];
     else this.licensesOff[id] = true;
@@ -386,6 +401,7 @@ export default class HangarService {
 
   /** Seals an open card out of the next runs' draw, or unseals it. */
   toggleSeal(id) {
+    if (isPilotStale()) return false;
     if (this.sealed.includes(id)) {
       this.sealed = this.sealed.filter((entry) => entry !== id);
     } else if (
@@ -407,6 +423,7 @@ export default class HangarService {
 
   /** Picks the Flight School's card (null for none); needs the item owned. */
   setStartingCard(id) {
+    if (isPilotStale()) return false;
     if (!this.owned['flight-school']) return false;
     if (id !== null && !FLIGHT_SCHOOL_CARDS.includes(id)) return false;
     this.startingCard = id;

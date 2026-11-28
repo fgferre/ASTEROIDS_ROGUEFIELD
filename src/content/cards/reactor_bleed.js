@@ -9,6 +9,7 @@ export default {
   icon: '☢️',
   themeColor: PALETTE.shot,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'null-and-void' },
   tags: ['damage', 'trade-off'],
   text: {
     name: 'Reactor Bleed',
@@ -18,17 +19,19 @@ export default {
     levels: [
       {
         title: 'Open Valve',
-        description: 'While no movement key is held, damage +30%.',
-        highlights: ['Let go to hit harder; move and the bonus is gone.'],
+        description: 'While you are not thrusting, damage +30%.',
+        highlights: [
+          'Turning and strafing keep it; thrust and the bonus is gone.',
+        ],
       },
       {
         title: 'Bypass Line',
-        description: 'While no movement key is held, damage +60%.',
+        description: 'While you are not thrusting, damage +60%.',
         highlights: ['Drifting counts: the ship need not be still.'],
       },
       {
         title: 'Core Tap',
-        description: 'While no movement key is held, damage +100%.',
+        description: 'While you are not thrusting, damage +100%.',
         highlights: ['A dash cuts the bleed until it ends.'],
       },
     ],
@@ -40,6 +43,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-reactor-bleed',
+          to: 'player',
+          lands: { idleDamageMultiplier: 'idleDamageMultiplier' },
           payload: { idleDamageMultiplier: 1.3 }, // proposta 20/10
         },
       ],
@@ -50,6 +55,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-reactor-bleed',
+          to: 'player',
+          lands: { idleDamageMultiplier: 'idleDamageMultiplier' },
           payload: { idleDamageMultiplier: 1.6 }, // proposta 20/10
         },
       ],
@@ -60,6 +67,8 @@ export default {
         {
           type: 'event',
           event: 'upgrade-reactor-bleed',
+          to: 'player',
+          lands: { idleDamageMultiplier: 'idleDamageMultiplier' },
           payload: { idleDamageMultiplier: 2 }, // proposta 20/10
         },
       ],

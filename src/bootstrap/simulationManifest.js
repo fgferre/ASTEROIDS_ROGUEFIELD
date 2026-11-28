@@ -17,12 +17,10 @@ import ProgressionSystem from '../modules/ProgressionSystem.js';
 import EffectsSystem from '../modules/EffectsSystem.js';
 import WorldSystem from '../modules/WorldSystem.js';
 import { GamePools } from '../core/GamePools.js';
-import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
 import RandomService from '../core/RandomService.js';
 import { gameEvents } from '../core/EventBus.js';
 import { createServiceResolver } from '../core/serviceUtils.js';
 import GameSessionService from '../services/GameSessionService.js';
-import CommandQueueService from '../services/CommandQueueService.js';
 import CodexService from '../services/CodexService.js';
 import AchievementService from '../services/AchievementService.js';
 import HangarService from '../services/HangarService.js';
@@ -33,14 +31,6 @@ export const DEFAULT_POOL_CONFIG = {
   particles: { initial: 60, max: 400 },
   asteroids: { initial: 20, max: 100 },
   xpOrbs: { initial: 40, max: 250 },
-  shockwaves: { initial: 8, max: 25 },
-  tempObjects: { initial: 15, max: 60 },
-};
-
-export const DEFAULT_GC_OPTIONS = {
-  defaultInterval: 4500,
-  idleTimeout: 120,
-  maxTasksPerFrame: 2,
 };
 
 function ensureGameStateService(gameState) {
@@ -145,35 +135,6 @@ function initializeGamePools(config) {
   return GamePools;
 }
 
-function createGarbageCollector(options) {
-  const gcOptions = { ...DEFAULT_GC_OPTIONS, ...options };
-  const manager = new GarbageCollectionManager(gcOptions);
-  manager.initialize();
-
-  manager.registerPeriodicTask(
-    'pool-auto-manage',
-    () => GamePools.autoManageAll(),
-    { interval: 5000, priority: 2, runImmediately: true }
-  );
-
-  manager.registerPeriodicTask(
-    'temp-pool-trim',
-    () => {
-      const tempPool = GamePools.tempObjects;
-      if (tempPool && typeof tempPool.autoManage === 'function') {
-        tempPool.autoManage({
-          targetUtilization: 0.55,
-          maxShrinkage: 10,
-          maxExpansion: 6,
-        });
-      }
-    },
-    { interval: 7000, priority: 1 }
-  );
-
-  return manager;
-}
-
 function createRandomService(context = {}) {
   const { randomOverrides, seed } = context;
 
@@ -256,7 +217,7 @@ function createRandomService(context = {}) {
 }
 
 export function createSimulationManifest(context = {}, presentation) {
-  const { gameState, poolConfig, garbageCollectorOptions } = context;
+  const { gameState, poolConfig } = context;
   const slot = (name) => {
     const entry = presentation?.[name];
     if (!entry) {
@@ -296,13 +257,6 @@ export function createSimulationManifest(context = {}, presentation) {
       lazy: false,
       dependencies: [],
       factory: () => initializeGamePools(poolConfig),
-    },
-    {
-      name: 'garbage-collector',
-      singleton: true,
-      lazy: false,
-      dependencies: ['game-pools'],
-      factory: () => createGarbageCollector(garbageCollectorOptions),
     },
     {
       name: 'settings',
@@ -354,30 +308,14 @@ export function createSimulationManifest(context = {}, presentation) {
     },
     slot('audio'),
     {
-      name: 'command-queue',
-      singleton: true,
-      lazy: false,
-      dependencies: [],
-      factory: ({ context: manifestContext }) =>
-        new CommandQueueService({
-          initialFrame: Number.isFinite(manifestContext?.initialFrame)
-            ? manifestContext.initialFrame
-            : 0,
-          frameSource: manifestContext?.frameSource,
-          hooks: manifestContext?.metrics?.commandQueue,
-        }),
-    },
-
-    {
       name: 'input',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'settings', 'command-queue', 'game-state'],
+      dependencies: ['event-bus', 'settings', 'game-state'],
       factory: ({ resolved }) =>
         new InputSystem({
           eventBus: resolved['event-bus'],
           settings: resolved['settings'],
-          'command-queue': resolved['command-queue'],
           'game-state': resolved['game-state'],
         }),
     },
@@ -385,19 +323,11 @@ export function createSimulationManifest(context = {}, presentation) {
       name: 'player',
       singleton: true,
       lazy: false,
-      dependencies: [
-        'event-bus',
-        'input',
-        'command-queue',
-        'hangar',
-        'difficulty',
-        'settings',
-      ],
+      dependencies: ['event-bus', 'input', 'hangar', 'difficulty', 'settings'],
       factory: ({ resolved }) =>
         new PlayerSystem({
           eventBus: resolved['event-bus'],
           input: resolved['input'],
-          'command-queue': resolved['command-queue'],
           hangar: resolved['hangar'],
           difficulty: resolved['difficulty'],
           settings: resolved['settings'],
@@ -652,7 +582,6 @@ export function createSimulationManifest(context = {}, presentation) {
     },
     slot('menu-background'),
     slot('renderer'),
-    // Last: an eager service can only resolve dependencies registered above it.
     {
       name: 'game-session',
       singleton: true,
@@ -669,6 +598,7 @@ export function createSimulationManifest(context = {}, presentation) {
         'physics',
         'xp-orbs',
         'healthHearts',
+        'pickups',
         'world',
         'effects',
         'combat',
@@ -689,8 +619,9 @@ export function createSimulationManifest(context = {}, presentation) {
             progression: resolved['progression'],
             enemies: resolved['enemies'],
             physics: resolved['physics'],
-            xpOrbs: resolved['xp-orbs'],
+            'xp-orbs': resolved['xp-orbs'],
             healthHearts: resolved['healthHearts'],
+            pickups: resolved['pickups'],
             world: resolved['world'],
             effects: resolved['effects'],
             combat: resolved['combat'],
@@ -700,6 +631,7 @@ export function createSimulationManifest(context = {}, presentation) {
             difficulty: resolved['difficulty'],
           },
           gameState: context.gameState,
+          playLink: context.playLink,
         });
 
         if (

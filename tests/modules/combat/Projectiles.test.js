@@ -120,4 +120,61 @@ describe('Projectiles', () => {
     expect(enemyList[0]).toBe(enemyKept[0]);
     expect(playerList[1]).toBe(playerKept[1]);
   });
+
+  it('gives back a shot taken from the pool again as a new one, whatever kind it was', () => {
+    const ship = { isDead: false, getPosition: () => ({ x: 400, y: 300 }) };
+    const projectiles = new Projectiles({
+      physics: () => ({
+        buildPlayerCollisionContext: () => ({ collisionRadius: 20 }),
+        checkCircleCollision: (x, y, r, px, py, pr) =>
+          Math.hypot(x - px, y - py) <= r + pr,
+      }),
+      emit: () => {},
+      weapon: () => ({ ...weapon }),
+      burstFlak: () => {},
+    });
+    GamePools.bullets.clear();
+
+    // The ship's shot, with what the weapon's forms write on it in flight
+    // (firePatterns.js, fanForms.js).
+    const shot = projectiles.createBullet(
+      { x: 400, y: 300 },
+      { x: 500, y: 300 },
+      10,
+      { struck: [], bursts: 0 },
+      { ricochet: { times: 2 }, coilSpeed: 1, coilRange: 40 }
+    );
+    shot.seeker = { target: null, id: null, turn: 4 };
+    shot.glance = { bullet: shot, fade: null };
+    shot.ricochets -= 1;
+    shot.scrapAge = 0.2;
+    shot.pierced.push({ id: 'rock' });
+    shot.pierceLeft -= 1;
+    shot.hit = true;
+
+    // Enemy shots: a Warden's and a frozen one that hit the parked ship, and
+    // a frozen one cleared from the air.
+    const enemyShot = (x, enemy) =>
+      projectiles.createEnemyBullet({
+        position: { x, y: 300 },
+        velocity: { x: 0, y: 0 },
+        projectile: { radius: 9, trailLength: 30, color: '#f0f', damage: 7 },
+        enemy: { x, y: 300, ...enemy },
+      });
+    enemyShot(410, { id: 'warden-1', type: 'boss' });
+    enemyShot(390, { id: 'drone-1', type: 'drone' });
+    enemyShot(100, { id: 'drone-2', type: 'drone' });
+    projectiles.freezeEnemyBullets(3);
+
+    projectiles.updateBullets(0.01);
+    projectiles.updateEnemyBullets(0.01, ship);
+    projectiles.clearEnemyBullets();
+
+    expect(GamePools.bullets.available).toHaveLength(4);
+    for (let i = 0; i < 4; i += 1) {
+      expect(GamePools.bullets.acquire()).toStrictEqual(
+        GamePools.bullets.createFn()
+      );
+    }
+  });
 });

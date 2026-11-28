@@ -48,9 +48,9 @@ export function mirrorProjectiles(t, combat) {
   if (!combat) return;
   const { lances } = t;
 
-  const bullets = combat.bullets || [];
-  const look = combat.lanceLook;
-  const evolved = combat.evolutions.length > 0;
+  const bullets = combat.projectiles.bullets || [];
+  const look = combat.weapons.lanceLook;
+  const evolved = combat.weapons.evolutions.length > 0;
   const trail = pushTrail.bind(null, t);
   for (let i = 0; i < bullets.length; i += 1) {
     const b = bullets[i];
@@ -63,7 +63,7 @@ export function mirrorProjectiles(t, combat) {
   mirrorWeaponEffects(t.THREE, combat, t, t.flashes);
 
   // Enemy shots: a barbed dart in the shot's own colour, as its trail.
-  const enemyBullets = combat.enemyBullets || [];
+  const enemyBullets = combat.projectiles.enemyBullets || [];
   for (let i = 0; i < enemyBullets.length; i += 1) {
     const b = enemyBullets[i];
     if (!b || b.hit) continue;
@@ -268,7 +268,8 @@ export function mirrorEffects(t, effects, impact) {
     );
   }
 
-  const screenFlash = effects.screenFlash;
+  // a flash frozen with the run under a cinematic's hold is not shown
+  const screenFlash = effects.flashHeld ? null : effects.screenFlash;
   const alpha =
     screenFlash && screenFlash.timer > 0 && screenFlash.duration > 0
       ? (screenFlash.timer / screenFlash.duration) * screenFlash.intensity

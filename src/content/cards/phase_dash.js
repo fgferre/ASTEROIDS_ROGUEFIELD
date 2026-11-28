@@ -9,6 +9,7 @@ export default {
   icon: '🌫️',
   themeColor: PALETTE.boss,
   unlockLevel: 3,
+  unlock: { by: 'medal', medal: 'untouchable' },
   tags: ['dash', 'charges'],
   text: {
     name: 'Ghost Drive',
@@ -31,6 +32,12 @@ export default {
         {
           type: 'event',
           event: 'upgrade-phase-dash',
+          to: 'player',
+          lands: {
+            'maneuvers.dashSpareMax': 'extraCharges',
+            'maneuvers.dashSpare': 'extraCharges',
+            'maneuvers.dashGhostLinger': 'ghostLinger',
+          },
           payload: { extraCharges: 1, ghostLinger: 2 }, // proposta 20/10
         },
       ],

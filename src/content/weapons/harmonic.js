@@ -154,6 +154,7 @@ export default {
     icon: '〰️',
     themeColor: PALETTE.shot,
     unlockLevel: 3,
+    unlock: { by: 'license', at: 3, cost: 325 },
     tags: ['weapon', 'weaponry'],
     text: {
       name: 'Harmonic Resonator',

@@ -159,6 +159,94 @@ describe('SettingsSystem dash binding migration', () => {
   });
 });
 
+describe('SettingsSystem rebinding a key another action holds', () => {
+  let restoreDom;
+
+  beforeEach(() => {
+    restoreDom = installDomStubs();
+  });
+
+  afterEach(() => {
+    restoreDom();
+  });
+
+  const create = (eventBus = createEventBusMock()) =>
+    new SettingsSystem({ eventBus });
+
+  it('takes the key from the flight action that had it', () => {
+    const settings = create();
+    settings.setSetting('controls', 'dash', {
+      keyboard: ['KeyE', 'ShiftRight'],
+      gamepad: ['button:5'],
+    });
+    expect(settings.getSetting('controls', 'dash').keyboard).toEqual([
+      'KeyE',
+      'ShiftRight',
+    ]);
+    expect(settings.getSetting('controls', 'activateShield').keyboard).toEqual(
+      []
+    );
+  });
+
+  it('takes a pad button the same way, and the loser stays unbound after a reload', () => {
+    create().setSetting('controls', 'dash', {
+      keyboard: ['ShiftLeft', 'ShiftRight'],
+      gamepad: ['button:6'],
+    });
+    const shield = create().getSetting('controls', 'activateShield');
+    expect(shield.gamepad).toEqual([]);
+    expect(shield.keyboard).toEqual(['KeyE']);
+  });
+
+  it('lets a menu action keep sharing a key with a flight action', () => {
+    const settings = create();
+    settings.setSetting('controls', 'dash', {
+      keyboard: ['Enter'],
+      gamepad: ['button:5'],
+    });
+    settings.setSetting('controls', 'confirm', {
+      keyboard: ['Enter', 'KeyE'],
+      gamepad: [],
+    });
+    expect(settings.getSetting('controls', 'confirm').keyboard).toEqual([
+      'Enter',
+      'KeyE',
+    ]);
+    expect(settings.getSetting('controls', 'dash').keyboard).toEqual(['Enter']);
+    expect(settings.getSetting('controls', 'activateShield').keyboard).toEqual([
+      'KeyE',
+    ]);
+  });
+
+  it('Reset Controls gives every action its default back', () => {
+    const settings = create();
+    settings.setSetting('controls', 'dash', {
+      keyboard: ['KeyE', 'KeyW'],
+      gamepad: ['button:6'],
+    });
+    settings.resetCategory('controls');
+    expect(settings.getCategoryValues('controls')).toEqual(
+      settings.defaults.controls
+    );
+  });
+
+  it('tells the game once, with both changes', () => {
+    const eventBus = createEventBusMock();
+    const settings = create(eventBus);
+    const heard = [];
+    eventBus.on('settings-controls-changed', ({ values }) =>
+      heard.push(values)
+    );
+    settings.setSetting('controls', 'dash', {
+      keyboard: ['KeyE'],
+      gamepad: ['button:5'],
+    });
+    expect(heard).toHaveLength(1);
+    expect(heard[0].dash.keyboard).toEqual(['KeyE']);
+    expect(heard[0].activateShield.keyboard).toEqual([]);
+  });
+});
+
 describe('SettingsSystem with a save holding options that left', () => {
   let restoreDom;
 

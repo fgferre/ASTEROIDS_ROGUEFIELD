@@ -11,6 +11,7 @@ export default {
   icon: '⏱️',
   themeColor: PALETTE.boss,
   unlockLevel: 4,
+  unlock: { by: 'license', at: 10, cost: 250 },
   tags: ['fire-rate', 'cursed'],
   text: {
     name: 'Overclocked Core',
@@ -26,6 +27,25 @@ export default {
       },
     ],
   },
+  // Damage in 30 s measured 26/11 (see heat_sink.js).
+  weaponText: {
+    harmonic: {
+      levels: [
+        {
+          description:
+            "Fire rate +35%, but the beam's own wait does not shrink: damage +25%. The hull loses 1 HP every 4 s, down to 20% of max.",
+        },
+      ],
+    },
+    'shard-halo': {
+      levels: [
+        {
+          description:
+            'The blades may cut the same enemy again 35% sooner, but a blade cuts only while it touches: damage +13%. The hull loses 1 HP every 4 s, down to 20% of max.',
+        },
+      ],
+    },
+  },
   levels: [
     {
       rank: 1,
@@ -33,11 +53,14 @@ export default {
         {
           type: 'event',
           event: 'upgrade-weapon-tuning',
+          to: 'combat',
           payload: { cooldownMultiplier: 0.74 },
         },
         {
           type: 'event',
           event: 'upgrade-hull-drain',
+          to: 'player',
+          lands: 'hullDrain',
           payload: { amount: 1, interval: 4, floorFraction: 0.2 },
         },
       ],

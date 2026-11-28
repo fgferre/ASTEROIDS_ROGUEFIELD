@@ -5,7 +5,7 @@
 import { PALETTE } from '../../../../data/constants/palette.js';
 import { bakeHullMaps } from '../../bakedMaps.js';
 import { colorOf } from '../../batches.js';
-import { SHINE, shiny } from '../../hullModel.js';
+import { SHINE, shiny, takeSceneSky } from '../../hullModel.js';
 import { mergeStatic } from '../../mergeStatic.js';
 import { addRimLight } from '../../rimLight.js';
 
@@ -94,6 +94,7 @@ export function createSentinelKit(kit, recipeViews) {
     })
   );
   addRimLight(emitterMaterial);
+  takeSceneSky(kit.scene, [emitterMaterial]);
   // A lens on `parent` at `at` ([x, y, z]), `size` across: a glow of the
   // view (drawn by the glow batch, no draw of its own), set with lensGain.
   const lens = (parent, at, size) =>
@@ -143,7 +144,7 @@ export function createSentinelKit(kit, recipeViews) {
     [soot, SHINE.worn],
   ]);
   function merge(parts) {
-    const geometry = mergeStatic(
+    return mergeStatic(
       THREE,
       parts.map((part) => ({
         flat: true,
@@ -151,8 +152,6 @@ export function createSentinelKit(kit, recipeViews) {
         ...part,
       }))
     );
-    geometry.setAttribute('uv2', geometry.getAttribute('uv'));
-    return geometry;
   }
   const both = (part) => [
     part,
