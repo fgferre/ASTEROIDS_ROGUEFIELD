@@ -5,7 +5,6 @@
 
 import { KEY_LIGHT_DIR, PALETTE } from '../../data/constants/palette.js';
 import THREE, { POINT_DECAY } from './three.js';
-import { LOOK } from './look.js';
 import {
   CapsuleBatch,
   PointBatch,
@@ -46,10 +45,12 @@ export const FOV = 20;
 // the camera's own lens, and the points in them are sized for this one.
 export const SCENE_FOV = 38;
 const KEY_ELEVATION = (40 * Math.PI) / 180;
-export const BLOOM = LOOK.bloom;
-// The scene draws in linear HDR and is bloomed there; the look's curve at
-// this exposure and sRGB come once, at the composer's end (toneAtEnd).
-const EXPOSURE = LOOK.exposure;
+export const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
+// The scene draws in linear HDR and is bloomed there; three's Linear curve
+// (the exposure and a clamp, no shoulder: the owner chose today's picture
+// over a curve's, 27/11) and sRGB come once, at the composer's end
+// (toneAtEnd).
+const EXPOSURE = 1;
 const WARDEN_LIGHT_DISTANCE = 420;
 const MAX_SHOCKWAVES = 25;
 // proposta 18/10: the key light's shadow box follows the camera target: the
@@ -171,7 +172,7 @@ function foldBloom(bloomPass, passes) {
   });
 }
 
-// The composer's end steps (`passes`) tone-map with three's ACES (SCENE_READ)
+// The composer's end steps (`passes`) tone-map with three's Linear (SCENE_READ)
 // at the renderer's exposure, read every frame: the ending sets it per shot,
 // and what three draws to the screen itself (the travel veil) gets the same.
 // Left out of three's own tone mapping, which would define the curve a
@@ -230,7 +231,7 @@ export function setupThree(seeded) {
   });
   renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE[`${LOOK.curve}ToneMapping`];
+  renderer.toneMapping = THREE.LinearToneMapping;
   renderer.toneMappingExposure = EXPOSURE;
   renderer.setClearColor(colorOf(THREE, PALETTE.background), 1);
   renderer.info.autoReset = false;

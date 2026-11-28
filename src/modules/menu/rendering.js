@@ -8,7 +8,6 @@
 
 import { debugLog } from '../../core/debugLogging.js';
 import { resolveDevicePixelRatio } from '../../core/viewport.js';
-import { LOOK } from '../render3d/look.js';
 
 export function createMenuRenderer(THREE, canvas) {
   // WebGL2 upgrade - enables #version 300 es shaders like the study
@@ -36,7 +35,7 @@ export function createMenuRenderer(THREE, canvas) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   // Monolith shader outputs in linear and lets renderer handle encoding.
   renderer.toneMapping = THREE.NoToneMapping;
-  renderer.toneMappingExposure = LOOK.exposure;
+  renderer.toneMappingExposure = 1.0;
 
   return renderer;
 }

@@ -19,7 +19,6 @@ import { createRockViews } from '../render3d/enemies/rocks.js';
 import { createOpeningRocks } from './openingRocks.js';
 import { FieldBackdrop } from '../render3d/fieldBackdrop.js';
 import { ringPoint } from '../render3d/ring/ringShape.js';
-import { LOOK } from '../render3d/look.js';
 import { BLOOM } from '../render3d/sceneSetup.js';
 import { CAMERA_FAR, SpaceField } from '../render3d/spaceField.js';
 
@@ -83,7 +82,7 @@ export function openingShotFromUrl() {
 // How much the frame's edges darken (the game's soft vignette, NORTE §2).
 const VIGNETTE = 0.5;
 
-// Three's ACES and linear → sRGB after the bloom, as the game's composer ends.
+// Three's Linear and linear → sRGB after the bloom, as the game's composer ends.
 const OUTPUT_SHADER = {
   uniforms: {
     tDiffuse: { value: null },
@@ -106,7 +105,7 @@ varying vec2 vUv;
 void main() {
   vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
   float edge = smoothstep(0.35, 1.1, length(p));
-  vec3 color = ${LOOK.curve}ToneMapping(texture2D(tDiffuse, vUv).rgb)
+  vec3 color = LinearToneMapping(texture2D(tDiffuse, vUv).rgb)
     * (1.0 - uVignette * edge);
   gl_FragColor = sRGBTransferOETF(vec4(color, 1.0));
 }`,
@@ -165,7 +164,7 @@ export function createOpeningScene(menu, random, shotName = null) {
     space.invalidateBakes()
   );
 
-  // The post chain: the world in linear HDR, the game's bloom, three's ACES
+  // The post chain: the world in linear HDR, the game's bloom, three's Linear
   // and sRGB out, then the menu's scene over it and the edges smoothed.
   const size = renderer.getDrawingBufferSize(new THREE.Vector2());
   const target = new THREE.WebGLRenderTarget(size.x, size.y, {
