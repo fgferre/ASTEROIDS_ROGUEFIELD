@@ -362,7 +362,8 @@ function paint(THREE, geometry, livery) {
 // Navigation lights' materials, one set per THREE: red to port, green to
 // starboard, the white strobe, the sensor's cyan under its glass. Bright
 // points the bloom haloes, not lights: a light would change the scene's
-// light count whenever the ship hides (playerMirror.js standIn).
+// light count whenever the ship hides (playerMirror.js standIn). The hexes
+// are sRGB, so three reads them to the linear values they were tuned at.
 const bulbs = new WeakMap();
 function bulbsOf(THREE) {
   if (!bulbs.has(THREE)) {
@@ -372,10 +373,10 @@ function bulbsOf(THREE) {
         toneMapped: false,
       });
     bulbs.set(THREE, {
-      port: bulb('#ff2a1a', 3),
-      starboard: bulb('#19ff5a', 3),
+      port: bulb('#ff715a', 3),
+      starboard: bulb('#58ffa0', 3),
       strobe: bulb('#ffffff', 3),
-      sensor: bulb('#5ff4ff', 2),
+      sensor: bulb('#a4faff', 2),
     });
   }
   return bulbs.get(THREE);

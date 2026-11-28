@@ -28,13 +28,13 @@ const PLANET = {
 // terminator, dead cities, the crack, the limb and the air, the haze.
 const SUN = [0.42, -0.8, -0.45];
 const LOOK = {
-  rock: ['#6e6860', 1],
+  rock: ['#afaba5', 1],
   day: 0.7,
   fill: 0.035,
   term: 0.2,
-  city: ['#bfe4ff', 0.16],
-  crack: ['#ff4a1c', 0.55],
-  rim: ['#ffc890', 0.4],
+  city: ['#e0f3ff', 0.16],
+  crack: ['#ff935d', 0.55],
+  rim: ['#ffe5c6', 0.4],
   air: 0.5,
   haze: 0.1,
 };
@@ -132,7 +132,8 @@ function faded(THREE, kit, name, options) {
 }
 
 function planet(THREE, kit) {
-  // the shader's own levels, as the approved mock-up set them (not sRGB)
+  // the shader's own levels, as the approved mock-up set them: sRGB hexes
+  // read to those linear values
   const color = ([css, k]) => new THREE.Color(css).multiplyScalar(k);
   const sun = { value: new THREE.Vector3(...SUN).normalize() };
   const rim = { value: color(LOOK.rim) };

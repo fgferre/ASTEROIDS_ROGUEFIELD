@@ -55,7 +55,7 @@ const MENU_SKY = 0.35;
 const STUDIO_GLSL = 'vec3(-0.45, 0.7, 0.55)';
 const STUDIO_STRENGTH = '1.1';
 // A locked hull's silhouette: dark slate, a shade above the starfield.
-const SILHOUETTE_COLOR = 0x1c2533;
+const SILHOUETTE_COLOR = 0x5d6a7c;
 
 // Plume: white-hot at the nozzle, fading into the accent toward the tip
 // (cone uv.y runs 0 at the base to 1 at the tip).

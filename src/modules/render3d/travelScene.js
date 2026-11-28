@@ -55,7 +55,7 @@ const JUMP = {
   stretch: 16,
   speed: 14,
   white: [0.3, 0.355, 0.375, 0.45],
-  tint: '#a9dcff',
+  tint: '#d5efff',
 };
 // proposta 12/11: the dust streaks: `count` in a box `half` wide and high
 // round the flight line, from `ahead` in front to `behind` the ship, none

@@ -116,7 +116,7 @@ export function createSovereign(sk) {
   } = sk;
   // proposta 12/11: the boss light over it, pale gold and dim, so the
   // lining stays dark against the shell
-  const BOSS_LIGHT = new THREE.Color('#ffe2b0').multiplyScalar(0.4);
+  const BOSS_LIGHT = new THREE.Color('#fff2d8').multiplyScalar(0.4);
   // Sovereign, Continuance's seat: a pale lacquered egg standing in a gold
   // collar, ringed by two polished halos that float round it. The egg's upper
   // face is eight shells (an inlaid rib down each, two bands across, a band

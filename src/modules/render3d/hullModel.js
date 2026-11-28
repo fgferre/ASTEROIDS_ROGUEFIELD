@@ -185,12 +185,13 @@ export const HULL_SPECULAR_CAP_GLSL = `
 // The hull's sky (buildHullEnvironment): a dim cool gradient, so the hull's
 // diffuse light hardly changes, and a few small bright softboxes, which are
 // what the paint, steel and glass mirror: [width, height, colour, gain,
-// position, roll]. proposta 22/11 (the owner's "médio").
+// position, roll]. proposta 22/11 (the owner's "médio"). The colours are
+// sRGB hexes, read to the linear values they were tuned at.
 const HULL_SKY_STRIPS = [
-  [70, 7, '#dfe9ff', 6, [0, 80, 10], 0],
-  [40, 5, '#dfe9ff', 4.2, [55, 55, -20], 0.6],
-  [26, 26, '#fff1e2', 4.8, [-60, 45, -40], 0],
-  [60, 3, '#7fe6ff', 3.6, [-20, 20, 85], 0.2],
+  [70, 7, '#f0f5ff', 6, [0, 80, 10], 0],
+  [40, 5, '#f0f5ff', 4.2, [55, 55, -20], 0.6],
+  [26, 26, '#fff9f2', 4.8, [-60, 45, -40], 0],
+  [60, 3, '#bbf4ff', 3.6, [-20, 20, 85], 0.2],
 ];
 
 /**

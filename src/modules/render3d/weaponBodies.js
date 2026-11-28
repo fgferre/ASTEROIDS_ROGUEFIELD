@@ -39,7 +39,11 @@ export class WeaponBodies {
     const mesh = (geometry, metal) => {
       const material = shiny(
         new THREE.MeshStandardMaterial({
-          color: PALETTE.hullLit,
+          // the palette's sRGB hex as the linear value it was tuned at
+          color: new THREE.Color().setStyle(
+            PALETTE.hullLit,
+            THREE.LinearSRGBColorSpace
+          ),
           flatShading: true,
           ...metal,
         })

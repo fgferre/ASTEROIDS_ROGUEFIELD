@@ -195,7 +195,8 @@ export function createFieldVeil(THREE, scene) {
     flare(x, z, flareColor) {
       const slot = flares.reduce((a, b) => (b.at.z < a.at.z ? b : a));
       slot.at.set(x, z, 1, 0);
-      slot.color.set(flareColor);
+      // the sRGB colour as the linear value it was tuned at
+      slot.color.setStyle(flareColor, THREE.LinearSRGBColorSpace);
     },
     update(dt) {
       flares.forEach(({ at }) => {

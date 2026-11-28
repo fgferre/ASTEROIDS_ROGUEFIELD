@@ -117,7 +117,7 @@ export const STORY_FAR = 160000;
 // The signal: a point in the Field ahead that pulses every `period` s.
 const SIGNAL = {
   at: [15000, 150, -1500],
-  color: '#4fd2ff',
+  color: '#97eaff',
   size: 900,
   period: 1.4,
 };
@@ -183,7 +183,7 @@ export class StoryScene {
       new THREE.Vector3()
     );
     // The hangar's own light: its mouth lies in the bow's shadow.
-    this.bay = new THREE.PointLight(0xbfd8ff, 0, 900, POINT_DECAY);
+    this.bay = new THREE.PointLight(0xe0edff, 0, 900, POINT_DECAY);
     this.bay.position.copy(this.hangar).add(new THREE.Vector3(120, -60, 0));
     scene.add(this.bay);
     this.signal = new THREE.Sprite(
