@@ -8,6 +8,7 @@ import { PALETTE } from '../../../data/constants/palette.js';
 import { SHIP_MAX_SPEED } from '../../../data/constants/physics.js';
 import { colorOf, rgbOf } from '../batches.js';
 import { NOZZLE_HEIGHT, VISUAL_SCALE, throatGeometry } from '../hullModel.js';
+import { POINT_DECAY, pointStrength } from '../three.js';
 
 const TRAIL_MIN = 12;
 const TRAIL_LENGTH = 22;
@@ -90,7 +91,7 @@ export function createEngines(mirror, THREE) {
     colorOf(THREE, PALETTE.player),
     0,
     150,
-    2
+    POINT_DECAY
   );
   mirror.group.add(mirror.light);
 }
@@ -217,8 +218,10 @@ export function lightEngines(
     .copy(mirror.accent)
     .multiplyScalar(0.5 + 1.3 * main);
   mirror.light.color.copy(mirror.accent).lerp(mirror.warmLight, 0.35 * main);
-  mirror.light.intensity =
-    2.6 * main + (mirror.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
+  mirror.light.intensity = pointStrength(
+    mirror.light,
+    2.6 * main + (mirror.muzzleFrames > 0 ? MUZZLE_LIGHT : 0)
+  );
   if (danger > 0) {
     mirror.light.intensity *= stall
       ? 0.2

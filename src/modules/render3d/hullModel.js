@@ -185,12 +185,13 @@ export const HULL_SPECULAR_CAP_GLSL = `
 // The hull's sky (buildHullEnvironment): a dim cool gradient, so the hull's
 // diffuse light hardly changes, and a few small bright softboxes, which are
 // what the paint, steel and glass mirror: [width, height, colour, gain,
-// position, roll]. proposta 22/11 (the owner's "médio").
+// position, roll]. proposta 22/11 (the owner's "médio"). The colours are
+// sRGB hexes, read to the linear values they were tuned at.
 const HULL_SKY_STRIPS = [
-  [70, 7, '#dfe9ff', 6, [0, 80, 10], 0],
-  [40, 5, '#dfe9ff', 4.2, [55, 55, -20], 0.6],
-  [26, 26, '#fff1e2', 4.8, [-60, 45, -40], 0],
-  [60, 3, '#7fe6ff', 3.6, [-20, 20, 85], 0.2],
+  [70, 7, '#f0f5ff', 6, [0, 80, 10], 0],
+  [40, 5, '#f0f5ff', 4.2, [55, 55, -20], 0.6],
+  [26, 26, '#fff9f2', 4.8, [-60, 45, -40], 0],
+  [60, 3, '#bbf4ff', 3.6, [-20, 20, 85], 0.2],
 ];
 
 /**
@@ -244,6 +245,37 @@ export function useHullEnvironment(materials, texture) {
   materials.forEach((material) => {
     material.envMap = texture;
     material.needsUpdate = true;
+  });
+}
+
+// Since r163 a material's envMapIntensity scales only its own envMap: the
+// scene's sky (Scene.environment) comes in at the scene's
+// environmentIntensity, left at 1, the strength most materials take it at.
+// The others carry that sky as their own map (takeSceneSky), so their
+// envMapIntensity scales it, and take it again when it is rebuilt.
+const SKY_TAKERS = new WeakMap();
+
+/**
+ * Of `materials`, the standard ones whose envMapIntensity is not 1 take
+ * `scene`'s sky as their own map (none where the scene has none, the
+ * menu's). After their strength is set, before any copy of them is made.
+ */
+export function takeSceneSky(scene, materials) {
+  if (!SKY_TAKERS.has(scene)) SKY_TAKERS.set(scene, new Set());
+  const takers = SKY_TAKERS.get(scene);
+  materials.forEach((material) => {
+    if (!material.isMeshStandardMaterial || material.envMapIntensity === 1) {
+      return;
+    }
+    material.envMap = scene.environment;
+    takers.add(material);
+  });
+}
+
+/** After `scene`'s sky was rebuilt: what took the old one takes it. */
+export function retakeSceneSky(scene) {
+  SKY_TAKERS.get(scene)?.forEach((material) => {
+    material.envMap = scene.environment;
   });
 }
 

@@ -115,7 +115,7 @@ describe('an enemy’s 3D look from its content file alone', () => {
     expect(view.body.rotation.y).not.toBe(turn);
     expect(view.body.position.y).not.toBe(height);
 
-    const gold = new THREE.Color(PALETTE.xp).convertSRGBToLinear();
+    const gold = new THREE.Color(PALETTE.xp);
     sentryEnemy.elite = true;
     sentryEnemy.affixes = [];
     mirror.update([sentryEnemy], 0.5);

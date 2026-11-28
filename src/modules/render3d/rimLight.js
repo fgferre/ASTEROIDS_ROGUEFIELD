@@ -19,13 +19,14 @@ export function setRimLight(enabled) {
 }
 
 // The key light is the scene's first directional light (Renderer3D adds it
-// first); its uniform colour already carries the biome tint and intensity.
+// first); its uniform colour already carries the biome tint and intensity,
+// in three's units (π times the number the rim was tuned on).
 const RIM_FRAGMENT = `
 #if NUM_DIR_LIGHTS > 0
 {
   float rimFacing = saturate(dot(normal, normalize(vViewPosition)));
   float rimSide = 0.35 + 0.65 * saturate(dot(normal, directionalLights[0].direction));
-  totalEmissiveRadiance += directionalLights[0].color
+  totalEmissiveRadiance += directionalLights[0].color * RECIPROCAL_PI
     * (uRimStrength * pow(1.0 - rimFacing, ${RIM_POWER.toFixed(1)}) * rimSide);
 }
 #endif`;

@@ -104,7 +104,6 @@ describe('Renderer3D brake ring', () => {
       b = 1;
       setStyle() {}
       set() {}
-      convertSRGBToLinear() {}
     }
     const uniform = () => ({ value: 0 });
     const ring = {

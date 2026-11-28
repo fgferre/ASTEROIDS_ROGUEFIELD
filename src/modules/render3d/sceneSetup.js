@@ -4,7 +4,7 @@
 // flashes, returned as one kit (Renderer3D's `three`).
 
 import { KEY_LIGHT_DIR, PALETTE } from '../../data/constants/palette.js';
-import THREE from './three.js';
+import THREE, { POINT_DECAY } from './three.js';
 import {
   CapsuleBatch,
   PointBatch,
@@ -24,7 +24,12 @@ import { SCENE_READ, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { ChestMirror } from './chestMirror.js';
 import { PlayerMirror } from './playerMirror.js';
-import { buildHullEnvironment, useHullEnvironment } from './hullModel.js';
+import {
+  buildHullEnvironment,
+  retakeSceneSky,
+  takeSceneSky,
+  useHullEnvironment,
+} from './hullModel.js';
 import { Blasts } from './blasts.js';
 import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
@@ -41,8 +46,10 @@ export const FOV = 20;
 export const SCENE_FOV = 38;
 const KEY_ELEVATION = (40 * Math.PI) / 180;
 export const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
-// proposta 17/10: ACES on lit surfaces, sRGB on the way out (emissives are
-// toneMapped:false, so they stay hot enough to bloom).
+// The scene draws in linear HDR and is bloomed there; three's Linear curve
+// (the exposure and a clamp, no shoulder: the owner chose today's picture
+// over a curve's, 27/11) and sRGB come once, at the composer's end
+// (toneAtEnd).
 const EXPOSURE = 1;
 const WARDEN_LIGHT_DISTANCE = 420;
 const MAX_SHOCKWAVES = 25;
@@ -61,14 +68,16 @@ export const KEY_SHADOW = {
   normalBias: 0.6,
 };
 
-// Last linear → sRGB step of the composer (the passes work in linear; the
-// renderer's outputEncoding only applies when drawing to the screen), on
-// frames the impact pass, which ends in the same step, does not run.
+// Last step of the composer, the tone curve (SCENE_READ) and linear → sRGB
+// (the passes work in linear HDR; three tone-maps and encodes only what it
+// draws to the screen), on frames the impact pass, which ends in the same
+// step, does not run.
 const OUTPUT_SHADER = {
   uniforms: {
     tDiffuse: { value: null },
     tBloom: { value: null },
     uBloom: { value: 0 },
+    toneMappingExposure: { value: 1 },
   },
   vertexShader: `
 varying vec2 vUv;
@@ -163,6 +172,20 @@ function foldBloom(bloomPass, passes) {
   });
 }
 
+// The composer's end steps (`passes`) tone-map with three's Linear (SCENE_READ)
+// at the renderer's exposure, read every frame: the ending sets it per shot,
+// and what three draws to the screen itself (the travel veil) gets the same.
+// Left out of three's own tone mapping, which would define the curve a
+// second time in one that draws to the screen (SMAA off).
+function toneAtEnd(renderer, passes) {
+  passes.forEach(({ material, uniforms }) => {
+    material.toneMapped = false;
+    Object.defineProperty(uniforms.toneMappingExposure, 'value', {
+      get: () => renderer.toneMappingExposure,
+    });
+  });
+}
+
 // After the sRGB step (`encoders`, one per frame) only SMAA reads the
 // picture: it waits in a target with no depth buffer instead of the
 // composer's second one, which carried a depth nobody reads. Half-float
@@ -208,7 +231,7 @@ export function setupThree(seeded) {
   });
   renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMapping = THREE.LinearToneMapping;
   renderer.toneMappingExposure = EXPOSURE;
   renderer.setClearColor(colorOf(THREE, PALETTE.background), 1);
   renderer.info.autoReset = false;
@@ -221,7 +244,10 @@ export function setupThree(seeded) {
   // on high/ultra it casts shadows between the 3D objects (applyShadows),
   // its target following the camera (updateCamera). The fill and the
   // environment keep the unlit sides readable.
-  const key = new THREE.DirectionalLight(colorOf(THREE, '#fff1e2'), 1.6);
+  const key = new THREE.DirectionalLight(
+    colorOf(THREE, '#fff1e2'),
+    1.6 * Math.PI
+  );
   const keyDir = new THREE.Vector3(
     KEY_LIGHT_DIR.x * Math.cos(KEY_ELEVATION),
     Math.sin(KEY_ELEVATION),
@@ -236,19 +262,19 @@ export function setupThree(seeded) {
   // Fill: cool, from below-right; hemisphere keeps shadows from going void.
   const fill = new THREE.DirectionalLight(
     colorOf(THREE, PALETTE.neutral),
-    0.35
+    0.35 * Math.PI
   );
   fill.position.set(0.7, 0.3, 0.65);
   const hemi = new THREE.HemisphereLight(
     colorOf(THREE, '#2a3346'),
     colorOf(THREE, '#050608'),
-    0.3
+    0.3 * Math.PI
   );
   const wardenLight = new THREE.PointLight(
     colorOf(THREE, PALETTE.boss),
     0,
     WARDEN_LIGHT_DISTANCE,
-    2
+    POINT_DECAY
   );
   scene.add(key, key.target, fill, hemi, wardenLight);
   const skies = buildSkies(THREE, renderer);
@@ -271,17 +297,6 @@ export function setupThree(seeded) {
     BLOOM.radius,
     BLOOM.threshold
   );
-  // The bloom chain defaults to 8-bit targets: in linear, its faint tail
-  // quantizes into steps that the sRGB encode turns into visible blocks.
-  [
-    bloomPass.renderTargetBright,
-    ...bloomPass.renderTargetsHorizontal,
-    ...bloomPass.renderTargetsVertical,
-  ].forEach((rt) => {
-    rt.texture.type = THREE.HalfFloatType;
-    // Full-screen quads only: nothing reads or tests depth here.
-    rt.depthBuffer = false;
-  });
   bloomPass.blackMip = new THREE.DataTexture(new Uint8Array(4), 1, 1);
   bloomPass.blackMip.needsUpdate = true;
   composer.addPass(bloomPass);
@@ -294,6 +309,7 @@ export function setupThree(seeded) {
   });
   composer.addPass(outputPass);
   foldBloom(bloomPass, [impactPass, outputPass]);
+  toneAtEnd(renderer, [impactPass, outputPass]);
   const smaaPass = new THREE.SMAAPass();
   // its weights read only the edges' red and green: two bytes a pixel, not
   // four (8-bit as in r128; three makes the target half-float since r158)
@@ -331,6 +347,7 @@ export function setupThree(seeded) {
   // softboxes vivid blue, 22/11)
   const hullMaterials = [...player.hullMaterials, player.canopyMaterial];
   useHullEnvironment(hullMaterials, skies.hull);
+  takeSceneSky(scene, player.turretMaterials);
   watchContextRestore(THREE, renderer, scene, space, hullMaterials, seeded);
   const pickups = new PickupMirror(THREE, scene);
   const chests = new ChestMirror(THREE, scene);
@@ -470,6 +487,7 @@ export function watchContextRestore(
       hullMaterials[0].envMap?.dispose();
       const skies = buildSkies(THREE, renderer);
       scene.environment = skies.scene;
+      retakeSceneSky(scene);
       useHullEnvironment(hullMaterials, skies.hull);
       space.invalidateBakes();
     })

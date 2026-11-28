@@ -40,6 +40,7 @@ import { HALF_H, HALF_W } from './batches.js';
 import { EndingHome, isHomeBeat } from './endingHome.js';
 import { LastImage } from './endingTwin.js';
 import { RING } from './ring/ringShape.js';
+import { pointStrength } from './three.js';
 
 const BEATS = new Set(REVELATION_BEATS.map((beat) => beat.id));
 const ALL_BEATS = new Set([
@@ -506,7 +507,9 @@ export class EndingScene {
     const view = mirror.husk;
     const ship = t.player.group;
     view.object.visible = !this.cut;
-    t.wardenLight.intensity = this.cut ? 0 : BOSS_LIGHT;
+    t.wardenLight.intensity = this.cut
+      ? 0
+      : pointStrength(t.wardenLight, BOSS_LIGHT);
     // the ship's stand-in light while it is out of a cut: the lit programs
     // are keyed on the count of lights shown (playerMirror.js standIn)
     t.player.standIn.visible = this.cut;

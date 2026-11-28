@@ -64,12 +64,13 @@ const SPIN = [0.012, -0.008];
 // centre, the limb and in the corona (the shader's own levels), how much
 // the cells show, the corona's fall and the whole's level (kept well under
 // the field: it was a cream that washed out the gold boss and the orbs).
+// The colours are sRGB hexes, read to the linear values they were tuned at.
 const STAR = {
   size: 3800,
   disc: 0.4,
-  core: ['#ff9a2a', 1],
-  edge: ['#d02a08', 0.9],
-  corona: ['#ff5a14', 0.9],
+  core: ['#ffcc71', 1],
+  edge: ['#e97132', 0.9],
+  corona: ['#ffa04f', 0.9],
   grain: 0.45,
   fall: 7,
   level: 0.23,

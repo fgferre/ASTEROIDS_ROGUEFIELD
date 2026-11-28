@@ -84,9 +84,9 @@ export class BiomeController {
       space,
     } = this.targets;
     keyLight.color.copy(look.keyColor);
-    keyLight.intensity = look.keyIntensity;
+    keyLight.intensity = look.keyIntensity * Math.PI;
     fill.color.copy(look.fillColor);
-    fill.intensity = look.fillIntensity * fillScale;
+    fill.intensity = look.fillIntensity * fillScale * Math.PI;
     hemi.intensity = hemiBase * hemiScale;
     bloomPass.strength = bloomBase * look.bloomScale;
     backdrop.setLook(look);

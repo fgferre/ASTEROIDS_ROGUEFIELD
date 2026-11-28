@@ -6,7 +6,7 @@
 
 import { PALETTE } from '../../data/constants/palette.js';
 import { HALF_H, HALF_W } from './batches.js';
-import { SHINE, shiny } from './hullModel.js';
+import { SHINE, shiny, takeSceneSky } from './hullModel.js';
 
 // proposta 20/10: bodies of each kind at once.
 export const WEAPON_BODY_CAPACITY = 48;
@@ -37,15 +37,21 @@ function casingGeometry(THREE) {
 export class WeaponBodies {
   constructor(THREE, scene) {
     const mesh = (geometry, metal) => {
+      const material = shiny(
+        new THREE.MeshStandardMaterial({
+          // the palette's sRGB hex as the linear value it was tuned at
+          color: new THREE.Color().setStyle(
+            PALETTE.hullLit,
+            THREE.LinearSRGBColorSpace
+          ),
+          flatShading: true,
+          ...metal,
+        })
+      );
+      takeSceneSky(scene, [material]);
       const instanced = new THREE.InstancedMesh(
         geometry,
-        shiny(
-          new THREE.MeshStandardMaterial({
-            color: PALETTE.hullLit,
-            flatShading: true,
-            ...metal,
-          })
-        ),
+        material,
         WEAPON_BODY_CAPACITY
       );
       instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

@@ -71,13 +71,17 @@ export class BrokenRing {
     // Null: each chunk by its distance; 0..2 forces that level everywhere.
     this.forcedLevel = null;
     // An LOD's update(camera) is the renderer's hook, every frame, before it
-    // draws the children: the Ring moves and picks its levels there.
+    // draws the children: the Ring moves, picks its levels and leaves out the
+    // chunks out of view there.
     this.object = new THREE.LOD();
     this.object.update = (camera) => this.update(camera);
     this.object.position.set(...RING.centre);
     this.object.rotation.x = -RING.tilt;
     this.aim = new THREE.Vector3();
     this.local = new THREE.Vector3();
+    this.view = new THREE.Frustum();
+    this.screen = new THREE.Matrix4();
+    this.seen = new THREE.Sphere();
 
     // Level 0 of every chunk from one pass over the arc.
     this.chunks = ringChunks();
@@ -87,12 +91,25 @@ export class BrokenRing {
     );
     this.chunks.forEach((chunk, c) => {
       chunk.meshes = [];
+      chunk.spheres = [];
       chunk.level = 0;
       this.addMesh(chunk, 0, mergeStatic(THREE, byChunk[c]));
     });
   }
 
+  // Every chunk sorts at the Ring's centre (its bounding sphere grows to
+  // reach it), as the arcs of the intact Ring do (fieldBackdrop.js): the
+  // chunks tie and draw in the order they were made, so at a seam the later
+  // one's hull covers the earlier one's lamps, and the Ring takes its turn
+  // among the places' sets as one structure while it fades out over a
+  // journey's arrival. Three culls by that sphere too, which holds the whole
+  // Ring: update() leaves out a chunk whose own sphere is out of view (the
+  // fine chunks behind a journey's camera came to ~100k triangles).
   addMesh(chunk, level, geometry) {
+    const sphere = geometry.boundingSphere;
+    chunk.spheres[level] = sphere.clone();
+    sphere.radius += sphere.center.length();
+    sphere.center.set(0, 0, 0);
     const mesh = new this.THREE.Mesh(geometry, this.material);
     mesh.renderOrder = -10;
     mesh.visible = level === chunk.level;
@@ -122,7 +139,7 @@ export class BrokenRing {
   }
 
   update(camera) {
-    const { object, aim, local } = this;
+    const { object, aim, local, view, seen } = this;
     camera.getWorldDirection(aim);
     const reach = -camera.position.y / Math.min(aim.y, -0.1);
     object.position.set(
@@ -133,14 +150,22 @@ export class BrokenRing {
     object.position.add(this.offset);
     object.updateMatrixWorld(true);
     object.worldToLocal(local.setFromMatrixPosition(camera.matrixWorld));
+    view.setFromProjectionMatrix(
+      this.screen.multiplyMatrices(
+        camera.projectionMatrix,
+        camera.matrixWorldInverse
+      )
+    );
     this.chunks.forEach((chunk) => {
       const level = this.levelFor(chunk, local.x, local.y, local.z);
-      if (level === chunk.level) return;
-      this.build(chunk, level);
-      chunk.meshes.forEach((mesh, n) => {
-        if (mesh) mesh.visible = n === level;
-      });
+      if (level !== chunk.level) this.build(chunk, level);
       chunk.level = level;
+      const shown = view.intersectsSphere(
+        seen.copy(chunk.spheres[level]).applyMatrix4(object.matrixWorld)
+      );
+      chunk.meshes.forEach((mesh, n) => {
+        if (mesh) mesh.visible = shown && n === level;
+      });
     });
   }
 }

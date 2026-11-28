@@ -359,11 +359,8 @@ export function createRockViews(kit) {
     view.family = look.crystal ? 'crystal' : 'stone';
     view.object.material = rockFamilies[view.family];
     const { rock } = view;
-    rock.base
-      .set(look.base)
-      .convertSRGBToLinear()
-      .multiplyScalar(look.gain || 1);
-    rock.vein.set(look.vein || PALETTE.shot).convertSRGBToLinear();
+    rock.base.set(look.base).multiplyScalar(look.gain || 1);
+    rock.vein.set(look.vein || PALETTE.shot);
     rock.surface[0] = look.roughness;
     rock.surface[1] = look.metalness;
     rock.seed.set(random() * 50, random() * 50, random() * 50);

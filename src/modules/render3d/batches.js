@@ -8,9 +8,10 @@ export const HALF_W = GAME_WIDTH / 2;
 export const HALF_H = GAME_HEIGHT / 2;
 
 // Colors are authored in sRGB (palette, simulation); lighting and blending
-// run in linear, and the composer encodes back to sRGB at the end.
+// run in linear, and the composer encodes back to sRGB at the end. Three
+// reads a CSS string or a hex as sRGB and keeps it in linear.
 export function colorOf(THREE, css) {
-  return new THREE.Color(css).convertSRGBToLinear();
+  return new THREE.Color(css);
 }
 
 // Parsed linear colors, keyed by the CSS string the simulation stores.
@@ -40,7 +41,6 @@ export function rgbOf(THREE, css) {
     } catch {
       color.set(0xffffff);
     }
-    color.convertSRGBToLinear();
     rgb = [color.r, color.g, color.b];
     colorCache.set(key, rgb);
   }

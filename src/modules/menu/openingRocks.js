@@ -14,6 +14,7 @@
 import { PALETTE } from '../../data/constants/palette.js';
 import { createAsteroidGeometry } from '../render3d/asteroidMesh.js';
 import { colorOf } from '../render3d/batches.js';
+import { POINT_DECAY, pointStrength } from '../render3d/three.js';
 
 // proposta 17/11: sizes (radius in units, share of rocks), stretch per axis,
 // drift and spin. Radii scale with the shot's `scale`.
@@ -481,7 +482,12 @@ export function createOpeningRocks({
 
   // Created at 0 up front: the light count never changes (no recompiles).
   const lights = Array.from({ length: LIGHTS.pool }, () => {
-    const light = new THREE.PointLight(colorOf(THREE, '#ffd29a'), 0, 1, 2);
+    const light = new THREE.PointLight(
+      colorOf(THREE, '#ffd29a'),
+      0,
+      1,
+      POINT_DECAY
+    );
     fx.add(light);
     return light;
   });
@@ -549,8 +555,11 @@ export function createOpeningRocks({
     const light = lights[nextLight];
     nextLight = (nextLight + 1) % lights.length;
     light.position.copy(at);
-    light.intensity = LIGHTS.peak * Math.min(1.6, 0.3 + 0.6 * power);
     light.distance = burst * LIGHTS.reach;
+    light.intensity = pointStrength(
+      light,
+      LIGHTS.peak * Math.min(1.6, 0.3 + 0.6 * power)
+    );
     shake.amount = Math.max(
       shake.amount,
       Math.min(SHAKE.max, SHAKE.amount * burst * power)
@@ -786,7 +795,8 @@ export function createOpeningRocks({
 
       const fade = Math.exp(-step / LIGHTS.decay);
       lights.forEach((light) => {
-        light.intensity = light.intensity > 0.02 ? light.intensity * fade : 0;
+        const out = light.intensity <= pointStrength(light, 0.02);
+        light.intensity = out ? 0 : light.intensity * fade;
       });
       shake.amount *= Math.exp(-step / SHAKE.decay);
       if (still) shake.amount = 0;

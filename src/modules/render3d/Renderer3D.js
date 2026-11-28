@@ -62,6 +62,7 @@ import { SHIP_MIN_CASTER } from './playerMirror.js';
 import { setRimLight } from './rimLight.js';
 import { BLOOM, FOV, SCENE_FOV, setupThree } from './sceneSetup.js';
 import { StoryScene } from './storyScene.js';
+import { pointStrength } from './three.js';
 import { TravelScene } from './travelScene.js';
 import { warmEnding, warmUp } from './warmUp.js';
 
@@ -858,7 +859,7 @@ class Renderer3D extends BaseSystem {
     t.blasts.update(dt, t.camera, this.flashScale);
     t.veil.update(dt);
     t.bursts.update(dt);
-    t.wardenLight.intensity = warden ? 2.6 : 0;
+    t.wardenLight.intensity = warden ? pointStrength(t.wardenLight, 2.6) : 0;
     if (warden) {
       t.wardenLight.position.copy(warden.object.position).setY(40);
       // A boss view may name its own light (Sovereign: pale gold).
@@ -931,7 +932,7 @@ class Renderer3D extends BaseSystem {
     const view = travel?.focus || this.camera;
     t.space.update(view.x, view.y, dt, {
       ship: ship || null,
-      shipLight: t.player.light.intensity,
+      shipLight: t.player.light.intensity / pointStrength(t.player.light, 1),
       pointScale,
       pixel: t.height / STAR_FRAME_HEIGHT,
     });
