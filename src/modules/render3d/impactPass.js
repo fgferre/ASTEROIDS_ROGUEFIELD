@@ -12,7 +12,10 @@
 // holds the decaying strength, the lenses and the grain's per-frame seed
 // (plain JS, so it runs in Node tests); createImpactPass builds the pass.
 
+import { LOOK } from './look.js';
+
 // proposta 17/10: peak values (subtle by design) and decay.
+
 export const IMPACT_MAX_ABERRATION_PX = 3;
 export const IMPACT_MAX_BLUR = 0.006; // fraction of the distance to centre
 const IMPACT_DECAY_TIME = 0.045; // s, e-folding: under 2 % after 180 ms
@@ -51,8 +54,9 @@ export function lensPull(slowFraction) {
  * scene plus the bloom's half-res result (`tBloom`, × `uBloom`: 1 on frames
  * the bloom ran), the sum UnrealBloomPass's own last draw would have left
  * in the scene target (premultiplied additive: its colour added as it is),
- * tone-mapped with three's ACES at `toneMappingExposure` (the scene draws in
- * linear HDR: three tone-maps only what it draws to the screen).
+ * tone-mapped with the look's curve (look.js) at `toneMappingExposure` (the
+ * scene draws in linear HDR: three tone-maps only what it draws to the
+ * screen).
  * sceneSetup.js foldBloom, toneAtEnd.
  */
 export const SCENE_READ = `
@@ -61,7 +65,7 @@ uniform sampler2D tDiffuse;
 uniform sampler2D tBloom;
 uniform float uBloom;
 vec3 sceneAt(vec2 uv) {
-  return ACESFilmicToneMapping(
+  return ${LOOK.curve}ToneMapping(
     texture2D(tDiffuse, uv).rgb + uBloom * texture2D(tBloom, uv).rgb
   );
 }`;
